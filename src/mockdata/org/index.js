@@ -7,6 +7,12 @@ export {
   setStoreStatus,
 } from "./stores";
 export {
+  getRoles,
+  getRoleNames,
+  saveRole,
+  deleteRole,
+} from "./roles";
+export {
   USER_ROLES,
   USER_STATUSES,
   getUsers,

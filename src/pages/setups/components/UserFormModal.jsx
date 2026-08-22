@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { toast } from "../../../components/common/ToastNotification";
-import { saveUser, USER_ROLES } from "../../../mockdata/org/users";
+import { saveUser } from "../../../mockdata/org/users";
+import { getRoleNames } from "../../../mockdata/org/roles";
 import { getStoreLocationOptions } from "../../../mockdata/org/stores";
 import CatalogFormModal from "./CatalogFormModal";
 
@@ -20,7 +21,7 @@ export default function UserFormModal({
   onSaved,
   editing = null,
   title,
-  subtitle = "Super Admin, Store Manager, or Staff. Store managers and staff must be assigned to a store.",
+  subtitle = "Assign a role from Roles & Permissions. Store managers and staff must be assigned to a store.",
   saveLabel,
 }) {
   const storeOptions = getStoreLocationOptions().map((label) => ({ value: label, label }));
@@ -35,7 +36,7 @@ export default function UserFormModal({
         label: "Role",
         type: "select",
         required: true,
-        options: USER_ROLES.map((role) => ({ value: role, label: role })),
+        options: getRoleNames().map((role) => ({ value: role, label: role })),
       },
       {
         key: "store",
@@ -55,7 +56,7 @@ export default function UserFormModal({
         description: "Inactive users cannot sign in or be assigned as a receiver or dispatcher.",
       },
     ],
-    [storeOptions],
+    [storeOptions, isOpen],
   );
 
   const handleSave = (form) => {

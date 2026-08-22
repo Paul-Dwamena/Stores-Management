@@ -1,7 +1,8 @@
 import React from "react";
-import { Building2, Users, Warehouse } from "lucide-react";
+import { Building2, Shield, Users, Warehouse } from "lucide-react";
 import TabbedPageHub from "../../components/common/TabbedPageHub";
 import UsersList from "./UsersList";
+import RolesPermissionsList from "./RolesPermissionsList";
 import StoreManagementList from "./StoreManagementList";
 import SuppliersList from "./SuppliersList";
 
@@ -9,15 +10,22 @@ export default function SetupsHub() {
   return (
     <TabbedPageHub
       title="Setups"
-      description="User management, stores, and suppliers used across inventory, supplies, and transfers."
+      description="Users, roles, stores, and suppliers used across inventory, supplies, and transfers."
       defaultTab="users"
       tabs={[
         {
           id: "users",
           label: "User Management",
           icon: Users,
-          description: "Invite and manage Super Admins, Store Managers, and Staff. Assign each person to a store. These users appear when selecting a receiver or dispatcher.",
+          description: "Invite and manage people who work in stores. Assign each person a role and store.",
           element: <UsersList />,
+        },
+        {
+          id: "roles",
+          label: "Roles & Permissions",
+          icon: Shield,
+          description: "Define roles and what they can view, add, edit, delete, or print across store modules.",
+          element: <RolesPermissionsList />,
         },
         {
           id: "stores",

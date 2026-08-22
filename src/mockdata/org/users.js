@@ -1,4 +1,6 @@
-/** Dashboard users — Super Admin, Store Manager, Staff. */
+/** Dashboard users — Super Admin, Store Manager, Staff, plus custom roles. */
+
+import { getRoleNames } from "./roles";
 
 export const USER_ROLES = ["Super Admin", "Store Manager", "Staff"];
 export const USER_STATUSES = ["Active", "Inactive"];
@@ -247,7 +249,7 @@ export function saveUser(payload, { id } = {}) {
   if (!email) throw new Error("Enter an email address.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
   if (!phone) throw new Error("Enter a phone number.");
-  if (!USER_ROLES.includes(role)) throw new Error("Select a role.");
+  if (!getRoleNames().includes(role)) throw new Error("Select a role.");
   if (role !== "Super Admin" && !store) throw new Error("Assign a store.");
 
   const duplicate = sessionUsers.some(

@@ -9,10 +9,10 @@ import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
 import {
-  SEED_SUPPLIERS,
-  STORE_LOCATION_OPTIONS,
   formatAccessoryMoney,
+  getStoreLocationOptions,
 } from "../../../../mockdata/stores";
+import { getActiveSuppliers, getSupplierContact } from "../../../../mockdata/org";
 import {
   SUBMIT_STORE_RECEIPT_FORM_FIELD_CATALOG,
   SUBMIT_STORE_RECEIPT_FORM_SETUP_CHANGED_EVENT,
@@ -70,13 +70,17 @@ export default function ReceiveIntoStoreModal({
   }, [isOpen, item?.id]);
 
   const setField = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) =>
+      key === "supplierId" ? { ...prev, supplierId: value, ...getSupplierContact(value) } : { ...prev, [key]: value },
+    );
     setErrors((prev) => {
       if (!prev[key] && !["supplierPhone", "supplierEmail"].includes(key)) return prev;
       const next = { ...prev };
       delete next[key];
-      if (key === "supplierPhone" || key === "supplierEmail") {
+      if (key === "supplierPhone" || key === "supplierEmail" || key === "supplierId") {
         delete next.supplierContact;
+        delete next.supplierPhone;
+        delete next.supplierEmail;
       }
       return next;
     });
@@ -189,7 +193,7 @@ export default function ReceiveIntoStoreModal({
                     className={fieldClassName}
                   >
                     <option value="">Select location</option>
-                    {STORE_LOCATION_OPTIONS.map((option) => (
+                    {getStoreLocationOptions().map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
@@ -212,7 +216,7 @@ export default function ReceiveIntoStoreModal({
                     className={cn(fieldClassName, errors.supplierId && "border-rose-500 bg-rose-50")}
                   >
                     <option value="">Select supplier</option>
-                    {SEED_SUPPLIERS.map((supplier) => (
+                    {getActiveSuppliers().map((supplier) => (
                       <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                     ))}
                   </select>
@@ -264,6 +268,7 @@ export default function ReceiveIntoStoreModal({
                 </div>
               );
             }
+            const isSupplierContact = field.key === "supplierPhone" || field.key === "supplierEmail";
             const type = field.key === "quantity" || field.key === "unitCost" ? "number" : field.key === "supplierEmail" ? "email" : field.key === "supplierPhone" ? "tel" : "text";
             return (
               <div key={field.id}>
@@ -271,8 +276,14 @@ export default function ReceiveIntoStoreModal({
                   label={field.title}
                   type={type}
                   value={form[field.key] ?? ""}
-                  onChange={(e) => setField(field.key, e.target.value)}
-                  placeholder={field.placeholder}
+                  onChange={isSupplierContact ? undefined : (e) => setField(field.key, e.target.value)}
+                  readOnly={isSupplierContact}
+                  placeholder={
+                    isSupplierContact
+                      ? (form.supplierId ? "—" : "Select a supplier")
+                      : field.placeholder
+                  }
+                  className={isSupplierContact ? "bg-slate-100 cursor-not-allowed focus:bg-slate-100" : undefined}
                   error={errors[field.key] || (field.key === "supplierPhone" ? errors.supplierContact : undefined)}
                 />
               </div>

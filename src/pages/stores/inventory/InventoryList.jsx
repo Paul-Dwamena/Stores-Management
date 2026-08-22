@@ -19,6 +19,7 @@ import {
   VEHICLE_PART_STATUS_OPTIONS,
   addAccessory,
   addAccessoriesBatch,
+  updateAccessoryDetails,
   addVehiclePart,
   addVehiclePartsBatch,
   formatAccessoryMoney,
@@ -36,6 +37,7 @@ import {
   AccessoryDetailModal,
   NewInventoryItemModal,
 } from "./components";
+import { ItemPhotoThumb } from "./components/ItemPhotoField";
 
 const PAGE_SIZE = 10;
 
@@ -178,7 +180,8 @@ export default function InventoryList({
         item.itemCode.toLowerCase().includes(q) ||
         item.name.toLowerCase().includes(q) ||
         item.brand.toLowerCase().includes(q) ||
-        (item.description || "").toLowerCase().includes(q)
+        (item.description || "").toLowerCase().includes(q) ||
+        (item.shelfPosition || "").toLowerCase().includes(q)
       );
     });
   }, [items, searchQuery, statusFilter, dateFrom, dateTo, isVehicleParts]);
@@ -243,6 +246,19 @@ export default function InventoryList({
       setPage(0);
     } catch (error) {
       toast.error(error.message ?? "Could not add inventory item.");
+    }
+  };
+
+  const handleUpdateDetails = (payload) => {
+    if (!selected) return;
+    try {
+      const updated = updateAccessoryDetails(selected.id, payload);
+      setAccessoryItems(getAccessories());
+      setSelected(updated);
+      toast.success("Item details updated.");
+    } catch (error) {
+      toast.error(error.message ?? "Could not update item.");
+      throw error;
     }
   };
 
@@ -394,6 +410,9 @@ export default function InventoryList({
             <table className="w-full text-left min-w-[1100px]">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
+                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
+                    Photo
+                  </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                     Item code
                   </th>
@@ -416,6 +435,9 @@ export default function InventoryList({
                     Quantity
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                    Shelf location
+                  </th>
+                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">
@@ -426,13 +448,16 @@ export default function InventoryList({
               <tbody className="divide-y divide-slate-50">
                 {pagedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-[13px] text-slate-400">
+                    <td colSpan={11} className="px-6 py-12 text-center text-[13px] text-slate-400">
                       No vehicle parts found.
                     </td>
                   </tr>
                 ) : (
                   pagedRows.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50">
+                      <td className="px-6 py-3.5">
+                        <ItemPhotoThumb src={row.photo} name={row.name} />
+                      </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
                         {row.itemCode}
                       </td>
@@ -447,6 +472,9 @@ export default function InventoryList({
                       </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
                         {row.quantity}
+                      </td>
+                      <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
+                        {row.shelfPosition || "—"}
                       </td>
                       <td className="px-6 py-3.5">
                         <span
@@ -469,9 +497,12 @@ export default function InventoryList({
               </tbody>
             </table>
           ) : (
-            <table className="w-full text-left min-w-[960px]">
+            <table className="w-full text-left min-w-[1040px]">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
+                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
+                    Photo
+                  </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                     Item code
                   </th>
@@ -488,6 +519,9 @@ export default function InventoryList({
                     Quantity
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                    Shelf location
+                  </th>
+                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                     Total purchase cost
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
@@ -501,13 +535,16 @@ export default function InventoryList({
               <tbody className="divide-y divide-slate-50">
                 {pagedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-[13px] text-slate-400">
+                    <td colSpan={10} className="px-6 py-12 text-center text-[13px] text-slate-400">
                       No accessories found.
                     </td>
                   </tr>
                 ) : (
                   pagedRows.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50/50">
+                      <td className="px-6 py-3.5">
+                        <ItemPhotoThumb src={row.photo} name={row.name} />
+                      </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
                         {row.itemCode}
                       </td>
@@ -520,6 +557,9 @@ export default function InventoryList({
                       </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
                         {row.quantity}
+                      </td>
+                      <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
+                        {row.shelfPosition || "—"}
                       </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800 whitespace-nowrap">
                         {formatAccessoryMoney(row.totalPurchaseCost)}
@@ -565,6 +605,7 @@ export default function InventoryList({
         variant={isVehicleParts ? "vehicle_part" : "accessory"}
         onReceiveStock={handleReceiveStock}
         onApproveSupply={handleApproveSupply}
+        onUpdateDetails={handleUpdateDetails}
       />
 
       <NewInventoryItemModal

@@ -1,7 +1,9 @@
 /** Inter-store transfer requests between store locations. */
 
+import { getUserContact } from "../org/users";
+import { getReceiverByName } from "./receivers";
 import { getAccessories, getInventoryStockByLocation } from "./accessories";
-import { STORE_LOCATION_OPTIONS } from "./requisitions";
+import { getStoreLocationOptions } from "../org/stores";
 import { getVehicleParts } from "./vehiclePartsInventory";
 
 export const INTER_STORE_TRANSFER_STATUS_OPTIONS = [
@@ -44,7 +46,8 @@ export function formatInterStoreItemDescription(item, itemType) {
 export function mapInventoryLocationToStore(location) {
   const value = String(location || "").trim();
   if (!value) return "";
-  if (STORE_LOCATION_OPTIONS.includes(value)) return value;
+  const options = getStoreLocationOptions();
+  if (options.includes(value)) return value;
   const lower = value.toLowerCase();
   if (lower.includes("takoradi") || lower.includes("effia")) {
     return "Takoradi Regional Store — Effia";
@@ -73,11 +76,11 @@ export function getInterStoreFromStoreOptions() {
       if (store) withStock.add(store);
     });
   });
-  return STORE_LOCATION_OPTIONS.filter((store) => withStock.has(store));
+  return getStoreLocationOptions().filter((store) => withStock.has(store));
 }
 
 export function getInterStoreStockLocations() {
-  return [...STORE_LOCATION_OPTIONS];
+  return getStoreLocationOptions();
 }
 
 export function getInterStoreItemsInStore(fromStore) {
@@ -153,6 +156,7 @@ const SEED_TRANSFERS = [
     toStore: "Tema Fleet Store — Community 12",
     requestedBy: "Kwesi Mensah",
     approvedBy: "Kojo Asante",
+    dispatcher: "Selorm Gbeho",
     status: "PENDING",
     createdAt: "2026-08-10T09:20:00.000Z",
     approvedAt: "2026-08-11T08:05:00.000Z",
@@ -200,7 +204,7 @@ const SEED_TRANSFERS = [
     requestedBy: "Ama Serwaa",
     approvedBy: "Nii Quaye",
     dispatchedBy: "Ama Serwaa",
-    dispatcher: "Kofi Ansah",
+    dispatcher: "Selorm Gbeho",
     status: "IN_TRANSIT",
     createdAt: "2026-08-08T14:10:00.000Z",
     approvedAt: "2026-08-08T16:40:00.000Z",
@@ -291,6 +295,7 @@ const SEED_TRANSFERS = [
     fromStore: "Tema Fleet Store — Community 12",
     toStore: "Accra Central Store — Ringway Estates",
     requestedBy: "Kudjo Alorwu",
+    dispatcher: "Kofi Ansah",
     status: "PENDING_APPROVAL",
     createdAt: "2026-08-15T10:05:00.000Z",
     notes: "Need extra jump starters for Accra roadside team.",
@@ -388,6 +393,7 @@ const SEED_TRANSFERS = [
     toStore: "Accra Central Store — Ringway Estates",
     requestedBy: "Ruth Ofori",
     rejectedBy: "Kwesi Mensah",
+    dispatcher: "Kwame Frimpong",
     status: "REJECTED",
     createdAt: "2026-08-02T09:00:00.000Z",
     rejectedAt: "2026-08-02T14:20:00.000Z",
@@ -423,6 +429,7 @@ const SEED_TRANSFERS = [
     toStore: "Accra Central Store — Ringway Estates",
     requestedBy: "Yaw Mensah",
     cancelledBy: "Yaw Mensah",
+    dispatcher: "Akosua Dede",
     status: "CANCELLED",
     createdAt: "2026-08-01T11:40:00.000Z",
     cancelledAt: "2026-08-01T16:10:00.000Z",
@@ -458,6 +465,7 @@ const SEED_TRANSFERS = [
     toStore: "Tema Fleet Store — Community 12",
     requestedBy: "Michael Addo",
     approvedBy: "Nii Quaye",
+    dispatcher: "Efua Darko",
     status: "PENDING",
     createdAt: "2026-08-12T08:40:00.000Z",
     approvedAt: "2026-08-12T15:20:00.000Z",
@@ -504,6 +512,7 @@ const SEED_TRANSFERS = [
     toStore: "Takoradi Regional Store — Effia",
     requestedBy: "Selorm Gbeho",
     rejectedBy: "Kwesi Mensah",
+    dispatcher: "Esi Nyarko",
     status: "REJECTED",
     createdAt: "2026-07-18T16:25:00.000Z",
     rejectedAt: "2026-07-19T09:10:00.000Z",
@@ -588,6 +597,7 @@ const SEED_TRANSFERS = [
     fromStore: "Tema Fleet Store — Community 12",
     toStore: "Kumasi Regional Store — Asokwa",
     requestedBy: "Kwesi Mensah",
+    dispatcher: "Kofi Ansah",
     status: "PENDING_APPROVAL",
     createdAt: "2026-08-16T09:15:00.000Z",
     notes: "Kumasi depot needs brake and tyre cover for Hilux pool.",
@@ -728,6 +738,7 @@ const SEED_TRANSFERS = [
     toStore: "Tamale Regional Store — Industrial Area",
     requestedBy: "Esi Nyarko",
     cancelledBy: "Esi Nyarko",
+    dispatcher: "Nana Osei",
     status: "CANCELLED",
     createdAt: "2026-08-03T13:20:00.000Z",
     cancelledAt: "2026-08-03T17:00:00.000Z",
@@ -810,6 +821,29 @@ function normalizeLine(line = {}, fallback = {}) {
   };
 }
 
+function resolveDispatcherContact(name) {
+  const receiver = getReceiverByName(name);
+  if (receiver) {
+    return {
+      name: receiver.name,
+      email: receiver.email || "",
+      phone: receiver.phone || "",
+      store: receiver.store || "",
+    };
+  }
+  return getUserContact(name);
+}
+
+function withDispatcherFields(row) {
+  const contact = resolveDispatcherContact(row?.dispatcher);
+  return {
+    dispatcher: contact.name,
+    dispatcherEmail: contact.email,
+    dispatcherPhone: contact.phone,
+    dispatcherStore: contact.store,
+  };
+}
+
 function normalizeTransfer(row) {
   if (!row) return null;
   const lines = Array.isArray(row.lines) && row.lines.length
@@ -824,6 +858,7 @@ function normalizeTransfer(row) {
   const toStores = [...new Set(lines.map((line) => line.toStore).filter(Boolean))];
   return {
     ...row,
+    ...withDispatcherFields(row),
     lines,
     quantity,
     toStore: toStores.length === 1 ? toStores[0] : row.toStore,
@@ -923,6 +958,8 @@ export function createInterStoreTransfer(payload = {}) {
   const now = new Date().toISOString();
   const requestedBy = payload.requestedBy?.trim() || INTER_STORE_TRANSFER_ACTOR;
   const notes = payload.notes?.trim() || "";
+  const dispatcher = payload.dispatcher?.trim() || "";
+  const dispatcherContact = resolveDispatcherContact(dispatcher);
   const created = {
     id: createUniqueId(kind === "vehicle_parts" ? "ist-vp" : kind === "mixed" ? "ist" : "ist-acc"),
     transferNumber: nextTransferNumber(kind),
@@ -935,6 +972,10 @@ export function createInterStoreTransfer(payload = {}) {
     toStore: toStores.length === 1 ? toStores[0] : toStores.join(" · "),
     lines,
     requestedBy,
+    dispatcher: dispatcherContact.name,
+    dispatcherEmail: dispatcherContact.email,
+    dispatcherPhone: dispatcherContact.phone,
+    dispatcherStore: dispatcherContact.store,
     status: "PENDING_APPROVAL",
     createdAt: now,
     notes,
@@ -1005,7 +1046,8 @@ export function dispatchInterStoreTransfer(id, payload = {}) {
   }
   const now = new Date().toISOString();
   const by = payload.by?.trim() || INTER_STORE_TRANSFER_ACTOR;
-  const dispatcher = payload.dispatcher?.trim() || "";
+  const dispatcher = payload.dispatcher?.trim() || row.dispatcher || "";
+  const dispatcherContact = resolveDispatcherContact(dispatcher);
   const note = String(payload.note || "").trim();
   return replaceTransfer(
     appendHistory(
@@ -1014,7 +1056,10 @@ export function dispatchInterStoreTransfer(id, payload = {}) {
         status: "IN_TRANSIT",
         dispatchedAt: now,
         dispatchedBy: by,
-        dispatcher,
+        dispatcher: dispatcherContact.name,
+        dispatcherEmail: dispatcherContact.email,
+        dispatcherPhone: dispatcherContact.phone,
+        dispatcherStore: dispatcherContact.store,
       },
       "dispatched",
       by,

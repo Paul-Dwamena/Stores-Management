@@ -29,6 +29,7 @@ export default function ConfiguredSearchSelectField({
   onChange,
   spanClass,
   required = false,
+  action = null,
 }) {
   const formKey = field.formKey || field.key;
   const value = values[formKey] ?? "";
@@ -63,7 +64,7 @@ export default function ConfiguredSearchSelectField({
           `${option.label} ${option.value}`.toLowerCase().includes(q),
         )
       : options;
-    return list.slice(0, 25);
+    return list.slice(0, 80);
   }, [options, query]);
 
   useEffect(() => {
@@ -123,15 +124,18 @@ export default function ConfiguredSearchSelectField({
 
   return (
     <div className={cn("space-y-1.5", spanClass)}>
-      <label
-        htmlFor={id}
-        className={cn(
-          "text-[10px] font-bold uppercase tracking-wider",
-          error ? "text-red-500" : "text-slate-500",
-        )}
-      >
-        {label}
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <label
+          htmlFor={id}
+          className={cn(
+            "text-[10px] font-bold uppercase tracking-wider",
+            error ? "text-red-500" : "text-slate-500",
+          )}
+        >
+          {label}
+        </label>
+        {action}
+      </div>
       {field.description?.trim() ? (
         <p className="text-[11px] text-slate-500 leading-snug">{field.description.trim()}</p>
       ) : null}

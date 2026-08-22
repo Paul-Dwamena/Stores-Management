@@ -84,15 +84,9 @@ export default function BatchApprovalRequestActionModal({
   const requestApproval = () => {
     const nextErrors = {};
     if (visibleItems.length === 0) nextErrors.items = "Keep at least one request, or close this window.";
-    visibleItems.forEach((row) => {
-      const form = rowForms[row.id] || {};
-      if (!form.approvalComment?.trim()) {
-        nextErrors[row.id] = { approvalComment: "Add an approval comment." };
-      }
-    });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
-      toast.warning(nextErrors.items || "Add approval comments for each selected request.");
+      toast.warning(nextErrors.items || "Keep at least one request, or close this window.");
       return;
     }
     setConfirmOpen(true);

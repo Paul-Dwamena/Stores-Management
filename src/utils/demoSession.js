@@ -16,9 +16,12 @@ export const isDemoSession = () => {
 export const buildDemoStoreSession = (email) => ({
   _id: "demo-store-admin",
   id: "demo-store-admin",
+  firstName: "Store",
+  lastName: "Administrator",
   name: "Store Administrator",
   email: email?.trim() || "admin@stores.local",
-  role: "admin",
+  phone: "024 000 0001",
+  role: "Super Admin",
   token: DEMO_TOKEN,
 });
 
@@ -35,6 +38,10 @@ export const normalizeStoreLoginResponse = (data, email) => {
         user.name ??
         user.fullName ??
         ([user.firstName, user.lastName].filter(Boolean).join(" ") || "Store Administrator"),
+      firstName: user.firstName ?? (user.name || user.fullName || "Store").split(/\s+/)[0],
+      lastName: user.lastName ?? (
+        (user.name || user.fullName || "Administrator").split(/\s+/).slice(1).join(" ") || "Administrator"
+      ),
       role: user.role ?? "admin",
       token: data.token,
     };

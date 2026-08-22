@@ -12,9 +12,11 @@ import {
   formatAccessoryStatus,
   getInventoryAverageUnitCost,
   getInventoryStockByLocation,
-  SEED_SUPPLIERS,
 } from "../../../../mockdata/stores";
+import { getSuppliers } from "../../../../mockdata/org";
 import ReceiveIntoStoreModal from "./ReceiveIntoStoreModal";
+import EditInventoryItemModal from "./EditInventoryItemModal";
+import { ItemPhotoThumb } from "./ItemPhotoField";
 
 function StatusPill({ status }) {
   const raw = (status ?? "").toString().toUpperCase();
@@ -373,7 +375,7 @@ function formatDetailLabel(key) {
 function formatDetailValue(key, value) {
   if (value == null || value === "") return "—";
   if (key === "supplierId") {
-    return SEED_SUPPLIERS.find((supplier) => supplier.id === value)?.name || value;
+    return getSuppliers().find((supplier) => supplier.id === value)?.name || value;
   }
   if (key === "condition") return formatCondition(value);
   if (["unitCost", "averageUnitCost", "totalPurchaseCost"].includes(key)) {
@@ -472,6 +474,7 @@ export default function AccessoryDetailModal({
   variant = "accessory",
   onReceiveStock,
   onApproveSupply,
+  onUpdateDetails,
 }) {
   const [openSections, setOpenSections] = useState({
     information: true,
@@ -479,6 +482,7 @@ export default function AccessoryDetailModal({
     supplies: true,
   });
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState(null);
   const [pendingApprove, setPendingApprove] = useState(null);
 
@@ -489,11 +493,13 @@ export default function AccessoryDetailModal({
       document.body.style.overflow = "hidden";
       setOpenSections({ information: true, collectives: true, supplies: true });
       setReceiveOpen(false);
+      setEditOpen(false);
       setSelectedMovement(null);
       setPendingApprove(null);
     } else {
       document.body.style.overflow = "";
       setReceiveOpen(false);
+      setEditOpen(false);
       setSelectedMovement(null);
       setPendingApprove(null);
     }
@@ -584,6 +590,9 @@ export default function AccessoryDetailModal({
               </Button>
             }
           >
+            <DetailRow label="Photo">
+              <ItemPhotoThumb src={item.photo} name={item.name} className="h-16 w-16" />
+            </DetailRow>
             <DetailRow label="Item Code">{item.itemCode}</DetailRow>
             {isVehiclePart ? (
               <>
@@ -602,6 +611,7 @@ export default function AccessoryDetailModal({
               </>
             )}
             <DetailRow label="Description">{item.description || "—"}</DetailRow>
+            <DetailRow label="Shelf location">{item.shelfPosition || "—"}</DetailRow>
             <DetailRow label="Quantity on hand">{item.quantity}</DetailRow>
             <DetailRow label="Average unit cost">
               {formatAccessoryMoney(averageUnitCost)}
@@ -663,10 +673,15 @@ export default function AccessoryDetailModal({
           </AccordionSection>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end rounded-b-2xl">
-          <Button onClick={onClose} variant="ghost" size="modal">
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 rounded-b-2xl">
+          <Button onClick={onClose} variant="ghost" size="modal" className="border border-slate-200">
             Close
           </Button>
+          {onUpdateDetails && !isVehiclePart ? (
+            <Button size="modal" onClick={() => setEditOpen(true)}>
+              Edit
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -675,6 +690,16 @@ export default function AccessoryDetailModal({
         onClose={() => setReceiveOpen(false)}
         item={item}
         onSave={handleReceiveSave}
+      />
+
+      <EditInventoryItemModal
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        item={item}
+        onSave={(payload) => {
+          onUpdateDetails?.(payload);
+          setEditOpen(false);
+        }}
       />
 
       <AddModal

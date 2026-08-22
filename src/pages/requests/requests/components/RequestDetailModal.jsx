@@ -135,10 +135,6 @@ export default function RequestDetailModal({ isOpen, onClose, request }) {
             <DetailRow label="Approval Status">{request.approvalStatus || "—"}</DetailRow>
             <DetailRow label="Payment Status">{request.paymentStatus || "—"}</DetailRow>
             <DetailRow label="Amount">{formatRequestAmount(request.amount)}</DetailRow>
-            <DetailRow label="Cost Center">{request.costCenter || "—"}</DetailRow>
-            <DetailRow label="Budget Line">{request.budgetLine || "—"}</DetailRow>
-            <DetailRow label="Class">{request.requestClass || "—"}</DetailRow>
-            <DetailRow label="Expense Category">{request.expenseCategory || "—"}</DetailRow>
             <DetailRow label="Purpose">{request.purpose || "—"}</DetailRow>
             <DetailRow label="Submitted Date">
               {formatRequestDateTime(request.submittedDate)}

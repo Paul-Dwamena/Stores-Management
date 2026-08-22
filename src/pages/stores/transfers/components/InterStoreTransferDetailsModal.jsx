@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "../../../../components/common/base/Button";
 import RequestDetailsModal, {
   AccordionSection,
@@ -10,6 +10,7 @@ import {
   formatInterStoreTransferHistoryAction,
   formatInterStoreTransferStatus,
 } from "../../../../mockdata/stores";
+import { getUserContact } from "../../../../mockdata/org/users";
 
 export default function InterStoreTransferDetailsModal({
   isOpen,
@@ -22,9 +23,19 @@ export default function InterStoreTransferDetailsModal({
   onCancel,
   onMarkArrived,
 }) {
-  const [openSection, setOpenSection] = useState("summary");
+  const [openSection, setOpenSection] = useState("dispatcher");
+
+  useEffect(() => {
+    if (isOpen) setOpenSection("dispatcher");
+  }, [isOpen, transfer?.id]);
 
   if (!transfer) return null;
+
+  const dispatcher = getUserContact(transfer.dispatcher);
+  const dispatcherName = transfer.dispatcher || dispatcher.name || "—";
+  const dispatcherEmail = transfer.dispatcherEmail || dispatcher.email || "—";
+  const dispatcherPhone = transfer.dispatcherPhone || dispatcher.phone || "—";
+  const dispatcherStore = transfer.dispatcherStore || dispatcher.store || "—";
 
   const status = transfer.status;
   const lines = transfer.lines || [];
@@ -47,7 +58,10 @@ export default function InterStoreTransferDetailsModal({
           <Button variant="danger" size="modal" onClick={onReject}>
             Reject
           </Button>
-          <Button size="modal" onClick={onDispatch}>
+          <Button size="modal" onClick={() => {
+            setOpenSection("dispatcher");
+            onDispatch?.();
+          }}>
             Dispatch
           </Button>
         </>
@@ -86,15 +100,23 @@ export default function InterStoreTransferDetailsModal({
         <DetailRow label="Requested by">{transfer.requestedBy}</DetailRow>
         <DetailRow label="Requested">{formatInterStoreTransferDateTime(transfer.createdAt)}</DetailRow>
         <DetailRow label="Notes">{transfer.notes || "—"}</DetailRow>
-        {transfer.dispatcher ? (
-          <DetailRow label="Dispatched by (person)">{transfer.dispatcher}</DetailRow>
-        ) : null}
         {transfer.rejectionReason ? (
           <DetailRow label="Rejection reason">{transfer.rejectionReason}</DetailRow>
         ) : null}
         {transfer.cancelReason ? (
           <DetailRow label="Cancel reason">{transfer.cancelReason}</DetailRow>
         ) : null}
+      </AccordionSection>
+
+      <AccordionSection
+        title="Dispatcher"
+        open={openSection === "dispatcher"}
+        onToggle={() => toggle("dispatcher")}
+      >
+        <DetailRow label="Person dispatching">{dispatcherName}</DetailRow>
+        <DetailRow label="Email">{dispatcherEmail}</DetailRow>
+        <DetailRow label="Phone">{dispatcherPhone}</DetailRow>
+        <DetailRow label="Home store">{dispatcherStore}</DetailRow>
       </AccordionSection>
 
       <AccordionSection

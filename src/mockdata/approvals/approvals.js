@@ -1,3 +1,5 @@
+import { getRequisitions } from "../stores/requisitions";
+
 function getSpendingRequests() {
   return [];
 }
@@ -279,15 +281,69 @@ export function getApprovalById(id) {
  * Push a submitted request into the pending approval queue.
  * Returns the created approval row (or null if not queued).
  */
+function requestPayloadFromRequisition(requisition) {
+  const qty = requisition.quantityRequested ?? requisition.quantity ?? 0;
+  return {
+    id: `req_from_${requisition.id}`,
+    requestNumber: requisition.requestNumber,
+    requestType: "request_from_stores",
+    amount: 0,
+    costCenter: requisition.storeLocation || "Stores",
+    requestedBy: requisition.requestedBy || "Current User",
+    purpose: requisition.comment || requisition.description || requisition.itemName,
+    expenseCategory: `${requisition.itemName || "Store item"} × ${qty}`,
+    status: "PENDING",
+    submittedDate: requisition.createdAt,
+    createdAt: requisition.createdAt,
+    storesDetails: {
+      requisitionId: requisition.id,
+      requestNumber: requisition.requestNumber,
+      kind: requisition.kind || "accessories",
+      itemName: requisition.itemName,
+      itemCode: requisition.itemCode,
+      quantity: qty,
+      justification: requisition.justification || requisition.comment || requisition.description,
+    },
+  };
+}
+
+function findExistingStoreApproval(request) {
+  const requisitionId = request?.storesDetails?.requisitionId;
+  const storeRequestNumber = request?.storesDetails?.requestNumber;
+  return sessionApprovals.find((row) => {
+    if (request?.id && row.sourceRequestId === request.id) return true;
+    if (requisitionId && row.storesDetails?.requisitionId === requisitionId) return true;
+    if (
+      storeRequestNumber
+      && (
+        row.storesDetails?.requestNumber === storeRequestNumber
+        || row.requestNumber === storeRequestNumber
+      )
+    ) {
+      return true;
+    }
+    return false;
+  }) ?? null;
+}
+
 export function enqueueApprovalFromRequest(request) {
   if (!request) return null;
   const status = (request.status ?? "").toString().toUpperCase();
   if (status !== "PENDING") return null;
 
-  const existing = sessionApprovals.find(
-    (row) => row.sourceRequestId && row.sourceRequestId === request.id,
-  );
-  if (existing) return cloneApproval(existing);
+  const existing = findExistingStoreApproval(request);
+  if (existing) {
+    if (request.storesDetails) {
+      sessionApprovals = sessionApprovals.map((row) =>
+        row.id === existing.id
+          ? { ...row, storesDetails: { ...request.storesDetails } }
+          : row,
+      );
+      const updated = sessionApprovals.find((row) => row.id === existing.id);
+      return cloneApproval(updated);
+    }
+    return cloneApproval(existing);
+  }
 
   const typeMeta =
     REQUEST_TYPE_TO_APPROVAL[request.requestType]
@@ -644,13 +700,20 @@ export function syncApprovalsFromFundingRequests(requests) {
   return getApprovals();
 }
 
-/** Ensure every PENDING request appears in the approval queue. */
+export function syncApprovalsFromSupplyRequisitions() {
+  getRequisitions()
+    .filter((row) => (row.status || "").toString().toUpperCase() === "PENDING_SUPPLY_REQUEST")
+    .forEach((row) => enqueueApprovalFromRequest(requestPayloadFromRequisition(row)));
+}
+
+/** Ensure every PENDING request and pending supply requisition appears in the approval queue. */
 export function syncApprovalsFromRequests(requests = []) {
   syncApprovalsFromSpendingRequests();
   syncApprovalsFromFundingRequests();
   (Array.isArray(requests) ? requests : [])
     .filter((request) => (request?.status ?? "").toString().toUpperCase() === "PENDING")
     .forEach((request) => enqueueApprovalFromRequest(request));
+  syncApprovalsFromSupplyRequisitions();
   return getApprovals();
 }
 

@@ -703,7 +703,10 @@ export function getAddReceiverFormLevelLabel(level) {
 export function leafToAddReceiverField(leaf, sectionId) {
   const rawType = leaf.fieldType || "text";
   const fieldType = rawType === "image" ? "file" : rawType;
-  const options = resolveLeafFieldOptions(leaf);
+  const catalog = ADD_RECEIVER_FORM_FIELD_CATALOG.find((field) => field.id === leaf.id);
+  const options = catalog?.options?.length
+    ? normalizeOptions(catalog.options)
+    : resolveLeafFieldOptions(leaf);
   return {
     id: leaf.id,
     key: leaf.key,

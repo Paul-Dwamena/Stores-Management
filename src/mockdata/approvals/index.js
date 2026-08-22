@@ -5,6 +5,7 @@ export {
   formatApprovalAmount,
   getApprovals,
   enqueueApprovalFromRequest,
+  syncApprovalsFromSupplyRequisitions,
   syncApprovalsFromRequests,
   decideApproval,
 } from "./approvals";

@@ -7,7 +7,6 @@ import {
   ShowConfiguredField,
 } from "../../../../components/common/ConfiguredFormSections";
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
-import { toast } from "../../../../components/common/ToastNotification";
 import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
 import {
   APPROVE_SUPPLY_REQUEST_FORM_FIELD_CATALOG,
@@ -63,15 +62,7 @@ export default function ApprovalRequestActionModal({
   }, [isOpen, requisition]);
 
   const handleSubmit = () => {
-    const nextErrors = {};
-    if (visibleKeys.has("approvalComment") && !approvalComment.trim()) {
-      nextErrors.approvalComment = "Add an approval comment.";
-    }
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) {
-      toast.warning("Add an approval comment before approving.");
-      return;
-    }
+    setErrors({});
     setPendingPayload({ approvalComment: approvalComment.trim() });
     setConfirmOpen(true);
   };
@@ -112,7 +103,7 @@ export default function ApprovalRequestActionModal({
           {visibleKeys.has("approvalComment") ? (
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-              {requiredFieldLabel("Approval comment", true)}
+              {requiredFieldLabel("Approval comment", false)}
             </label>
             <textarea
               value={approvalComment}

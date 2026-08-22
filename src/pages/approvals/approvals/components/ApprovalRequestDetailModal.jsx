@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, Store, XCircle } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import RequestDetailsModal, {
   AccordionSection,
@@ -8,6 +8,8 @@ import RequestDetailsModal, {
   StatusPill,
 } from "../../../../components/common/details/RequestDetailsModal";
 import { formatApprovalAmount } from "../../../../mockdata/approvals";
+import { getRequisitionByRef } from "../../../../mockdata/stores";
+import RequisitionRequestSummary from "../../../stores/supplies/components/RequisitionRequestSummary";
 
 function ApproverRow({ approver }) {
   return (
@@ -28,12 +30,41 @@ function ApproverRow({ approver }) {
   );
 }
 
+function isStoreSupplyRequest(request) {
+  return Boolean(request?.storesDetails && !request.storesDetails.transferId);
+}
+
+function SupplyRequestDetails({ request }) {
+  const details = request.storesDetails || {};
+  const requisition = getRequisitionByRef(details.requisitionId || details.requestNumber);
+  const [open, setOpen] = useState(true);
+
+  if (requisition) {
+    return <RequisitionRequestSummary requisition={requisition} title="Supply request details" />;
+  }
+
+  return (
+    <AccordionSection title="Supply request details" open={open} onToggle={() => setOpen((current) => !current)}>
+      <DetailRow label="Request #">{details.requestNumber || request.requestNumber}</DetailRow>
+      <DetailRow label="Item">{details.itemName || "—"}</DetailRow>
+      <DetailRow label="Item code">{details.itemCode || "—"}</DetailRow>
+      <DetailRow label="Quantity">{details.quantity ?? "—"}</DetailRow>
+      <DetailRow label="Requester">{request.requester || "—"}</DetailRow>
+      <DetailRow label="Purpose">{request.purpose || details.justification || "—"}</DetailRow>
+      <DetailRow label="Status">
+        <StatusPill status={request.status} />
+      </DetailRow>
+    </AccordionSection>
+  );
+}
+
 export default function ApprovalRequestDetailModal({
   isOpen,
   onClose,
   request,
   onApprove,
   onReject,
+  onApproveFromStores,
 }) {
   const [openSections, setOpenSections] = useState({
     documents: true,
@@ -45,6 +76,7 @@ export default function ApprovalRequestDetailModal({
   if (!isOpen || !request) return null;
 
   const isPending = request.queue === "pending";
+  const isStoreRequest = isStoreSupplyRequest(request);
   const toggle = (key) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -54,14 +86,29 @@ export default function ApprovalRequestDetailModal({
       onClose={onClose}
       title="Request Details"
       subtitle={
-        isPending
-          ? "Review the request details, then approve or reject."
-          : "Complete information about the request."
+        isStoreRequest
+          ? isPending
+            ? "Review the supply request, then continue from Stores."
+            : "Supply request details."
+          : isPending
+            ? "Review the request details, then approve or reject."
+            : "Complete information about the request."
       }
       status={request.status}
       identifier={request.requestNumber}
       footerRight={
-        isPending ? (
+        isPending && isStoreRequest ? (
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Button onClick={() => onReject?.(request)} variant="danger" size="modal">
+              <XCircle size={16} />
+              Reject
+            </Button>
+            <Button onClick={() => onApproveFromStores?.(request)} variant="primary" size="modal">
+              <Store size={16} />
+              Approve from Stores
+            </Button>
+          </div>
+        ) : isPending ? (
           <div className="flex flex-wrap gap-2 sm:justify-end">
             <Button onClick={() => onReject?.(request)} variant="danger" size="modal">
               <XCircle size={16} />
@@ -75,116 +122,118 @@ export default function ApprovalRequestDetailModal({
         ) : null
       }
     >
-      <AccordionSection
-        title="Supporting Documents"
-        open={openSections.documents}
-        onToggle={() => toggle("documents")}
-      >
-        {request.spendingDetails ? null : (
-          <>
-            <DetailRow label="Receipt Number">
-              {request.supportingDocuments?.receiptNumber || "—"}
-            </DetailRow>
-            <DetailRow label="Receipt Date Of Purchase">
-              {request.supportingDocuments?.purchaseDate || "—"}
-            </DetailRow>
-          </>
-        )}
-        {request.spendingDetails?.attachments
-        && Object.keys(request.spendingDetails.attachments).length > 0 ? (
-          Object.entries(request.spendingDetails.attachments).map(([key, value]) => (
-            <FileAttachmentRow key={key} label={key.replaceAll("_", " ")} fileName={value} />
-          ))
-        ) : (
-          <FileAttachmentRow
-            label="File Attachment"
-            fileName={request.supportingDocuments?.fileName}
-          />
-        )}
-      </AccordionSection>
-
-      <AccordionSection
-        title="Payment Details"
-        open={openSections.payment}
-        onToggle={() => toggle("payment")}
-      >
-        {request.paymentDetails ? (
-          <>
-            <DetailRow label="Payment Reference">
-              {request.paymentDetails.paymentReference}
-            </DetailRow>
-            <DetailRow label="Transaction ID">{request.paymentDetails.transactionId}</DetailRow>
-            <DetailRow label="Payment Status">
-              <StatusPill status={request.paymentDetails.paymentStatus} />
-            </DetailRow>
-            <DetailRow label="Payment Message">{request.paymentDetails.paymentMessage}</DetailRow>
-            <DetailRow label="Initiated At">{request.paymentDetails.initiatedAt}</DetailRow>
-            <DetailRow label="Completed At">{request.paymentDetails.completedAt}</DetailRow>
-          </>
-        ) : (
-          <p className="text-[13px] text-slate-400">No payment has been initiated for this request.</p>
-        )}
-      </AccordionSection>
-
-      <AccordionSection
-        title="Request Information"
-        open={openSections.information}
-        onToggle={() => toggle("information")}
-      >
-        <DetailRow label="Request Number">{request.requestNumber}</DetailRow>
-        <DetailRow label="Request Type">{request.requestType}</DetailRow>
-        <DetailRow label="Status">
-          <StatusPill status={request.status} />
-        </DetailRow>
-        <DetailRow label="Amount">{formatApprovalAmount(request.amount)}</DetailRow>
-        <DetailRow label="Requester">{request.requester}</DetailRow>
-        <DetailRow label="Cost Center">{request.costCenter}</DetailRow>
-        <DetailRow label="Purpose">{request.purpose || "—"}</DetailRow>
-        {request.spendingDetails ? (
-          <>
-            <DetailRow label="Expense Category">
-              {request.spendingDetails.expenseCategory || "—"}
-            </DetailRow>
-            <DetailRow label="Funding Request">
-              {request.spendingDetails.fundingRequest || "—"}
-            </DetailRow>
-            <DetailRow label="Payee">{request.spendingDetails.payee || "—"}</DetailRow>
-            <DetailRow label="Payee Account">
-              {request.spendingDetails.payeeAccount || "—"}
-            </DetailRow>
-          </>
-        ) : null}
-        {request.storesDetails ? (
-          <>
-            <DetailRow label="Item">{request.storesDetails.itemName || "—"}</DetailRow>
-            <DetailRow label="Item code">{request.storesDetails.itemCode || "—"}</DetailRow>
-            <DetailRow label="Quantity">{request.storesDetails.quantity ?? "—"}</DetailRow>
-            {request.storesDetails.fromStore ? (
-              <DetailRow label="From store">{request.storesDetails.fromStore}</DetailRow>
-            ) : null}
-            {request.storesDetails.toStore ? (
-              <DetailRow label="To store">{request.storesDetails.toStore}</DetailRow>
-            ) : null}
-          </>
-        ) : null}
-      </AccordionSection>
-
-      <AccordionSection
-        title="Approval History"
-        open={openSections.history}
-        onToggle={() => toggle("history")}
-      >
-        <div className="space-y-2">
-          {(request.approvalHistory || []).flatMap((entry, index) =>
-            (entry.approvers || []).map((approver) => (
-              <ApproverRow
-                key={`${entry.status || "decision"}-${approver.name}-${index}`}
-                approver={approver}
+      {isStoreRequest ? (
+        <SupplyRequestDetails request={request} />
+      ) : (
+        <>
+          <AccordionSection
+            title="Supporting Documents"
+            open={openSections.documents}
+            onToggle={() => toggle("documents")}
+          >
+            {request.spendingDetails ? null : (
+              <>
+                <DetailRow label="Receipt Number">
+                  {request.supportingDocuments?.receiptNumber || "—"}
+                </DetailRow>
+                <DetailRow label="Receipt Date Of Purchase">
+                  {request.supportingDocuments?.purchaseDate || "—"}
+                </DetailRow>
+              </>
+            )}
+            {request.spendingDetails?.attachments
+            && Object.keys(request.spendingDetails.attachments).length > 0 ? (
+              Object.entries(request.spendingDetails.attachments).map(([key, value]) => (
+                <FileAttachmentRow key={key} label={key.replaceAll("_", " ")} fileName={value} />
+              ))
+            ) : (
+              <FileAttachmentRow
+                label="File Attachment"
+                fileName={request.supportingDocuments?.fileName}
               />
-            )),
-          )}
-        </div>
-      </AccordionSection>
+            )}
+          </AccordionSection>
+
+          <AccordionSection
+            title="Payment Details"
+            open={openSections.payment}
+            onToggle={() => toggle("payment")}
+          >
+            {request.paymentDetails ? (
+              <>
+                <DetailRow label="Payment Reference">
+                  {request.paymentDetails.paymentReference}
+                </DetailRow>
+                <DetailRow label="Transaction ID">{request.paymentDetails.transactionId}</DetailRow>
+                <DetailRow label="Payment Status">
+                  <StatusPill status={request.paymentDetails.paymentStatus} />
+                </DetailRow>
+                <DetailRow label="Payment Message">{request.paymentDetails.paymentMessage}</DetailRow>
+                <DetailRow label="Initiated At">{request.paymentDetails.initiatedAt}</DetailRow>
+                <DetailRow label="Completed At">{request.paymentDetails.completedAt}</DetailRow>
+              </>
+            ) : (
+              <p className="text-[13px] text-slate-400">No payment has been initiated for this request.</p>
+            )}
+          </AccordionSection>
+
+          <AccordionSection
+            title="Request Information"
+            open={openSections.information}
+            onToggle={() => toggle("information")}
+          >
+            <DetailRow label="Request Number">{request.requestNumber}</DetailRow>
+            <DetailRow label="Request Type">{request.requestType}</DetailRow>
+            <DetailRow label="Status">
+              <StatusPill status={request.status} />
+            </DetailRow>
+            <DetailRow label="Amount">{formatApprovalAmount(request.amount)}</DetailRow>
+            <DetailRow label="Requester">{request.requester}</DetailRow>
+            <DetailRow label="Purpose">{request.purpose || "—"}</DetailRow>
+            {request.spendingDetails ? (
+              <>
+                <DetailRow label="Funding Request">
+                  {request.spendingDetails.fundingRequest || "—"}
+                </DetailRow>
+                <DetailRow label="Payee">{request.spendingDetails.payee || "—"}</DetailRow>
+                <DetailRow label="Payee Account">
+                  {request.spendingDetails.payeeAccount || "—"}
+                </DetailRow>
+              </>
+            ) : null}
+            {request.storesDetails ? (
+              <>
+                <DetailRow label="Item">{request.storesDetails.itemName || "—"}</DetailRow>
+                <DetailRow label="Item code">{request.storesDetails.itemCode || "—"}</DetailRow>
+                <DetailRow label="Quantity">{request.storesDetails.quantity ?? "—"}</DetailRow>
+                {request.storesDetails.fromStore ? (
+                  <DetailRow label="From store">{request.storesDetails.fromStore}</DetailRow>
+                ) : null}
+                {request.storesDetails.toStore ? (
+                  <DetailRow label="To store">{request.storesDetails.toStore}</DetailRow>
+                ) : null}
+              </>
+            ) : null}
+          </AccordionSection>
+
+          <AccordionSection
+            title="Approval History"
+            open={openSections.history}
+            onToggle={() => toggle("history")}
+          >
+            <div className="space-y-2">
+              {(request.approvalHistory || []).flatMap((entry, index) =>
+                (entry.approvers || []).map((approver) => (
+                  <ApproverRow
+                    key={`${entry.status || "decision"}-${approver.name}-${index}`}
+                    approver={approver}
+                  />
+                )),
+              )}
+            </div>
+          </AccordionSection>
+        </>
+      )}
     </RequestDetailsModal>
   );
 }

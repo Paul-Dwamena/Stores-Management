@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -16,12 +17,14 @@ import { toast } from "../../../components/common/ToastNotification";
 import {
   REQUISITION_KIND_TABS,
   REQUISITION_STATUS_OPTIONS,
-  STORE_LOCATION_OPTIONS,
+  getStoreLocationOptions,
   approveRequisitionBatch,
   advanceRequisition,
   formatRequisitionDate,
   formatRequisitionStatus,
   getRequisitions,
+  getRequisitionByRef,
+  ensureRequisitionForStoreRequest,
   getRequisitionDisplayRows,
   getRequisitionRemainingQuantity,
   createIssuanceBatchId,
@@ -29,6 +32,7 @@ import {
   raiseRequisitionBatch,
   rejectRequisition,
 } from "../../../mockdata/stores";
+import { getRequests } from "../../../mockdata/requests";
 import {
   ApprovalRequestActionModal,
   BatchApprovalRequestActionModal,
@@ -99,6 +103,8 @@ export default function RequisitionsList({
   view = "accessories",
 }) {
   const isVehicleParts = view === "vehicle_parts";
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState(() => getRequisitions());
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -121,6 +127,55 @@ export default function RequisitionsList({
     setBatchRaiseOpen(false);
     setBatchIssueOpen(false);
   }, [view]);
+
+  useEffect(() => {
+    const raiseRef = searchParams.get("raise");
+    if (!raiseRef) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("raise");
+    setSearchParams(nextParams, { replace: true });
+
+    const navState = location.state || {};
+    const sourceRequest = getRequests().find((row) =>
+      row.id === navState.sourceRequestId
+      || row.requestNumber === navState.approvalRequestNumber
+      || row.id === raiseRef
+      || row.requestNumber === raiseRef
+      || row.storesDetails?.requisitionId === raiseRef
+      || row.storesDetails?.requestNumber === raiseRef,
+    );
+    const details = {
+      ...(sourceRequest?.storesDetails || {}),
+      ...(navState.raiseStoresDetails || {}),
+    };
+
+    let match =
+      getRequisitionByRef(raiseRef)
+      || getRequisitionByRef(details.requisitionId)
+      || getRequisitionByRef(details.requestNumber);
+
+    if (!match && (details.itemCode || details.itemName || details.requisitionId)) {
+      match = ensureRequisitionForStoreRequest({
+        ...details,
+        requestedBy: sourceRequest?.requestedBy || details.requestedBy,
+      });
+      setRows(getRequisitions());
+    }
+
+    if (!match) {
+      toast.error("Could not find that supply request in Stores.");
+      return;
+    }
+
+    setActiveAction({
+      row: match,
+      config:
+        match.status === "PENDING_SUPPLY_REQUEST"
+          ? { action: "raise_supply_request" }
+          : getActionConfig(match.status, match),
+    });
+  }, [searchParams, setSearchParams, location.state]);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -210,7 +265,7 @@ export default function RequisitionsList({
     [rows, selectedIds, statusFilter, locationFilter, showIssuanceStore],
   );
 
-  const issuanceStoreOptions = STORE_LOCATION_OPTIONS;
+  const issuanceStoreOptions = getStoreLocationOptions();
 
   const allPagedSelected =
     showBulkSelection

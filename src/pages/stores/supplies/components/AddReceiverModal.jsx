@@ -12,7 +12,14 @@ import {
 import { addReceiver } from "../../../../mockdata/stores";
 import AddReceiverConfiguredFields from "./AddReceiverConfiguredFields";
 
-export default function AddReceiverModal({ isOpen, onClose, onCreated, title = "Add receiver", saveLabel = "Add receiver" }) {
+export default function AddReceiverModal({
+  isOpen,
+  onClose,
+  onCreated,
+  title = "Add receiver",
+  saveLabel = "Add receiver",
+  subtitle = "Create a receiver with name, email, phone, and role. They can collect issued items immediately.",
+}) {
   const setupRevision = useSetupTreeRevision(ADD_RECEIVER_FORM_SETUP_CHANGED_EVENT);
   const formSetup = useMemo(() => {
     void setupRevision;
@@ -60,8 +67,9 @@ export default function AddReceiverModal({ isOpen, onClose, onCreated, title = "
     }
     try {
       const created = addReceiver(form);
-      toast.success(`${created.name} added as a receiver.`);
+      toast.success(`${created.name} added.`);
       onCreated?.(created);
+      onClose?.();
     } catch (error) {
       toast.error(error.message ?? "Could not add receiver.");
     }
@@ -73,9 +81,10 @@ export default function AddReceiverModal({ isOpen, onClose, onCreated, title = "
       onClose={onClose}
       onSave={handleSave}
       title={title}
-      subtitle="Create a receiver with name, email, phone, and role. They can collect issued items immediately."
+      subtitle={subtitle}
       saveLabel={saveLabel}
       dialogClassName="max-w-lg"
+      overlayClassName="!z-[10001]"
     >
       <AddReceiverConfiguredFields
         sections={configuredSections}

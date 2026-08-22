@@ -1,6 +1,9 @@
 /** Stores requisitions — accessories and vehicle parts supply requests. */
 
-import { generateAccessoryItemCode } from "./accessories";
+import { generateAccessoryItemCode, getAccessories } from "./accessories";
+import { getStoreLocationOptions } from "../org/stores";
+
+export { getStoreLocationOptions };
 
 export const REQUISITION_STATUS_OPTIONS = [
   { value: "ALL", label: "All" },
@@ -23,6 +26,7 @@ export const PENDING_REQUISITION_STATUSES = [
   "PENDING_ISSUANCE",
 ];
 
+/** @deprecated Prefer getStoreLocationOptions() so new stores from Setups appear. */
 export const STORE_LOCATION_OPTIONS = [
   "Accra Central Store — Ringway Estates",
   "Tema Fleet Store — Community 12",
@@ -1042,6 +1046,51 @@ function normalizeRequisitionRow(row) {
   return { ...row, status: "PENDING_ISSUANCE", isBatch: false };
 }
 
+export function getRequisitionByRef(ref) {
+  const key = String(ref || "").trim().toLowerCase();
+  if (!key) return null;
+  return getRequisitions().find(
+    (row) => row.id.toLowerCase() === key || String(row.requestNumber || "").toLowerCase() === key,
+  ) ?? null;
+}
+
+/** Find an existing supply requisition, or create one from approval/request stores details. */
+export function ensureRequisitionForStoreRequest(details = {}) {
+  const existing =
+    getRequisitionByRef(details.requisitionId)
+    || getRequisitionByRef(details.requestNumber)
+    || getRequisitions().find((row) => {
+      const code = String(details.itemCode || "").trim().toLowerCase();
+      if (!code) return false;
+      return (
+        String(row.itemCode || "").toLowerCase() === code
+        && (row.status || "").toString().toUpperCase() === "PENDING_SUPPLY_REQUEST"
+      );
+    })
+    || null;
+  if (existing) return existing;
+
+  const itemCode = String(details.itemCode || "").trim();
+  const catalogItem = itemCode
+    ? getAccessories().find((item) => String(item.itemCode || "").toLowerCase() === itemCode.toLowerCase())
+    : null;
+
+  return addRequisition({
+    kind: details.kind === "vehicle_parts" ? "vehicle_parts" : "accessories",
+    itemId: details.itemId || catalogItem?.id || null,
+    itemCode: itemCode || catalogItem?.itemCode || "",
+    itemName: details.itemName || catalogItem?.name || "Store item",
+    brand: details.brand || catalogItem?.brand || "",
+    description: details.description || catalogItem?.description || details.justification || "",
+    quantity: details.quantity ?? 1,
+    justification: details.justification || "",
+    photo: catalogItem?.photo || details.photo || "",
+    isOther: !details.itemId && !catalogItem,
+    requestedBy: details.requestedBy || "Current User",
+    status: "PENDING_SUPPLY_REQUEST",
+  });
+}
+
 export function getRequisitions() {
   return sessionRequisitions.map(normalizeRequisitionRow);
 }
@@ -1104,6 +1153,7 @@ export function addRequisition(payload) {
     componentPath: componentPath || description || null,
     quantity: Number(payload.quantity) || 0,
     justification: String(payload.justification ?? "").trim() || null,
+    photo: payload.photo || "",
     isOther: Boolean(payload.isOther),
     requestedBy: payload.requestedBy || "Current User",
     status: payload.status || "PENDING_SUPPLY_REQUEST",
@@ -1163,12 +1213,6 @@ function normalizeRaisedStoreAllocations(payload = {}, quantityRequested) {
   }
 
   const total = allocations.reduce((sum, row) => sum + row.quantity, 0);
-  if (total > requested) {
-    throw new Error(`Store quantities cannot exceed the requested quantity (${requested}).`);
-  }
-  if (total !== requested) {
-    throw new Error(`Store quantities must total the requested quantity (${requested}).`);
-  }
 
   return {
     storeAllocations: allocations.map((row) => ({

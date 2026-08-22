@@ -20,7 +20,7 @@ import {
   getRequisitionRemainingQuantity,
   getVehiclePartById,
   mapInventoryLocationToStore,
-  STORE_LOCATION_OPTIONS,
+  getStoreLocationOptions,
   VEHICLE_PART_STATUS_OPTIONS,
 } from "../../../../mockdata/stores";
 import RequisitionRequestSummary from "./RequisitionRequestSummary";
@@ -45,9 +45,10 @@ export function getStockLocationsForRequisition(requisition) {
     totals.set(store, (totals.get(store) || 0) + quantity);
   });
 
+  const catalog = getStoreLocationOptions();
   return [
-    ...STORE_LOCATION_OPTIONS.filter((store) => totals.has(store)),
-    ...[...totals.keys()].filter((store) => !STORE_LOCATION_OPTIONS.includes(store)),
+    ...catalog.filter((store) => totals.has(store)),
+    ...[...totals.keys()].filter((store) => !catalog.includes(store)),
   ].map((location) => ({ location, quantity: totals.get(location) }));
 }
 
@@ -67,8 +68,9 @@ export function getRequisitionIssuingStores(requisition) {
   if (!locations.length) return [];
 
   return [...new Set(locations)].sort((a, b) => {
-    const aIndex = STORE_LOCATION_OPTIONS.indexOf(a);
-    const bIndex = STORE_LOCATION_OPTIONS.indexOf(b);
+    const catalog = getStoreLocationOptions();
+    const aIndex = catalog.indexOf(a);
+    const bIndex = catalog.indexOf(b);
     const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
     const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
     if (aRank !== bRank) return aRank - bRank;
@@ -275,16 +277,7 @@ export default function RaiseSupplyRequestModal({
   };
 
   const handleLocationQuantityChange = (location, value) => {
-    const stock = getLocationStock(stockLocations, location);
-    const others = selectedLocations
-      .filter((item) => item !== location)
-      .reduce((sum, item) => sum + (Number(quantitiesByLocation[item]) || 0), 0);
-    const maxAllowed = Math.min(stock, Math.max(0, requested - others));
-    let nextValue = value;
-    if (nextValue !== "" && Number(nextValue) > maxAllowed) {
-      nextValue = String(maxAllowed);
-    }
-    setQuantitiesByLocation((current) => ({ ...current, [location]: nextValue }));
+    setQuantitiesByLocation((current) => ({ ...current, [location]: value }));
     setErrors((current) => ({
       ...current,
       storeLocations: undefined,
@@ -297,8 +290,6 @@ export default function RaiseSupplyRequestModal({
     const nextErrors = {};
     if (quantityRequested === "" || Number.isNaN(requested) || requested <= 0) {
       if (!isRemainingRaise) nextErrors.quantityRequested = "Enter a valid quantity requested.";
-    } else if (isRemainingRaise && requested > remaining) {
-      nextErrors.quantityRequested = `Cannot exceed remaining (${remaining}).`;
     }
     if (selectedLocations.length === 0) {
       nextErrors.storeLocations = "Select at least one store.";
@@ -312,18 +303,9 @@ export default function RaiseSupplyRequestModal({
         nextErrors[`qty-${location}`] = `Cannot exceed stock (${stock}).`;
       }
     });
-    if (isRemainingRaise) {
-      if (allocated <= 0) {
-        nextErrors.storeQuantities = "Enter the quantity you are supplying now.";
-      } else if (allocated > remaining) {
-        nextErrors.storeQuantities = `Total cannot exceed remaining (${remaining}).`;
-      }
-    } else if (allocated > requested) {
-      nextErrors.storeQuantities = `Total cannot exceed the requested quantity (${requested}).`;
-    } else if (selectedLocations.length > 0 && allocated !== requested) {
-      nextErrors.storeQuantities = `Total must equal the requested quantity (${requested}). Currently ${allocated}.`;
+    if (selectedLocations.length > 0 && allocated <= 0) {
+      nextErrors.storeQuantities = "Enter a quantity from at least one store.";
     }
-    if (visibleKeys.has("comment") && !comment.trim()) nextErrors.comment = "Add a comment.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warning("Fix the highlighted fields before submitting.");
@@ -334,7 +316,7 @@ export default function RaiseSupplyRequestModal({
       location,
       quantity: Number(quantitiesByLocation[location]),
     }));
-    const nextRequested = isRemainingRaise ? allocated : requested;
+    const nextRequested = requested || allocated;
     setPendingPayload({
       quantityRequested: nextRequested,
       storeLocations: selectedLocations,
@@ -362,7 +344,7 @@ export default function RaiseSupplyRequestModal({
         subtitle={
           isRemainingRaise
             ? `Remaining to supply: ${remaining}. Stores and quantities are not locked — pick any stocked store.`
-            : "Choose stores and enter how many units come from each. The total must equal the requested quantity."
+            : "Choose stores and enter how many units come from each."
         }
         dialogClassName="max-w-2xl"
         saveLabel="Submit supply request"
@@ -390,23 +372,31 @@ export default function RaiseSupplyRequestModal({
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <label
+              htmlFor="raiseQuantityRequested"
+              className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+            >
               {isRemainingRaise ? "Quantity remaining" : "Quantity requested"}
-            </p>
+            </label>
             {isRemainingRaise ? (
-              <div className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2">
-                <p className="text-[13px] font-semibold text-slate-900">{remaining}</p>
-                <p className="mt-0.5 text-[10px] text-slate-500">
-                  Remaining of {originalRequested} requested
-                  {alreadySupplied > 0 ? ` · ${alreadySupplied} already supplied` : ""}.
-                  Pick any stock and enter the quantity you are supplying now — store and quantity are not locked.
-                </p>
-              </div>
-            ) : (
-              <div className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-700">
-                {quantityRequested || "—"}
-              </div>
-            )}
+              <p className="text-[10px] text-slate-500">
+                Remaining of {originalRequested} requested
+                {alreadySupplied > 0 ? ` · ${alreadySupplied} already supplied` : ""}.
+              </p>
+            ) : null}
+            <input
+              id="raiseQuantityRequested"
+              type="number"
+              min="1"
+              value={quantityRequested}
+              onChange={(e) => {
+                setQuantityRequested(e.target.value);
+                setErrors((current) => ({ ...current, quantityRequested: undefined }));
+              }}
+              className={`${fieldClassName} bg-white ${
+                errors.quantityRequested ? "border-rose-400 bg-rose-50" : ""
+              }`}
+            />
             {errors.quantityRequested ? (
               <p className="text-[10px] text-rose-600">{errors.quantityRequested}</p>
             ) : null}
@@ -449,21 +439,10 @@ export default function RaiseSupplyRequestModal({
                       {requiredFieldLabel("Quantity from each store", true)}
                     </p>
                     <p className={`text-[10px] font-bold ${
-                      isRemainingRaise
-                        ? (allocated > remaining
-                          ? "text-rose-600"
-                          : allocated > 0
-                            ? "text-emerald-600"
-                            : "text-slate-500")
-                        : allocated === requested && requested > 0
-                          ? "text-emerald-600"
-                          : allocated > requested
-                            ? "text-rose-600"
-                            : "text-slate-500"
+                      allocated > 0 ? "text-emerald-600" : "text-slate-500"
                     }`}>
-                      {isRemainingRaise
-                        ? `Supplying ${allocated} of ${remaining} remaining`
-                        : `Total ${allocated} / ${requested || "—"}`}
+                      Total {allocated || 0}
+                      {requested ? ` of ${requested} requested` : ""}
                     </p>
                   </div>
                   <div className="overflow-hidden rounded-lg border border-slate-200">
@@ -490,7 +469,6 @@ export default function RaiseSupplyRequestModal({
                                 <input
                                   type="number"
                                   min="1"
-                                  max={stock}
                                   value={quantitiesByLocation[location] ?? ""}
                                   onChange={(e) => handleLocationQuantityChange(location, e.target.value)}
                                   className={`${fieldClassName} bg-white py-1.5 ${
@@ -511,7 +489,7 @@ export default function RaiseSupplyRequestModal({
                     <p className="text-[10px] text-rose-600">{errors.storeQuantities}</p>
                   ) : (
                     <p className="text-[10px] text-slate-400">
-                      Quantities from selected stores must add up to the requested quantity and cannot go above it.
+                      Enter the quantity from each selected store. You can also change the requested quantity above.
                     </p>
                   )}
                 </div>
@@ -522,7 +500,7 @@ export default function RaiseSupplyRequestModal({
           {visibleKeys.has("comment") ? (
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-              {requiredFieldLabel("Comment", true)}
+              {requiredFieldLabel("Comment", false)}
             </label>
             <textarea
               value={comment}

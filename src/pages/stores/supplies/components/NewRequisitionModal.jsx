@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Replace, Search } from "lucide-react";
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
@@ -23,6 +23,7 @@ import {
   MultiAccessoryRequisitionTable,
   MultiVehiclePartRequisitionTable,
 } from "./MultiRequisitionTables";
+import { ItemPhotoThumb } from "../../inventory/components/ItemPhotoField";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -42,6 +43,32 @@ function DetailLine({ label, value }) {
         {label}
       </span>
       <span className="font-medium text-slate-800">{value || "—"}</span>
+    </div>
+  );
+}
+
+function SelectedAccessoryCard({ item, onChange }) {
+  const meta = [item.itemCode, item.brand].filter(Boolean).join(" · ");
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-brand/15 bg-brand-muted px-3 py-1.5">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+        <div className="min-w-0">
+          <p className="truncate text-[12px] font-semibold text-slate-900">{item.name}</p>
+          {meta ? (
+            <p className="truncate text-[10px] leading-tight text-slate-500">{meta}</p>
+          ) : null}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onChange}
+        className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-brand hover:text-brand-hover"
+      >
+        <Replace size={12} />
+        Change
+      </button>
     </div>
   );
 }
@@ -100,11 +127,9 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
   const [accessorySearch, setAccessorySearch] = useState("");
   const [selectedAccessoryId, setSelectedAccessoryId] = useState("");
   const [accessoryQty, setAccessoryQty] = useState("");
-  const [accessoryJustification, setAccessoryJustification] = useState("");
   const [otherName, setOtherName] = useState("");
   const [otherQty, setOtherQty] = useState("");
   const [otherDescription, setOtherDescription] = useState("");
-  const [otherJustification, setOtherJustification] = useState("");
 
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
@@ -141,11 +166,9 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
     setAccessorySearch("");
     setSelectedAccessoryId("");
     setAccessoryQty("");
-    setAccessoryJustification("");
     setOtherName("");
     setOtherQty("");
     setOtherDescription("");
-    setOtherJustification("");
     setMake("");
     setModel("");
     setYear("");
@@ -286,9 +309,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
       ) {
         nextErrors.accessoryQty = "Enter a valid quantity.";
       }
-      if (!accessoryJustification.trim() && visibleKeys.has("justification")) {
-        nextErrors.accessoryJustification = "Enter a justification.";
-      }
       setErrors(nextErrors);
       if (Object.keys(nextErrors).length) {
         toast.warning("Fix the highlighted fields before submitting.");
@@ -302,7 +322,7 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
         brand: selectedAccessory.brand || "—",
         description: selectedAccessory.description || "—",
         quantity: Number(accessoryQty),
-        justification: accessoryJustification.trim(),
+        photo: selectedAccessory.photo || "",
         isOther: false,
       };
     }
@@ -312,7 +332,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
       nextErrors.otherQty = "Enter a valid quantity.";
     }
     if (!otherDescription.trim()) nextErrors.otherDescription = "Enter a description.";
-    if (!otherJustification.trim()) nextErrors.otherJustification = "Enter a justification.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warning("Fix the highlighted fields before submitting.");
@@ -326,7 +345,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
       brand: "—",
       description: otherDescription.trim() || "—",
       quantity: Number(otherQty),
-      justification: otherJustification.trim(),
       isOther: true,
     };
   };
@@ -373,10 +391,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
       ) {
         rowErrors.quantity = "Enter a valid quantity.";
       }
-      if (!String(line.justification || "").trim()) {
-        rowErrors.justification = "Enter a justification.";
-      }
-
       const isOther = line.source === "other";
       const catalogItem = !isOther
         ? accessories.find((item) => item.id === line.accessoryId)
@@ -402,7 +416,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
           brand: "—",
           description: (line.description || "").trim() || "—",
           quantity: Number(line.quantity),
-          justification: String(line.justification || "").trim(),
           isOther: true,
         });
         return;
@@ -416,7 +429,7 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
         brand: catalogItem?.brand || line.brand || "—",
         description: catalogItem?.description || line.description || "—",
         quantity: Number(line.quantity),
-        justification: String(line.justification || "").trim(),
+        photo: catalogItem?.photo || line.photo || "",
         isOther: false,
       });
     });
@@ -601,13 +614,14 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                   Number of items
                   <span className="normal-case !text-red-500" aria-hidden="true"> *</span>
                 </p>
-                <div role="radiogroup" aria-label="Number of items" className="space-y-2">
+                <div role="radiogroup" aria-label="Number of items" className="flex flex-nowrap gap-2">
                   <ChoiceOption
                     type="radio"
                     id="reqItemCountSingle"
                     name="reqItemCount"
                     value="single"
                     label="Single"
+                    className="min-w-0 flex-1"
                     checked={quantityMode === "single"}
                     onChange={() => {
                       setQuantityMode("single");
@@ -620,6 +634,7 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                     name="reqItemCount"
                     value="multiple"
                     label="Multiple"
+                    className="min-w-0 flex-1"
                     checked={quantityMode === "multiple"}
                     onChange={() => {
                       setQuantityMode("multiple");
@@ -666,62 +681,77 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
 
             {accessoryMode === "catalog" ? (
               <>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Search accessories
-                  </label>
-                  <div className="relative">
-                    <Search
-                      size={14}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                    <input
-                      value={accessorySearch}
-                      onChange={(e) => setAccessorySearch(e.target.value)}
-                      className={cn(fieldClassName, "pl-9")}
-                      placeholder="Search by code, name, or brand…"
-                    />
-                  </div>
-                </div>
-                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-50">
-                  {filteredAccessories.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-[12px] text-slate-400">
-                      No accessories match your search.
-                    </p>
-                  ) : (
-                    filteredAccessories.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedAccessoryId(item.id);
-                          clearError("selectedAccessoryId");
-                        }}
+                {selectedAccessory ? (
+                  <SelectedAccessoryCard
+                    item={selectedAccessory}
+                    onChange={() => {
+                      setSelectedAccessoryId("");
+                      clearError("selectedAccessoryId");
+                    }}
+                  />
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <label
                         className={cn(
-                          "w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors",
-                          selectedAccessoryId === item.id && "bg-emerald-50/70",
+                          "text-[10px] font-bold uppercase tracking-wider",
+                          errors.selectedAccessoryId ? "text-red-500" : "text-slate-500",
                         )}
                       >
-                        <p className="text-[12px] font-bold text-slate-900">{item.name}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {item.itemCode} · {item.brand}
+                        Search accessories
+                      </label>
+                      <div className="relative">
+                        <Search
+                          size={14}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                          value={accessorySearch}
+                          onChange={(e) => setAccessorySearch(e.target.value)}
+                          className={cn(
+                            fieldClassName,
+                            "pl-9",
+                            errors.selectedAccessoryId && "border-red-500 bg-red-50",
+                          )}
+                          placeholder="Search by code, name, or brand…"
+                        />
+                      </div>
+                      {errors.selectedAccessoryId ? (
+                        <p className="text-[10px] font-medium text-red-500">
+                          {errors.selectedAccessoryId}
                         </p>
-                      </button>
-                    ))
-                  )}
-                </div>
-                {errors.selectedAccessoryId && (
-                  <p className="text-[10px] font-medium text-red-500">
-                    {errors.selectedAccessoryId}
-                  </p>
-                )}
-                {selectedAccessory && (
-                  <DetailBlock>
-                    <DetailLine label="Code" value={selectedAccessory.itemCode} />
-                    <DetailLine label="Name" value={selectedAccessory.name} />
-                    <DetailLine label="Brand" value={selectedAccessory.brand} />
-                    <DetailLine label="Description" value={selectedAccessory.description} />
-                  </DetailBlock>
+                      ) : null}
+                    </div>
+                    <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-50">
+                      {filteredAccessories.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-[12px] text-slate-400">
+                          No accessories match your search.
+                        </p>
+                      ) : (
+                        filteredAccessories.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAccessoryId(item.id);
+                              clearError("selectedAccessoryId");
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                          >
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+                              <div className="min-w-0">
+                                <p className="text-[12px] font-bold text-slate-900">{item.name}</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  {item.itemCode} · {item.brand}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
                 )}
                 <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="quantity">
                 <InputField
@@ -735,36 +765,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                   }}
                   error={errors.accessoryQty}
                 />
-                </ShowConfiguredField>
-                <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="justification">
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="reqAccJustification"
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                  >
-                    Justification
-                  </label>
-                  <textarea
-                    id="reqAccJustification"
-                    rows={3}
-                    value={accessoryJustification}
-                    onChange={(e) => {
-                      setAccessoryJustification(e.target.value);
-                      clearError("accessoryJustification");
-                    }}
-                    className={cn(
-                      fieldClassName,
-                      "resize-none",
-                      errors.accessoryJustification && "border-red-500 bg-red-50",
-                    )}
-                    placeholder="Why is this item needed?"
-                  />
-                  {errors.accessoryJustification && (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {errors.accessoryJustification}
-                    </p>
-                  )}
-                </div>
                 </ShowConfiguredField>
               </>
             ) : (
@@ -816,34 +816,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                   {errors.otherDescription && (
                     <p className="text-[10px] font-medium text-red-500">
                       {errors.otherDescription}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="reqOtherJustification"
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                  >
-                    Justification
-                  </label>
-                  <textarea
-                    id="reqOtherJustification"
-                    rows={3}
-                    value={otherJustification}
-                    onChange={(e) => {
-                      setOtherJustification(e.target.value);
-                      clearError("otherJustification");
-                    }}
-                    className={cn(
-                      fieldClassName,
-                      "resize-none",
-                      errors.otherJustification && "border-red-500 bg-red-50",
-                    )}
-                    placeholder="Why is this item needed?"
-                  />
-                  {errors.otherJustification && (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {errors.otherJustification}
                     </p>
                   )}
                 </div>
@@ -1096,20 +1068,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                 if (!prev[id]) return prev;
                 const next = { ...prev };
                 delete next[id];
-                return next;
-              });
-            }}
-            onChangeJustification={(id, justification) => {
-              setMultiAccessoryLines((prev) =>
-                prev.map((line) => (line.id === id ? { ...line, justification } : line)),
-              );
-              setLineErrors((prev) => {
-                if (!prev[id]?.justification) return prev;
-                const next = { ...prev };
-                const row = { ...next[id] };
-                delete row.justification;
-                if (Object.keys(row).length) next[id] = row;
-                else delete next[id];
                 return next;
               });
             }}

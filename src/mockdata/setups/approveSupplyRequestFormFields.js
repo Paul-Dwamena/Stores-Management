@@ -29,7 +29,7 @@ export const APPROVE_SUPPLY_REQUEST_FORM_FIELD_CATALOG = [
     title: "Approval comment",
     fieldType: "textarea",
     sectionId: "main_form",
-    required: true,
+    required: false,
     isDefaultLocked: true,
     isActive: true,
     colSpan: 1,

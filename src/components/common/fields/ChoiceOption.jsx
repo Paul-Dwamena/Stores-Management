@@ -11,6 +11,7 @@ export default function ChoiceOption({
   label,
   onChange,
   bordered = true,
+  className,
 }) {
   return (
     <label
@@ -25,6 +26,7 @@ export default function ChoiceOption({
                 : "border-slate-200 hover:bg-slate-50/80",
             )
           : "py-0.5",
+        className,
       )}
     >
       {type === "radio" ? (

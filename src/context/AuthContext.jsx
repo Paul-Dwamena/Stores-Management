@@ -51,8 +51,29 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("userInfo");
   };
 
+  const updateProfile = (patch = {}) => {
+    setUser((current) => {
+      if (!current) return current;
+      const firstName = patch.firstName ?? current.firstName ?? "";
+      const lastName = patch.lastName ?? current.lastName ?? "";
+      const composed = [firstName, lastName]
+        .map((part) => String(part).trim())
+        .filter(Boolean)
+        .join(" ");
+      const next = {
+        ...current,
+        ...patch,
+        firstName,
+        lastName,
+        name: patch.name ?? (composed || current.name),
+      };
+      localStorage.setItem("userInfo", JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

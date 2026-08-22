@@ -125,21 +125,13 @@ export default function BatchRaiseSupplyRequestModal({
   const setLocationQuantity = (id, location, value) => {
     setRowForms((current) => {
       const form = current[id] || {};
-      const stock = getLocationStock(stockByRequestId[id] || [], location);
-      const requested = Number(form.quantityRequested) || 0;
-      const others = (form.storeLocations || [])
-        .filter((item) => item !== location)
-        .reduce((sum, item) => sum + (Number(form.quantitiesByLocation?.[item]) || 0), 0);
-      const maxAllowed = Math.min(stock, Math.max(0, requested - others));
-      let nextValue = value;
-      if (nextValue !== "" && Number(nextValue) > maxAllowed) nextValue = String(maxAllowed);
       return {
         ...current,
         [id]: {
           ...form,
           quantitiesByLocation: {
             ...(form.quantitiesByLocation || {}),
-            [location]: nextValue,
+            [location]: value,
           },
         },
       };
@@ -178,12 +170,9 @@ export default function BatchRaiseSupplyRequestModal({
           rowErrors[`qty-${location}`] = `Max ${stock}`;
         }
       });
-      if (allocated > requested) {
-        rowErrors.storeQuantities = `Cannot exceed requested (${requested}).`;
-      } else if (locations.length > 0 && allocated !== requested) {
-        rowErrors.storeQuantities = `Must total ${requested}. Now ${allocated}.`;
+      if (locations.length > 0 && allocated <= 0) {
+        rowErrors.storeQuantities = "Enter a quantity from at least one store.";
       }
-      if (!form.comment?.trim()) rowErrors.comment = "Add a comment.";
       if (Object.keys(rowErrors).length) nextErrors[row.id] = rowErrors;
     });
     setErrors(nextErrors);

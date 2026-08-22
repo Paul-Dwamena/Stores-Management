@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Replace, Search, Trash2 } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import InputField from "../../../../components/common/fields/InputField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
+import { ItemPhotoThumb } from "../../inventory/components/ItemPhotoField";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -24,7 +25,7 @@ export function createEmptyAccessoryLine() {
     brand: "",
     description: "",
     quantity: "1",
-    justification: "",
+    photo: "",
   };
 }
 
@@ -56,6 +57,32 @@ function DetailLine({ label, value }) {
   );
 }
 
+function SelectedAccessoryCard({ item, onChange }) {
+  const meta = [item.itemCode, item.brand].filter(Boolean).join(" · ");
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-brand/15 bg-brand-muted px-3 py-1.5">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+        <div className="min-w-0">
+          <p className="truncate text-[12px] font-semibold text-slate-900">{item.name}</p>
+          {meta ? (
+            <p className="truncate text-[10px] leading-tight text-slate-500">{meta}</p>
+          ) : null}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onChange}
+        className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-brand hover:text-brand-hover"
+      >
+        <Replace size={12} />
+        Change
+      </button>
+    </div>
+  );
+}
+
 /** Multi-line accessory requisition: search/add above, items table below. */
 export function MultiAccessoryRequisitionTable({
   lines,
@@ -64,17 +91,14 @@ export function MultiAccessoryRequisitionTable({
   onAddItem,
   onRemoveLine,
   onChangeQuantity,
-  onChangeJustification,
 }) {
   const [tab, setTab] = useState("catalog");
   const [search, setSearch] = useState("");
   const [selectedAccessoryId, setSelectedAccessoryId] = useState("");
   const [catalogQty, setCatalogQty] = useState("1");
-  const [catalogJustification, setCatalogJustification] = useState("");
   const [otherName, setOtherName] = useState("");
   const [otherQty, setOtherQty] = useState("1");
   const [otherDescription, setOtherDescription] = useState("");
-  const [otherJustification, setOtherJustification] = useState("");
   const [formErrors, setFormErrors] = useState({});
   const [findItemsOpen, setFindItemsOpen] = useState(true);
 
@@ -119,7 +143,6 @@ export function MultiAccessoryRequisitionTable({
   const resetCatalogForm = () => {
     setSelectedAccessoryId("");
     setCatalogQty("1");
-    setCatalogJustification("");
     setSearch("");
     setFormErrors({});
   };
@@ -128,7 +151,6 @@ export function MultiAccessoryRequisitionTable({
     setOtherName("");
     setOtherQty("1");
     setOtherDescription("");
-    setOtherJustification("");
     setFormErrors({});
   };
 
@@ -141,9 +163,6 @@ export function MultiAccessoryRequisitionTable({
       || Number(catalogQty) <= 0
     ) {
       nextErrors.catalogQty = "Enter a valid quantity.";
-    }
-    if (!catalogJustification.trim()) {
-      nextErrors.catalogJustification = "Enter a justification.";
     }
     setFormErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
@@ -168,7 +187,7 @@ export function MultiAccessoryRequisitionTable({
       brand: selectedAccessory.brand || "—",
       description: selectedAccessory.description || "—",
       quantity: String(Number(catalogQty)),
-      justification: catalogJustification.trim(),
+      photo: selectedAccessory.photo || "",
     });
     resetCatalogForm();
     toast.success("Item added to table.");
@@ -185,7 +204,6 @@ export function MultiAccessoryRequisitionTable({
       nextErrors.otherQty = "Enter a valid quantity.";
     }
     if (!otherDescription.trim()) nextErrors.otherDescription = "Enter a description.";
-    if (!otherJustification.trim()) nextErrors.otherJustification = "Enter a justification.";
     setFormErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warning("Fix the highlighted fields before adding.");
@@ -201,7 +219,7 @@ export function MultiAccessoryRequisitionTable({
       brand: "—",
       description: otherDescription.trim(),
       quantity: String(Number(otherQty)),
-      justification: otherJustification.trim(),
+      photo: "",
     });
     resetOtherForm();
     toast.success("Item added to table.");
@@ -271,25 +289,84 @@ export function MultiAccessoryRequisitionTable({
 
             {tab === "catalog" ? (
               <div className="space-y-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Search accessories
-                    </label>
-                    <div className="relative">
-                      <Search
-                        size={14}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                      />
-                      <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className={cn(fieldClassName, "pl-9 h-[38px]")}
-                        placeholder="Search by code, name, or brand…"
-                      />
+                {selectedAccessory ? (
+                  <SelectedAccessoryCard
+                    item={selectedAccessory}
+                    onChange={() => {
+                      setSelectedAccessoryId("");
+                      clearFormError("selectedAccessoryId");
+                    }}
+                  />
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <label
+                        className={cn(
+                          "text-[10px] font-bold uppercase tracking-wider",
+                          formErrors.selectedAccessoryId ? "text-red-500" : "text-slate-500",
+                        )}
+                      >
+                        Search accessories
+                      </label>
+                      <div className="relative">
+                        <Search
+                          size={14}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        />
+                        <input
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          className={cn(
+                            fieldClassName,
+                            "pl-9 h-[38px]",
+                            formErrors.selectedAccessoryId && "border-red-500 bg-red-50",
+                          )}
+                          placeholder="Search by code, name, or brand…"
+                        />
+                      </div>
+                      {formErrors.selectedAccessoryId ? (
+                        <p className="text-[10px] font-medium text-red-500">
+                          {formErrors.selectedAccessoryId}
+                        </p>
+                      ) : null}
                     </div>
-                  </div>
-                  <div className="w-full lg:w-28 shrink-0 space-y-1.5">
+                    <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-50">
+                      {filteredAccessories.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-[12px] text-slate-400">
+                          {accessories.length > 0
+                            && lines.some((line) => line.source === "catalog" && line.accessoryId)
+                            && !search.trim()
+                            ? "All matching accessories are already in the table."
+                            : "No accessories match your search."}
+                        </p>
+                      ) : (
+                        filteredAccessories.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAccessoryId(item.id);
+                              clearFormError("selectedAccessoryId");
+                            }}
+                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors"
+                          >
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+                              <div className="min-w-0">
+                                <p className="text-[12px] font-bold text-slate-900">{item.name}</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  {item.itemCode} · {item.brand}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="w-full sm:w-28 shrink-0 space-y-1.5">
                     <label
                       htmlFor="multiAccQty"
                       className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
@@ -326,86 +403,6 @@ export function MultiAccessoryRequisitionTable({
                       <Plus size={14} /> Add to table
                     </Button>
                   </div>
-                </div>
-
-                <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-50">
-                  {filteredAccessories.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-[12px] text-slate-400">
-                      {accessories.length > 0
-                        && lines.some((line) => line.source === "catalog" && line.accessoryId)
-                        && !search.trim()
-                        ? "All matching accessories are already in the table."
-                        : "No accessories match your search."}
-                    </p>
-                  ) : (
-                    filteredAccessories.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedAccessoryId(item.id);
-                          clearFormError("selectedAccessoryId");
-                        }}
-                        className={cn(
-                          "w-full text-left px-4 py-2.5 transition-colors",
-                          selectedAccessoryId === item.id
-                            ? "bg-emerald-50"
-                            : "hover:bg-slate-50",
-                        )}
-                      >
-                        <p className="text-[12px] font-bold text-slate-900">{item.name}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {item.itemCode} · {item.brand}
-                        </p>
-                      </button>
-                    ))
-                  )}
-                </div>
-                {formErrors.selectedAccessoryId ? (
-                  <p className="text-[10px] font-medium text-red-500">
-                    {formErrors.selectedAccessoryId}
-                  </p>
-                ) : null}
-
-                {selectedAccessory ? (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Selected item
-                    </p>
-                    <DetailLine label="Code" value={selectedAccessory.itemCode} />
-                    <DetailLine label="Name" value={selectedAccessory.name} />
-                    <DetailLine label="Brand" value={selectedAccessory.brand} />
-                    <DetailLine label="Description" value={selectedAccessory.description} />
-                  </div>
-                ) : null}
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="multiAccJustification"
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                  >
-                    Justification
-                  </label>
-                  <textarea
-                    id="multiAccJustification"
-                    rows={2}
-                    value={catalogJustification}
-                    onChange={(e) => {
-                      setCatalogJustification(e.target.value);
-                      clearFormError("catalogJustification");
-                    }}
-                    className={cn(
-                      fieldClassName,
-                      "resize-none min-h-[64px]",
-                      formErrors.catalogJustification && "border-red-500 bg-red-50",
-                    )}
-                    placeholder="Why is this item needed?"
-                  />
-                  {formErrors.catalogJustification ? (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {formErrors.catalogJustification}
-                    </p>
-                  ) : null}
                 </div>
               </div>
             ) : (
@@ -470,44 +467,14 @@ export function MultiAccessoryRequisitionTable({
                   ) : null}
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <label
-                      htmlFor="multiOtherJustification"
-                      className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                    >
-                      Justification
-                    </label>
-                    <textarea
-                      id="multiOtherJustification"
-                      rows={2}
-                      value={otherJustification}
-                      onChange={(e) => {
-                        setOtherJustification(e.target.value);
-                        clearFormError("otherJustification");
-                      }}
-                      className={cn(
-                        fieldClassName,
-                        "resize-none min-h-[64px]",
-                        formErrors.otherJustification && "border-red-500 bg-red-50",
-                      )}
-                      placeholder="Why is this item needed?"
-                    />
-                    {formErrors.otherJustification ? (
-                      <p className="text-[10px] font-medium text-red-500">
-                        {formErrors.otherJustification}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="shrink-0">
-                    <Button
-                      type="button"
-                      onClick={handleAddOther}
-                      className="h-[38px] px-4 text-[12px] w-full sm:w-auto"
-                    >
-                      <Plus size={14} /> Add to table
-                    </Button>
-                  </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleAddOther}
+                    className="h-[38px] px-4 text-[12px] w-full sm:w-auto"
+                  >
+                    <Plus size={14} /> Add to table
+                  </Button>
                 </div>
               </div>
             )}
@@ -527,15 +494,15 @@ export function MultiAccessoryRequisitionTable({
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full min-w-[920px] text-left">
+          <table className="w-full min-w-[760px] text-left">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200">
+                <th className={thClass}>Photo</th>
                 <th className={thClass}>Code</th>
                 <th className={thClass}>Name</th>
                 <th className={thClass}>Brand</th>
                 <th className={cn(thClass, "min-w-[160px]")}>Description</th>
                 <th className={cn(thClass, "min-w-[100px]")}>Qty requested</th>
-                <th className={cn(thClass, "min-w-[180px]")}>Justification</th>
                 <th className={thClass} />
               </tr>
             </thead>
@@ -552,8 +519,16 @@ export function MultiAccessoryRequisitionTable({
               ) : (
                 lines.map((line) => {
                   const rowError = errors[line.id] || {};
+                  const catalogItem = accessories.find((item) => item.id === line.accessoryId);
                   return (
                     <tr key={line.id}>
+                      <td className={tdClass}>
+                        <ItemPhotoThumb
+                          src={line.photo || catalogItem?.photo}
+                          name={line.name}
+                          className="h-9 w-9"
+                        />
+                      </td>
                       <td className={cn(tdClass, "font-mono text-[11px] text-slate-600")}>
                         {line.itemCode?.trim() ? line.itemCode : "—"}
                       </td>
@@ -578,22 +553,6 @@ export function MultiAccessoryRequisitionTable({
                         />
                         {rowError.quantity ? (
                           <p className="text-[10px] text-red-500 mt-1">{rowError.quantity}</p>
-                        ) : null}
-                      </td>
-                      <td className={tdClass}>
-                        <textarea
-                          rows={2}
-                          value={line.justification || ""}
-                          onChange={(e) => onChangeJustification?.(line.id, e.target.value)}
-                          className={cn(
-                            fieldClassName,
-                            "w-full min-w-[160px] resize-none",
-                            rowError.justification && "border-red-500 bg-red-50",
-                          )}
-                          placeholder="Justification…"
-                        />
-                        {rowError.justification ? (
-                          <p className="text-[10px] text-red-500 mt-1">{rowError.justification}</p>
                         ) : null}
                       </td>
                       <td className={tdClass}>

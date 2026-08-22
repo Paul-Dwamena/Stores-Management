@@ -17,9 +17,9 @@ import {
   getStoresWithRemainingQty,
 } from "./RaiseSupplyRequestModal";
 import ReceiverPicker from "./ReceiverPicker";
-import AddReceiverModal from "./AddReceiverModal";
 import IssueOtpSection from "./IssueOtpSection";
 import RejectRequisitionModal from "./RejectRequisitionModal";
+import AddReceiverModal from "./AddReceiverModal";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -332,6 +332,7 @@ export default function BatchIssueItemActionModal({
         <div className="space-y-4">
           <div className="max-w-md">
             <ReceiverPicker
+              id="batch-issue-person-search"
               value={suppliedTo}
               required={false}
               onChange={(nextValue) => {
@@ -349,6 +350,7 @@ export default function BatchIssueItemActionModal({
               error={errors.suppliedTo}
               selectClassName={fieldClassName}
               onAddClick={() => setReceiverEditorOpen(true)}
+              addButtonLabel="Add receiver"
             />
           </div>
 
@@ -534,7 +536,6 @@ export default function BatchIssueItemActionModal({
             delete next.suppliedTo;
             return next;
           });
-          setReceiverEditorOpen(false);
         }}
       />
 

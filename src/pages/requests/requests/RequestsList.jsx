@@ -4,13 +4,13 @@ import {
   FileText,
   Clock3,
   CheckCircle2,
-  Eye,
   Calendar,
 } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import PageHeader from "../../../components/common/PageHeader";
 import Button from "../../../components/common/base/Button";
 import SummaryStatCard from "../../../components/common/SummaryStatCard";
+import { TableRowActions, TableViewAction } from "../../../components/common/tableActions";
 import { toast } from "../../../components/common/ToastNotification";
 import { getRequests, saveRequest } from "../../../mockdata/requests";
 import {
@@ -253,34 +253,38 @@ export default function RequestsList() {
                           {formatRequestAmount(request.amount)}
                         </span>
                       </span>
-                      <span>
-                        Cost Center:{" "}
-                        <span className="font-semibold text-slate-800">{request.costCenter}</span>
-                      </span>
-                      <span>
-                        Budget Line:{" "}
-                        <span className="font-semibold text-slate-800">{request.budgetLine}</span>
-                      </span>
-                      <span>
-                        Class:{" "}
-                        <span className="font-semibold text-slate-800">{request.requestClass}</span>
-                      </span>
+                      {request.storesDetails?.itemName ? (
+                        <span>
+                          Item:{" "}
+                          <span className="font-semibold text-slate-800">
+                            {request.storesDetails.itemName}
+                            {request.storesDetails.quantity != null
+                              ? ` × ${request.storesDetails.quantity}`
+                              : ""}
+                          </span>
+                        </span>
+                      ) : null}
+                      {request.storesDetails?.fromStore || request.storesDetails?.toStore ? (
+                        <span>
+                          Store:{" "}
+                          <span className="font-semibold text-slate-800">
+                            {request.storesDetails.fromStore || request.storesDetails.toStore}
+                          </span>
+                        </span>
+                      ) : null}
                     </div>
 
-                    <p className="text-[11px] text-slate-500">
-                      Expense Category:{" "}
-                      <span className="font-medium text-slate-700">{request.expenseCategory}</span>
-                    </p>
+                    {request.purpose ? (
+                      <p className="text-[11px] text-slate-500">{request.purpose}</p>
+                    ) : null}
                   </div>
 
-                  <button
-                    type="button"
-                    title="View request details"
-                    onClick={() => setSelectedRequest(request)}
-                    className="mt-0.5 rounded-md p-2 text-sky-600 transition-colors hover:bg-sky-50"
-                  >
-                    <Eye size={16} />
-                  </button>
+                  <TableRowActions className="mt-0.5">
+                    <TableViewAction
+                      title="View request details"
+                      onClick={() => setSelectedRequest(request)}
+                    />
+                  </TableRowActions>
                 </div>
               </div>
             ))}

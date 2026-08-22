@@ -10,6 +10,9 @@ import Overview from "./pages/overview/Overview";
 import StoresHub from "./pages/stores/StoresHub";
 import { RequestsList } from "./pages/requests";
 import { ApprovalsList } from "./pages/approvals";
+import { SetupsHub } from "./pages/setups";
+import { AuditTrailList } from "./pages/auditTrail";
+import { AccountSettings } from "./pages/settings";
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -39,6 +42,9 @@ function App() {
             <Route path="stores" element={<StoresHub />} />
             <Route path="requests" element={<RequestsList />} />
             <Route path="approvals" element={<ApprovalsList />} />
+            <Route path="setups" element={<SetupsHub />} />
+            <Route path="audit-trail" element={<AuditTrailList />} />
+            <Route path="settings" element={<AccountSettings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

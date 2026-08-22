@@ -458,6 +458,37 @@ export const SEED_ACCESSORIES = [
   },
 ];
 
+const SEED_SHELF_POSITIONS = {
+  "acc-001": "Aisle A · Shelf B2",
+  "acc-002": "Aisle A · Shelf C1",
+  "acc-003": "Cage 1 · Hook 4",
+  "acc-004": "Aisle B · Bin 12",
+  "acc-005": "Drawer 3 · Slot 8",
+  "acc-006": "Cage 2 · Shelf A1",
+  "acc-007": "Counter · Hook 2",
+  "acc-008": "Aisle C · Shelf D4",
+  "acc-009": "Aisle B · Bin 6",
+  "acc-010": "Rack 2 · Peg 9",
+};
+
+const SEED_ITEM_PHOTOS = [
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTbSeu-k9kK8Z4O1u0IrYJB0zNCXSCSnVoAcvMBaawnPw&s",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTw8ZdKAUE6rSl_Fcoyv3UOdVTZWITuWdbEJNrrsTjsMFZrM2uvPqn_oxxl&s=10",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTVpdkNO4MlZCN48H3xgvl1l0MN_UdO60BPUaz37UkOcg&s=10",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRqR2vsA_OoWNQNS4R8v-7HRA-mAyQBHR6MTotPvVlhkQ&s=10",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQlE7mmSf9TyWi2E_5t1jVnTCtRVRAAS55FeYo2Ml54ag&s=10",
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSt7LJjSWosin6-wL6uYT8nHb0zE19WYaULwVXKj71-MQ&s",
+];
+
+function seedItemPhoto(id) {
+  const key = String(id || "");
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return SEED_ITEM_PHOTOS[hash % SEED_ITEM_PHOTOS.length];
+}
+
 const STORE_LOCATIONS = [
   "Accra Central Store — Ringway Estates",
   "Tema Fleet Store — Community 12",
@@ -500,6 +531,8 @@ let sessionAccessories = SEED_ACCESSORIES.map((item, itemIndex) => {
   const location = STORE_LOCATIONS[itemIndex % STORE_LOCATIONS.length];
   return {
     ...item,
+    photo: item.photo || seedItemPhoto(item.id),
+    shelfPosition: item.shelfPosition || SEED_SHELF_POSITIONS[item.id] || `Aisle ${String.fromCharCode(65 + (itemIndex % 5))} · Shelf ${itemIndex + 1}`,
     location,
     stockByLocation: (item.stockByLocation ?? [{ quantity: item.quantity }]).map(
       (row, rowIndex) => ({
@@ -570,7 +603,9 @@ export function addAccessory(payload) {
     createdAt: now,
     updatedAt: now,
     location,
-    stockByLocation: quantity > 0 ? [{ location, quantity }] : [],
+    photo: payload.photo || "",
+    shelfPosition: payload.shelfPosition?.trim() || "",
+    stockByLocation: quantity > 0 ? [{ location, quantity, shelfPosition: payload.shelfPosition?.trim() || "" }] : [],
     minStock: Number(payload.minStock) || 5,
     supplierId: payload.supplierId || "",
     waybillNumber: payload.waybillNumber?.trim() || "",
@@ -605,6 +640,32 @@ export function addAccessory(payload) {
   };
   sessionAccessories = [created, ...sessionAccessories];
   return { ...created };
+}
+
+export function updateAccessoryDetails(id, payload = {}) {
+  const index = sessionAccessories.findIndex((row) => row.id === id);
+  if (index < 0) throw new Error("Accessory not found.");
+
+  const item = sessionAccessories[index];
+  const name = payload.name !== undefined ? String(payload.name || "").trim() : item.name;
+  if (!name) throw new Error("Enter the item name.");
+
+  const next = {
+    ...item,
+    name,
+    brand: payload.brand !== undefined ? String(payload.brand || "").trim() || "—" : item.brand,
+    description:
+      payload.description !== undefined ? String(payload.description || "").trim() : item.description,
+    photo: payload.photo !== undefined ? payload.photo || "" : item.photo,
+    shelfPosition:
+      payload.shelfPosition !== undefined
+        ? String(payload.shelfPosition || "").trim()
+        : item.shelfPosition,
+    updatedAt: new Date().toISOString(),
+  };
+
+  sessionAccessories = sessionAccessories.map((row, rowIndex) => (rowIndex === index ? next : row));
+  return { ...next };
 }
 
 function resolveInventoryStatus(quantity, minStock) {

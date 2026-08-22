@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Menu, LogOut } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import SearchInput from "./common/fields/SearchInput";
@@ -33,18 +34,20 @@ const Header = ({ setSidebarOpen }) => {
           <span className="text-[10px] font-medium text-muted">System Live</span>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 pl-3 h-8 rounded-md hover:bg-slate-50 transition-colors pr-2 border-r border-slate-100">
+        <Link
+          to="/settings"
+          className="hidden sm:flex items-center gap-2 pl-3 h-8 rounded-md hover:bg-slate-50 transition-colors pr-2 border-r border-slate-100"
+        >
           <div className="flex flex-col items-end leading-none">
             <span className="text-[10px] font-bold text-text">
               {user?.name ?? "Store Admin"}
             </span>
-            <span className="text-[9px] text-subtle">Admin</span>
+            <span className="text-[9px] text-subtle">{user?.role ?? "Staff"}</span>
           </div>
           <div className="h-7 w-7 rounded bg-slate-100 border border-border flex items-center justify-center text-muted text-[9px] font-bold">
             {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
           </div>
-        </div>
-
+        </Link>
         <button
           type="button"
           onClick={() => setLogoutOpen(true)}

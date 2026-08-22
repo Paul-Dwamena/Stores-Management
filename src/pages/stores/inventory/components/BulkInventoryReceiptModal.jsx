@@ -10,10 +10,10 @@ import TableRowActions from "../../../../components/common/tableActions/TableRow
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import {
-  SEED_SUPPLIERS,
-  STORE_LOCATION_OPTIONS,
   formatAccessoryMoney,
+  getStoreLocationOptions,
 } from "../../../../mockdata/stores";
+import { getActiveSuppliers, getSupplierContact } from "../../../../mockdata/org";
 import { ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
@@ -22,12 +22,13 @@ import {
 } from "../../../../mockdata/stores/vehiclePartsInventory";
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
+import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
 
 const readOnlyClassName =
-  "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] text-slate-600";
+  "w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-600 cursor-not-allowed";
 
 const whiteInputClassName = "bg-white focus:bg-white";
 
@@ -69,6 +70,7 @@ function createLine(inventoryType, mode) {
     quantity: "",
     unitCost: "",
     location: "",
+    photo: "",
     condition: "",
     notes: "",
     inventoryType,
@@ -83,6 +85,14 @@ function lineName(line, inventoryType, mode, items) {
   if (inventoryType === "accessory") return line.name.trim() || "New accessory";
   const levels = VEHICLE_COMPONENT_LEVEL_KEYS.map((key) => line[key]).filter(Boolean);
   return levels.at(-1) || "New vehicle part";
+}
+
+function linePhoto(line, mode, items) {
+  if (line.photo) return line.photo;
+  if (mode === "existing" && line.itemId) {
+    return items.find((item) => item.id === line.itemId)?.photo || "";
+  }
+  return "";
 }
 
 function calcLineTotal(quantity, unitCost) {
@@ -208,11 +218,17 @@ function SharedSupplyFields({ value, errors, onChange }) {
           </FieldLabel>
           <select
             value={value.supplierId}
-            onChange={(event) => onChange("supplierId", event.target.value)}
+            onChange={(event) => {
+              const supplierId = event.target.value;
+              const contact = getSupplierContact(supplierId);
+              onChange("supplierId", supplierId);
+              onChange("supplierPhone", contact.supplierPhone);
+              onChange("supplierEmail", contact.supplierEmail);
+            }}
             className={cn(fieldClassName, errors.supplierId && "border-rose-500 bg-rose-50")}
           >
             <option value="">Select supplier</option>
-            {SEED_SUPPLIERS.map((supplier) => (
+            {getActiveSuppliers().map((supplier) => (
               <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
             ))}
           </select>
@@ -238,17 +254,19 @@ function SharedSupplyFields({ value, errors, onChange }) {
           label="Supplier phone"
           type="tel"
           value={value.supplierPhone}
-          onChange={(event) => onChange("supplierPhone", event.target.value)}
+          readOnly
+          placeholder={value.supplierId ? "—" : "Select a supplier"}
           error={errors.supplierContact}
-        className={whiteInputClassName}
+          className={readOnlyClassName}
         />
         <InputField
           label="Supplier email"
           type="email"
           value={value.supplierEmail}
-          onChange={(event) => onChange("supplierEmail", event.target.value)}
+          readOnly
+          placeholder={value.supplierId ? "—" : "Select a supplier"}
           error={errors.supplierEmail}
-        className={whiteInputClassName}
+          className={readOnlyClassName}
         />
         <div>
           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -291,7 +309,7 @@ function LocationSelect({ value, onChange, error }) {
         className={cn(fieldClassName, "mt-1", error && "border-rose-500 bg-rose-50")}
       >
         <option value="">Select store location</option>
-        {STORE_LOCATION_OPTIONS.map((location) => (
+        {getStoreLocationOptions().map((location) => (
           <option key={location} value={location}>{location}</option>
         ))}
       </select>
@@ -579,14 +597,17 @@ function ExistingLineFields({
                         }
                         setSearch("");
                       }}
-                      className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                      className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
                     >
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-slate-800">{item.name}</p>
-                        <p className="text-[10px] text-slate-500">
-                          {item.itemCode}
-                          {item.brand ? ` · ${item.brand}` : ""}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-semibold text-slate-800">{item.name}</p>
+                          <p className="text-[10px] text-slate-500">
+                            {item.itemCode}
+                            {item.brand ? ` · ${item.brand}` : ""}
+                          </p>
+                        </div>
                       </div>
                       <span className="shrink-0 text-[10px] font-medium text-slate-400">
                         Qty {item.quantity ?? 0}
@@ -614,9 +635,11 @@ function ExistingLineFields({
     <div className="space-y-3">
       <div className="overflow-hidden rounded-lg border border-emerald-100 bg-emerald-50/50">
         <div className="flex items-center justify-between gap-3 px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-[12px] font-semibold text-slate-900">{selected.name}</p>
-            <p className="truncate text-[10px] leading-tight text-slate-500">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <ItemPhotoThumb src={selected.photo} name={selected.name} className="h-9 w-9" />
+            <div className="min-w-0">
+              <p className="truncate text-[12px] font-semibold text-slate-900">{selected.name}</p>
+              <p className="truncate text-[10px] leading-tight text-slate-500">
               {[
                 selected.itemCode,
                 selected.brand,
@@ -626,6 +649,7 @@ function ExistingLineFields({
                 `On hand ${selected.quantity ?? 0}`,
               ].filter(Boolean).join(" · ")}
             </p>
+            </div>
           </div>
           <button
             type="button"
@@ -715,6 +739,11 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
         value={line.description}
         onChange={(event) => onChange("description", event.target.value)}
         className={whiteInputClassName}
+      />
+      <ItemPhotoField
+        id={`bulk-acc-photo-${line.clientId}`}
+        value={line.photo}
+        onChange={(photo) => onChange("photo", photo)}
       />
     </div>
   );
@@ -855,10 +884,10 @@ function LineEditorPanel({
           usedItemIds={usedItemIds}
           inventoryType={inventoryType}
         />
-      ) : inventoryType === "accessory" ? (
-        <NewAccessoryFields splitPanes line={line} errors={errors} onChange={onChange} />
-      ) : (
+      ) : inventoryType === "vehicle_part" ? (
         <NewVehiclePartFields splitPanes line={line} errors={errors} onChange={onChange} />
+      ) : (
+        <NewAccessoryFields splitPanes line={line} errors={errors} onChange={onChange} />
       )}
     </div>
   );
@@ -1120,6 +1149,7 @@ export default function BulkInventoryReceiptModal({
                   <thead className="sticky top-0 bg-slate-50/95">
                     <tr className="border-b border-slate-200">
                       <th className={thClass}>#</th>
+                      <th className={cn(thClass, "w-14")}>Photo</th>
                       <th className={thClass}>Item</th>
                       <th className={thClass}>Details</th>
                       <th className={thClass}>Qty</th>
@@ -1142,6 +1172,12 @@ export default function BulkInventoryReceiptModal({
                           )}
                         >
                           <td className={tdClass}>{index + 1}</td>
+                          <td className={tdClass}>
+                            <ItemPhotoThumb
+                              src={linePhoto(line, mode, items)}
+                              name={lineName(line, inventoryType, mode, items)}
+                            />
+                          </td>
                           <td className={tdClass}>
                             <p className="font-semibold text-slate-800">
                               {lineName(line, inventoryType, mode, items)}

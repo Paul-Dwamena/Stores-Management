@@ -23,12 +23,12 @@ import {
   getReceiveRegisteredItemsFormSetup,
 } from "../../../../mockdata/setups";
 import {
-  SEED_SUPPLIERS,
-  STORE_LOCATION_OPTIONS,
   getAccessories,
   getVehicleParts,
   formatAccessoryMoney,
+  getStoreLocationOptions,
 } from "../../../../mockdata/stores";
+import { getActiveSuppliers, getSupplierContact } from "../../../../mockdata/org";
 import { generateAccessoryItemCode, ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
@@ -38,6 +38,7 @@ import {
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import BulkInventoryReceiptModal from "./BulkInventoryReceiptModal";
+import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -71,6 +72,7 @@ const INITIAL_ACCESSORY = {
   quantity: "",
   unitPrice: "",
   location: "",
+  photo: "",
   ...SUPPLYING_FIELDS,
 };
 
@@ -191,11 +193,14 @@ function SelectedItemCard({ item, onChange }) {
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-brand/15 bg-brand-muted px-3 py-1.5">
-      <div className="min-w-0">
-        <p className="truncate text-[12px] font-semibold text-slate-900">{item.name}</p>
-        {meta ? (
-          <p className="truncate text-[10px] leading-tight text-slate-500">{meta}</p>
-        ) : null}
+      <div className="flex min-w-0 items-center gap-2.5">
+        <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+        <div className="min-w-0">
+          <p className="truncate text-[12px] font-semibold text-slate-900">{item.name}</p>
+          {meta ? (
+            <p className="truncate text-[10px] leading-tight text-slate-500">{meta}</p>
+          ) : null}
+        </div>
       </div>
       <button
         type="button"
@@ -207,6 +212,10 @@ function SelectedItemCard({ item, onChange }) {
       </button>
     </div>
   );
+}
+
+function applySupplierContact(form, supplierId) {
+  return { ...form, supplierId, ...getSupplierContact(supplierId) };
 }
 
 function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys }) {
@@ -231,7 +240,7 @@ function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys }) {
             className={cn(fieldClassName, errors.supplierId && "border-red-500 bg-red-50")}
           >
             <option value="">Select supplier…</option>
-            {SEED_SUPPLIERS.map((supplier) => (
+            {getActiveSuppliers().map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.name}
               </option>
@@ -302,9 +311,10 @@ function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys }) {
           id={`${prefix}SupplierPhone`}
           type="tel"
           value={form.supplierPhone}
-          onChange={onChange("supplierPhone")}
+          readOnly
+          placeholder={form.supplierId ? "—" : "Select a supplier"}
           error={errors.supplierContact}
-          placeholder="e.g. +233 24 000 0000"
+          className={readOnlyClassName}
         />
         </ShowConfiguredField>
         <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="supplierEmail">
@@ -313,9 +323,10 @@ function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys }) {
           id={`${prefix}SupplierEmail`}
           type="email"
           value={form.supplierEmail}
-          onChange={onChange("supplierEmail")}
+          readOnly
+          placeholder={form.supplierId ? "—" : "Select a supplier"}
           error={errors.supplierEmail}
-          placeholder="e.g. receipts@supplier.com"
+          className={readOnlyClassName}
         />
         </ShowConfiguredField>
       </div>
@@ -361,7 +372,7 @@ function StoreLocationField({ id, value, onChange, error }) {
         className={cn(fieldClassName, error && "border-red-500 bg-red-50")}
       >
         <option value="">Select store location…</option>
-        {STORE_LOCATION_OPTIONS.map((location) => (
+        {getStoreLocationOptions().map((location) => (
           <option key={location} value={location}>{location}</option>
         ))}
       </select>
@@ -420,7 +431,7 @@ function validateStockFields(form, errors, visibleKeys) {
 
 export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkSave }) {
   const [step, setStep] = useState("setup");
-  const [itemType, setItemType] = useState("");
+  const [itemType, setItemType] = useState("accessory");
   const [entryMode, setEntryMode] = useState("");
   const [registrationMode, setRegistrationMode] = useState("registered");
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -450,7 +461,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   useEffect(() => {
     if (!isOpen) return;
     setStep("setup");
-    setItemType("");
+    setItemType("accessory");
     setEntryMode("");
     setRegistrationMode("registered");
     setBulkOpen(false);
@@ -590,8 +601,16 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   };
 
   const handleAccessoryChange = (field) => (event) => {
-    setAccessoryForm((prev) => ({ ...prev, [field]: event.target.value }));
+    const value = event?.target ? event.target.value : event;
+    setAccessoryForm((prev) =>
+      field === "supplierId" ? applySupplierContact(prev, value) : { ...prev, [field]: value },
+    );
     clearError(field);
+    if (field === "supplierId") {
+      clearError("supplierPhone");
+      clearError("supplierEmail");
+      clearError("supplierContact");
+    }
     if (field === "supplierPhone" || field === "supplierEmail") clearError("supplierContact");
   };
 
@@ -604,9 +623,17 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       if (field === "model") {
         return { ...prev, model: value, year: "" };
       }
+      if (field === "supplierId") {
+        return applySupplierContact(prev, value);
+      }
       return { ...prev, [field]: value };
     });
     clearError(field);
+    if (field === "supplierId") {
+      clearError("supplierPhone");
+      clearError("supplierEmail");
+      clearError("supplierContact");
+    }
     if (field === "supplierPhone" || field === "supplierEmail") clearError("supplierContact");
     if (field === "make") {
       clearError("model");
@@ -617,8 +644,16 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   };
 
   const handleRegisteredChange = (field) => (event) => {
-    setRegisteredForm((prev) => ({ ...prev, [field]: event.target.value }));
+    const value = event.target.value;
+    setRegisteredForm((prev) =>
+      field === "supplierId" ? applySupplierContact(prev, value) : { ...prev, [field]: value },
+    );
     clearError(field);
+    if (field === "supplierId") {
+      clearError("supplierPhone");
+      clearError("supplierEmail");
+      clearError("supplierContact");
+    }
     if (field === "supplierPhone" || field === "supplierEmail") clearError("supplierContact");
   };
 
@@ -702,12 +737,11 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setRegisteredForm(INITIAL_REGISTERED);
     setItemSearch("");
     setComponentFilterOpen(true);
-    if (itemType === "accessory") {
-      setAccessoryForm((prev) => ({
-        ...prev,
-        itemCode: generateAccessoryItemCode(),
-      }));
-    }
+    setItemType("accessory");
+    setAccessoryForm((prev) => ({
+      ...prev,
+      itemCode: generateAccessoryItemCode(),
+    }));
     setStep("form");
   };
 
@@ -770,6 +804,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         totalPurchaseCost: accessoryTotal,
         supplierId: accessoryForm.supplierId,
         location: accessoryForm.location,
+        photo: accessoryForm.photo,
         waybillNumber: accessoryForm.waybillNumber,
         deliveredByName: accessoryForm.deliveredByName,
         supplierPhone: accessoryForm.supplierPhone,
@@ -840,11 +875,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       submitRegistered();
       return;
     }
-    if (itemType === "accessory") {
-      submitAccessory();
-      return;
-    }
-    submitVehiclePart();
+    submitAccessory();
   };
 
   const isSetupStep = step === "setup";
@@ -861,10 +892,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
           isSetupStep
             ? "New Inventory Item"
             : isRegistered
-              ? `Receive registered ${itemType === "vehicle_part" ? "vehicle part" : "accessory"}`
-              : itemType === "accessory"
-                ? "New Accessory"
-                : "New Vehicle Part"
+              ? "Receive registered item"
+              : "Receive unregistered item"
         }
         subtitle={
           isSetupStep
@@ -880,7 +909,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
               ? "Submit for approval"
               : "Save item"
         }
-        dialogClassName={isSetupStep ? "max-w-2xl" : "max-w-3xl"}
+        dialogClassName={isSetupStep ? "max-w-lg" : "max-w-3xl"}
         contentClassName="space-y-4"
         secondaryAction={
           isFormStep
@@ -905,13 +934,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
               >
                 Number of items
               </p>
-              <div role="radiogroup" aria-label="Number of items" className="space-y-2">
+              <div role="radiogroup" aria-label="Number of items" className="flex flex-nowrap gap-2">
                 <ChoiceOption
                   type="radio"
                   id="inventoryItemCountSingle"
                   name="inventoryItemCount"
                   value="single"
                   label="Single"
+                  className="min-w-0 flex-1"
                   checked={entryMode === "single"}
                   onChange={() => {
                     setEntryMode("single");
@@ -924,6 +954,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                   name="inventoryItemCount"
                   value="multiple"
                   label="Multiple"
+                  className="min-w-0 flex-1"
                   checked={entryMode === "multiple"}
                   onChange={() => {
                     setEntryMode("multiple");
@@ -952,172 +983,67 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                 <div className="space-y-3">
                   {!selectedRegisteredItem ? (
                     <>
-                      {itemType === "vehicle_part" ? (
-                        <>
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div className="space-y-1.5">
-                              <label
-                                htmlFor="regVpMake"
-                                className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                              >
-                                Make
-                              </label>
-                              <select
-                                id="regVpMake"
-                                value={registeredForm.make}
-                                onChange={handleRegisteredVehicleFilterChange("make")}
-                                className={fieldClassName}
-                              >
-                                <option value="">Select make…</option>
-                                {registeredMakeOptions.map((make) => (
-                                  <option key={make} value={make}>{make}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <label
-                                htmlFor="regVpModel"
-                                className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                              >
-                                Model
-                              </label>
-                              <select
-                                id="regVpModel"
-                                value={registeredForm.model}
-                                onChange={handleRegisteredVehicleFilterChange("model")}
-                                disabled={!registeredForm.make}
-                                className={cn(fieldClassName, !registeredForm.make && "opacity-60")}
-                              >
-                                <option value="">
-                                  {!registeredForm.make ? "Select make first" : "Select model…"}
-                                </option>
-                                {registeredModelOptions.map((model) => (
-                                  <option key={model} value={model}>{model}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <label
-                                htmlFor="regVpYear"
-                                className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                              >
-                                Year
-                              </label>
-                              <select
-                                id="regVpYear"
-                                value={registeredForm.year}
-                                onChange={handleRegisteredVehicleFilterChange("year")}
-                                disabled={!registeredForm.model}
-                                className={cn(fieldClassName, !registeredForm.model && "opacity-60")}
-                              >
-                                <option value="">
-                                  {!registeredForm.model ? "Select model first" : "Select year…"}
-                                </option>
-                                {registeredYearOptions.map((year) => (
-                                  <option key={year} value={year}>{year}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-
-                          <CollapsibleSection
-                            title="Vehicle part component"
-                            description="Optional. Narrow the list by component level."
-                            open={componentFilterOpen}
-                            onToggle={() => setComponentFilterOpen((prev) => !prev)}
-                          >
-                            <ComponentLevelSelects
-                              levels={{
-                                level1: registeredForm.level1,
-                                level2: registeredForm.level2,
-                                level3: registeredForm.level3,
-                                level4: registeredForm.level4,
-                                level5: registeredForm.level5,
-                                level6: registeredForm.level6,
-                              }}
-                              onChange={(levels) => {
-                                setRegisteredForm((prev) => ({
-                                  ...prev,
-                                  ...levels,
-                                  itemId: "",
-                                }));
-                                setItemSearch("");
-                                clearError("itemId");
-                              }}
-                            />
-                          </CollapsibleSection>
-                        </>
-                      ) : null}
-
-                      {hasVehiclePartFilters ? (
-                        <>
-                          <div className="space-y-1.5">
-                            <label
-                              htmlFor="regItemSearch"
-                              className={cn(
-                                "text-[10px] font-bold uppercase tracking-wider",
-                                errors.itemId ? "text-red-500" : "text-slate-500",
-                              )}
-                            >
-                              Search registered item
-                            </label>
-                            <div className="relative">
-                              <Search
-                                size={14}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                              />
-                              <input
-                                id="regItemSearch"
-                                value={itemSearch}
-                                onChange={(event) => setItemSearch(event.target.value)}
-                                className={cn(
-                                  fieldClassName,
-                                  "pl-9",
-                                  errors.itemId && "border-red-500 bg-red-50",
-                                )}
-                                placeholder="Search by code, name, brand…"
-                              />
-                            </div>
-                            {errors.itemId ? (
-                              <p className="text-[10px] font-medium text-red-500">{errors.itemId}</p>
-                            ) : null}
-                          </div>
-                          <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white">
-                            {filteredCatalog.length === 0 ? (
-                              <p className="px-3 py-3 text-[11px] text-slate-400">
-                                No registered items found.
-                              </p>
-                            ) : (
-                              filteredCatalog.map((item) => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  onClick={() => selectRegisteredItem(item)}
-                                  className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left last:border-b-0 hover:bg-slate-50"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="text-[12px] font-semibold text-slate-800">{item.name}</p>
-                                    <p className="text-[10px] text-slate-500">
-                                      {item.itemCode}
-                                      {item.brand ? ` · ${item.brand}` : ""}
-                                      {item.make
-                                        ? ` · ${item.make} ${item.model || ""} ${item.year || ""}`
-                                        : ""}
-                                    </p>
-                                  </div>
-                                  <span className="shrink-0 text-[10px] font-medium text-slate-400">
-                                    Qty {item.quantity ?? 0}
-                                  </span>
-                                </button>
-                              ))
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="regItemSearch"
+                          className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider",
+                            errors.itemId ? "text-red-500" : "text-slate-500",
+                          )}
+                        >
+                          Search registered item
+                        </label>
+                        <div className="relative">
+                          <Search
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                          />
+                          <input
+                            id="regItemSearch"
+                            value={itemSearch}
+                            onChange={(event) => setItemSearch(event.target.value)}
+                            className={cn(
+                              fieldClassName,
+                              "pl-9",
+                              errors.itemId && "border-red-500 bg-red-50",
                             )}
-                          </div>
-                        </>
-                      ) : (
-                        <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[11px] text-slate-500">
-                          Select make, model, and year to search registered vehicle parts.
-                        </p>
-                      )}
+                            placeholder="Search by code, name, brand…"
+                          />
+                        </div>
+                        {errors.itemId ? (
+                          <p className="text-[10px] font-medium text-red-500">{errors.itemId}</p>
+                        ) : null}
+                      </div>
+                      <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+                        {filteredCatalog.length === 0 ? (
+                          <p className="px-3 py-3 text-[11px] text-slate-400">
+                            No registered items found.
+                          </p>
+                        ) : (
+                          filteredCatalog.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => selectRegisteredItem(item)}
+                              className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left last:border-b-0 hover:bg-slate-50"
+                            >
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+                                <div className="min-w-0">
+                                  <p className="text-[12px] font-semibold text-slate-800">{item.name}</p>
+                                  <p className="text-[10px] text-slate-500">
+                                    {item.itemCode}
+                                    {item.brand ? ` · ${item.brand}` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="shrink-0 text-[10px] font-medium text-slate-400">
+                                Qty {item.quantity ?? 0}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
                     </>
                   ) : (
                     <SelectedItemCard
@@ -1170,7 +1096,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                   </ShowConfiguredField>
                 </div>
               </>
-            ) : itemType === "accessory" ? (
+            ) : (
               <>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -1239,6 +1165,11 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     placeholder="Short description…"
                   />
                 </div>
+                <ItemPhotoField
+                  id="newAccPhoto"
+                  value={accessoryForm.photo}
+                  onChange={(photo) => handleAccessoryChange("photo")(photo)}
+                />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ShowConfiguredField visibleKeys={unregisteredVisibleKeys} fieldKey="quantity">
                   <InputField
@@ -1279,183 +1210,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                   </ShowConfiguredField>
                 </div>
               </>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="newVpMake"
-                      className={cn(
-                        "text-[10px] font-bold uppercase tracking-wider",
-                        errors.make ? "text-red-500" : "text-slate-500",
-                      )}
-                    >
-                      Make
-                    </label>
-                    <select
-                      id="newVpMake"
-                      value={vehicleForm.make}
-                      onChange={handleVehicleChange("make")}
-                      className={cn(fieldClassName, errors.make && "border-red-500 bg-red-50")}
-                    >
-                      <option value="">Select make…</option>
-                      {VEHICLE_PART_MAKE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.make ? (
-                      <p className="text-[10px] font-medium text-red-500">{errors.make}</p>
-                    ) : null}
-                  </div>
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="newVpModel"
-                      className={cn(
-                        "text-[10px] font-bold uppercase tracking-wider",
-                        errors.model ? "text-red-500" : "text-slate-500",
-                      )}
-                    >
-                      Model
-                    </label>
-                    <select
-                      id="newVpModel"
-                      value={vehicleForm.model}
-                      onChange={handleVehicleChange("model")}
-                      disabled={!vehicleForm.make}
-                      className={cn(
-                        fieldClassName,
-                        errors.model && "border-red-500 bg-red-50",
-                        !vehicleForm.make && "opacity-60",
-                      )}
-                    >
-                      <option value="">
-                        {!vehicleForm.make ? "Select make first" : "Select model…"}
-                      </option>
-                      {vehicleModelOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.model ? (
-                      <p className="text-[10px] font-medium text-red-500">{errors.model}</p>
-                    ) : null}
-                  </div>
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="newVpYear"
-                      className={cn(
-                        "text-[10px] font-bold uppercase tracking-wider",
-                        errors.year ? "text-red-500" : "text-slate-500",
-                      )}
-                    >
-                      Year
-                    </label>
-                    <select
-                      id="newVpYear"
-                      value={vehicleForm.year}
-                      onChange={handleVehicleChange("year")}
-                      disabled={!vehicleForm.model}
-                      className={cn(
-                        fieldClassName,
-                        errors.year && "border-red-500 bg-red-50",
-                        !vehicleForm.model && "opacity-60",
-                      )}
-                    >
-                      <option value="">
-                        {!vehicleForm.model ? "Select model first" : "Select year…"}
-                      </option>
-                      {vehicleYearOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.year ? (
-                      <p className="text-[10px] font-medium text-red-500">{errors.year}</p>
-                    ) : null}
-                  </div>
-                </div>
-                <InputField
-                  label="VIN / Chassis number"
-                  id="newVpChassis"
-                  value={vehicleForm.chassisNumber}
-                  onChange={handleVehicleChange("chassisNumber")}
-                  placeholder="Optional"
-                />
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    Vehicle part component
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    Select from Level 1 downward. The deepest selected level becomes the item name.
-                  </p>
-                  <ComponentLevelSelects
-                    levels={{
-                      level1: vehicleForm.level1,
-                      level2: vehicleForm.level2,
-                      level3: vehicleForm.level3,
-                      level4: vehicleForm.level4,
-                      level5: vehicleForm.level5,
-                      level6: vehicleForm.level6,
-                    }}
-                    onChange={(levels) => {
-                      setVehicleForm((prev) => ({ ...prev, ...levels }));
-                      if (levels.level1) clearError("level1");
-                    }}
-                  />
-                  {errors.level1 && (
-                    <p className="text-[10px] font-medium text-red-500">{errors.level1}</p>
-                  )}
-                  <div className="space-y-1.5 pt-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Name (last component level)
-                    </p>
-                    <div className={readOnlyClassName}>{componentName || "—"}</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ShowConfiguredField visibleKeys={unregisteredVisibleKeys} fieldKey="quantity">
-                  <InputField
-                    label="Quantity"
-                    id="newVpQty"
-                    type="number"
-                    value={vehicleForm.quantity}
-                    onChange={handleVehicleChange("quantity")}
-                    error={errors.quantity}
-                  />
-                  </ShowConfiguredField>
-                  <ShowConfiguredField visibleKeys={unregisteredVisibleKeys} fieldKey="unitPrice">
-                  <InputField
-                    label="Unit price (GH₵)"
-                    id="newVpUnitPrice"
-                    type="number"
-                    value={vehicleForm.unitPrice}
-                    onChange={handleVehicleChange("unitPrice")}
-                    error={errors.unitPrice}
-                  />
-                  </ShowConfiguredField>
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Total price (GH₵)
-                    </p>
-                    <div className={readOnlyClassName}>{vehicleTotal || "—"}</div>
-                    <p className="text-[10px] text-slate-400">
-                      Auto-calculated from quantity × unit price
-                    </p>
-                  </div>
-                  <ShowConfiguredField visibleKeys={unregisteredVisibleKeys} fieldKey="location">
-                  <StoreLocationField
-                    id="newVpLocation"
-                    value={vehicleForm.location}
-                    onChange={handleVehicleChange("location")}
-                    error={errors.location}
-                  />
-                  </ShowConfiguredField>
-                </div>
-              </>
             )}
             </CollapsibleSection>
 
@@ -1465,49 +1219,19 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
               onToggle={() => setSupplyingDetailsOpen((prev) => !prev)}
             >
               <SupplyingDetails
-                form={
-                  isRegistered
-                    ? registeredForm
-                    : itemType === "accessory"
-                      ? accessoryForm
-                      : vehicleForm
-                }
+                form={isRegistered ? registeredForm : accessoryForm}
                 errors={errors}
-                onChange={
-                  isRegistered
-                    ? handleRegisteredChange
-                    : itemType === "accessory"
-                      ? handleAccessoryChange
-                      : handleVehicleChange
-                }
-                prefix={
-                  isRegistered
-                    ? "reg"
-                    : itemType === "accessory"
-                      ? "newAcc"
-                      : "newVp"
-                }
+                onChange={isRegistered ? handleRegisteredChange : handleAccessoryChange}
+                prefix={isRegistered ? "reg" : "newAcc"}
                 visibleKeys={isRegistered ? registeredVisibleKeys : unregisteredVisibleKeys}
               />
             </CollapsibleSection>
             <ConfiguredCustomFields
               sections={isRegistered ? registeredSections : unregisteredSections}
               systemKeys={isRegistered ? registeredSystemKeys : unregisteredSystemKeys}
-              form={
-                isRegistered
-                  ? registeredForm
-                  : itemType === "accessory"
-                    ? accessoryForm
-                    : vehicleForm
-              }
+              form={isRegistered ? registeredForm : accessoryForm}
               formErrors={errors}
-              handleChange={
-                isRegistered
-                  ? handleRegisteredChange
-                  : itemType === "accessory"
-                    ? handleAccessoryChange
-                    : handleVehicleChange
-              }
+              handleChange={isRegistered ? handleRegisteredChange : handleAccessoryChange}
               idPrefix={isRegistered ? "rri" : "nac"}
             />
           </div>
@@ -1518,19 +1242,11 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         isOpen={Boolean(pendingSave)}
         onClose={() => setPendingSave(null)}
         onConfirm={handleConfirmSave}
-        title={
-          pendingSave?.mode === "existing"
-            ? "Submit stock receipt?"
-            : pendingSave?.type === "vehicle_part"
-              ? "Save vehicle part?"
-              : "Save accessory?"
-        }
+        title={pendingSave?.mode === "existing" ? "Submit stock receipt?" : "Save item?"}
         message={
           pendingSave?.mode === "existing"
             ? `Submit stock receipt for ${pendingSave?.label || "this item"} for approval? It will be added to receivables only after approval.`
-            : pendingSave?.type === "vehicle_part"
-              ? `Add ${pendingSave?.label || "this vehicle part"} to inventory?`
-              : `Add ${pendingSave?.label || "this accessory"} to inventory?`
+            : `Add ${pendingSave?.label || "this item"} to inventory?`
         }
         confirmText={pendingSave?.mode === "existing" ? "Submit for approval" : "Save item"}
       />
@@ -1538,7 +1254,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       <BulkInventoryReceiptModal
         isOpen={isOpen && bulkOpen}
         onClose={() => setBulkOpen(false)}
-        inventoryType={itemType}
+        inventoryType="accessory"
         items={catalogItems}
         onSave={(payload) => {
           onBulkSave?.(payload);

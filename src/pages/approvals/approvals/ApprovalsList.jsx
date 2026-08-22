@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../components/common/PageHeader";
 import SearchInput from "../../../components/common/fields/SearchInput";
 import Pagination from "../../../components/common/Pagination";
@@ -58,6 +59,7 @@ function approvalSortTime(row) {
 }
 
 export default function ApprovalsList() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState(() => syncApprovalsFromRequests(getRequests()));
   const [tab, setTab] = useState("pending");
   const [search, setSearch] = useState("");
@@ -140,6 +142,22 @@ export default function ApprovalsList() {
     setSelected(null);
   };
 
+  const openRaiseFromStores = (request) => {
+    const details = request?.storesDetails || {};
+    const raiseRef =
+      details.requisitionId
+      || details.requestNumber
+      || request?.sourceRequestId
+      || request?.requestNumber;
+    navigate(`/stores?sub=requisition&raise=${encodeURIComponent(raiseRef || "store")}`, {
+      state: {
+        raiseStoresDetails: details,
+        sourceRequestId: request?.sourceRequestId || null,
+        approvalRequestNumber: request?.requestNumber || null,
+      },
+    });
+  };
+
   const requestDecision = (type, request) => {
     if (!request) return;
     setAction({
@@ -214,9 +232,6 @@ export default function ApprovalsList() {
                 <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Request #</th>
                 <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Type</th>
                 <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Requester</th>
-                {tab === "history" && (
-                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Cost Center</th>
-                )}
                 <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Amount</th>
                 {tab === "history" ? (
                   <>
@@ -234,7 +249,7 @@ export default function ApprovalsList() {
               {pagedRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={tab === "history" ? 9 : 6}
+                    colSpan={tab === "history" ? 8 : 6}
                     className="px-6 py-12 text-center text-[13px] text-slate-400"
                   >
                     {tab === "pending" ? "No pending approvals" : "No approval history"}
@@ -251,9 +266,6 @@ export default function ApprovalsList() {
                       <p className="text-[13px] font-semibold text-slate-900">{row.requester}</p>
                       <p className="text-[11px] text-slate-400">{row.requesterDept}</p>
                     </td>
-                    {tab === "history" && (
-                      <td className="px-4 py-3 text-[13px] text-slate-600">{row.costCenter}</td>
-                    )}
                     <td className="px-4 py-3 text-[13px] font-bold text-slate-800 whitespace-nowrap">
                       {formatApprovalAmount(row.amount)}
                     </td>
@@ -301,6 +313,7 @@ export default function ApprovalsList() {
         request={selected}
         onApprove={(request) => requestDecision("approve", request)}
         onReject={(request) => requestDecision("reject", request)}
+        onApproveFromStores={openRaiseFromStores}
       />
 
       <ApprovalDecisionModal

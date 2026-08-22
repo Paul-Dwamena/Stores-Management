@@ -1,4 +1,5 @@
 export { default as AccessoryDetailModal } from "./AccessoryDetailModal";
+export { default as EditInventoryItemModal } from "./EditInventoryItemModal";
 export { default as AddAccessoryModal } from "./AddAccessoryModal";
 export { default as AddVehiclePartModal } from "./AddVehiclePartModal";
 export { default as NewInventoryItemModal } from "./NewInventoryItemModal";

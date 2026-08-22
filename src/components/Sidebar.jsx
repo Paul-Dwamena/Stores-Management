@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { FiGrid, FiBox, FiX } from "react-icons/fi";
-import { CheckCircle, Inbox } from "lucide-react";
+import { FiGrid, FiBox, FiX, FiSettings } from "react-icons/fi";
+import { CheckCircle, Inbox, ScrollText, SlidersHorizontal } from "lucide-react";
 import { cn } from "../utils/cn";
 import StoreLogo from "./common/StoreLogo";
 
@@ -10,6 +10,9 @@ const mainNavItems = [
   { name: "Stores", icon: FiBox, path: "/stores" },
   { name: "Requests", icon: Inbox, path: "/requests" },
   { name: "Approvals", icon: CheckCircle, path: "/approvals" },
+  { name: "Setups", icon: SlidersHorizontal, path: "/setups" },
+  { name: "Audit Trail", icon: ScrollText, path: "/audit-trail" },
+  { name: "Settings", icon: FiSettings, path: "/settings" },
 ];
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {

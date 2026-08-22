@@ -87,7 +87,7 @@ export default function AddReceiverConfiguredFields({
             className={cn(selectClass, formErrors.role && "border-rose-500 bg-rose-50")}
           >
             <option value="">{field.placeholder || "Select role"}</option>
-            {optionRows(field.options).map((option) => (
+            {optionRows(RECEIVER_ROLE_OPTIONS).map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

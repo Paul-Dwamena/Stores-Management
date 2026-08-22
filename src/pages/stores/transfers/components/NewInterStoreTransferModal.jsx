@@ -50,11 +50,11 @@ export default function NewInterStoreTransferModal({
   const systemKeys = new Set(NEW_INTER_STORE_TRANSFER_FORM_FIELD_CATALOG.map((field) => field.key));
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
-  const [receiver, setReceiver] = useState("");
+  const [dispatcher, setDispatcher] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
-  const [addReceiverOpen, setAddReceiverOpen] = useState(false);
+  const [addDispatcherOpen, setAddDispatcherOpen] = useState(false);
 
   const fromStoreOptions = useMemo(() => getInterStoreFromStoreOptions(), [isOpen]);
   const storeOptions = useMemo(() => getInterStoreStockLocations(), [isOpen]);
@@ -73,11 +73,11 @@ export default function NewInterStoreTransferModal({
     setErrors({});
     setConfirmOpen(false);
     setPendingPayload(null);
-    setReceiver("");
+    setDispatcher("");
     setOtpSent(false);
     setOtp("");
     setOtpVerified(false);
-    setAddReceiverOpen(false);
+    setAddDispatcherOpen(false);
   }, [isOpen]);
 
   const selectedKeys = useMemo(
@@ -160,8 +160,8 @@ export default function NewInterStoreTransferModal({
     const nextErrors = {};
     if (!fromStore) nextErrors.fromStore = "Select the sending store first.";
     if (!lines.length) nextErrors.lines = "Select at least one item from this store.";
-    if (!receiver.trim()) nextErrors.receiver = "Select the receiver.";
-    else if (!otpVerified) nextErrors.receiver = "Verify the OTP sent to the receiver first.";
+    if (!dispatcher.trim()) nextErrors.dispatcher = "Select the person dispatching.";
+    else if (!otpVerified) nextErrors.dispatcher = "Verify the OTP sent to the dispatcher first.";
 
     lines.forEach((line) => {
       const key = lineKey(line);
@@ -181,14 +181,14 @@ export default function NewInterStoreTransferModal({
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
-      toast.warning("Complete the transfer lines and receiver OTP before requesting approval.");
+      toast.warning("Complete the transfer lines and dispatcher OTP before requesting approval.");
       return;
     }
 
     setPendingPayload({
       fromStore,
       notes: notes.trim(),
-      receiver: receiver.trim(),
+      dispatcher: dispatcher.trim(),
       lines: lines.map((line) => ({
         ...line,
         movingQuantity: Number(line.movingQuantity),
@@ -198,13 +198,13 @@ export default function NewInterStoreTransferModal({
   };
 
   const handleSendOtp = () => {
-    if (!receiver.trim()) {
-      setErrors((prev) => ({ ...prev, receiver: "Select the receiver first." }));
-      toast.warning("Select the receiver first.");
+    if (!dispatcher.trim()) {
+      setErrors((prev) => ({ ...prev, dispatcher: "Select the person dispatching first." }));
+      toast.warning("Select the person dispatching first.");
       return;
     }
     setOtpSent(true);
-    toast.info(`OTP sent to ${receiver.trim()}.`);
+    toast.info(`OTP sent to ${dispatcher.trim()}.`);
   };
 
   const finalizeSave = () => {
@@ -217,11 +217,11 @@ export default function NewInterStoreTransferModal({
   return (
     <>
       <AddModal
-        isOpen={isOpen && !confirmOpen && !addReceiverOpen}
+        isOpen={isOpen && !confirmOpen && !addDispatcherOpen}
         onClose={onClose}
         onSave={handleSave}
         title="New inter-store transfer"
-        subtitle="Choose the sending store, select items, confirm the receiver with OTP, then request approval."
+        subtitle="Choose the sending store, select items, confirm the dispatcher with OTP, then request approval."
         dialogClassName="max-w-5xl"
         saveLabel="Request approval"
         saveDisabled={!otpVerified}
@@ -441,28 +441,29 @@ export default function NewInterStoreTransferModal({
 
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
             <ReceiverPicker
-              label="Receiver"
-              placeholder="Select receiver"
-              addButtonLabel="Add receiver"
-              value={receiver}
+              id="transfer-dispatcher-search"
+              label="Person dispatching"
+              placeholder="Select dispatcher"
+              addButtonLabel="Add dispatcher"
+              value={dispatcher}
               onChange={(value) => {
-                setReceiver(value);
+                setDispatcher(value);
                 setOtpSent(false);
                 setOtp("");
                 setOtpVerified(false);
                 setErrors((prev) => {
-                  if (!prev.receiver) return prev;
+                  if (!prev.dispatcher) return prev;
                   const next = { ...prev };
-                  delete next.receiver;
+                  delete next.dispatcher;
                   return next;
                 });
               }}
-              error={errors.receiver}
+              error={errors.dispatcher}
               selectClassName={fieldClassName}
-              onAddClick={() => setAddReceiverOpen(true)}
+              onAddClick={() => setAddDispatcherOpen(true)}
             />
             <IssueOtpSection
-              suppliedTo={receiver}
+              suppliedTo={dispatcher}
               otpSent={otpSent}
               otp={otp}
               otpVerified={otpVerified}
@@ -475,7 +476,7 @@ export default function NewInterStoreTransferModal({
             />
             {!otpVerified ? (
               <p className="text-[11px] text-amber-700">
-                Request approval stays disabled until the receiver confirms the OTP.
+                Request approval stays disabled until the dispatcher confirms the OTP.
               </p>
             ) : null}
           </div>
@@ -490,27 +491,29 @@ export default function NewInterStoreTransferModal({
         title="Send for approval?"
         message={
           pendingPayload
-            ? `Request transfer of ${pendingPayload.lines.length} item${pendingPayload.lines.length === 1 ? "" : "s"} from ${pendingPayload.fromStore} (receiver: ${pendingPayload.receiver})? This goes to the approval queue first.`
+            ? `Request transfer of ${pendingPayload.lines.length} item${pendingPayload.lines.length === 1 ? "" : "s"} from ${pendingPayload.fromStore} (dispatcher: ${pendingPayload.dispatcher})? This goes to the approval queue first.`
             : "Request this inter-store transfer?"
         }
         confirmText="Request approval"
       />
 
       <AddReceiverModal
-        isOpen={addReceiverOpen}
-        onClose={() => setAddReceiverOpen(false)}
+        isOpen={addDispatcherOpen}
+        onClose={() => setAddDispatcherOpen(false)}
+        title="Add dispatcher"
+        saveLabel="Add dispatcher"
+        subtitle="Create a dispatcher with name, email, phone, and role. They can dispatch this transfer immediately."
         onCreated={(created) => {
-          setReceiver(created.name);
+          setDispatcher(created.name);
           setOtpSent(false);
           setOtp("");
           setOtpVerified(false);
           setErrors((prev) => {
-            if (!prev.receiver) return prev;
+            if (!prev.dispatcher) return prev;
             const next = { ...prev };
-            delete next.receiver;
+            delete next.dispatcher;
             return next;
           });
-          setAddReceiverOpen(false);
         }}
       />
     </>

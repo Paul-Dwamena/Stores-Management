@@ -1,24 +1,29 @@
-/** Issuance receivers — people who can collect supplied parts. */
+/** Issuance receivers — anyone who can collect or dispatch items. */
 
 export const RECEIVER_ROLE_OPTIONS = [
+  "Customer",
+  "Walk-in customer",
   "Driver",
-  "Workshop technician",
-  "Workshop lead",
-  "Store clerk",
-  "Fleet supervisor",
+  "Contractor",
   "Field dispatcher",
 ];
 
 const SEED_RECEIVERS = [
-  { id: "rcv-001", name: "Kwesi Mensah", email: "kwesi.mensah@fleet.gh", phone: "024 111 0001", role: "Workshop technician" },
-  { id: "rcv-002", name: "Ama Serwaa", email: "ama.serwaa@fleet.gh", phone: "024 111 0002", role: "Fleet supervisor" },
-  { id: "rcv-003", name: "Esi Nyarko", email: "esi.nyarko@fleet.gh", phone: "024 111 0003", role: "Store clerk" },
-  { id: "rcv-004", name: "Kojo Owusu", email: "kojo.owusu@fleet.gh", phone: "024 111 0004", role: "Driver" },
-  { id: "rcv-005", name: "Michael Addo", email: "michael.addo@fleet.gh", phone: "024 111 0005", role: "Workshop lead" },
-  { id: "rcv-006", name: "Selorm Gbeho", email: "selorm.gbeho@fleet.gh", phone: "024 111 0006", role: "Field dispatcher" },
-  { id: "rcv-007", name: "Fiifi Bentum", email: "fiifi.bentum@fleet.gh", phone: "024 111 0007", role: "Fleet supervisor" },
-  { id: "rcv-008", name: "Ebo Lamptey", email: "ebo.lamptey@fleet.gh", phone: "024 111 0008", role: "Driver" },
-  { id: "rcv-009", name: "Nii Armah Quaye", email: "nii.quaye@fleet.gh", phone: "024 111 0009", role: "Workshop technician" },
+  { id: "rcv-001", name: "Akua Boateng", email: "akua.boateng@example.com", phone: "024 220 1101", role: "Customer" },
+  { id: "rcv-002", name: "Yaw Darko", email: "yaw.darko@example.com", phone: "024 220 1102", role: "Walk-in customer" },
+  { id: "rcv-003", name: "Abena Sarpong", email: "abena.sarpong@example.com", phone: "024 220 1103", role: "Customer" },
+  { id: "rcv-004", name: "Kofi Ansah", email: "kofi.ansah@fleet.gh", phone: "024 220 1104", role: "Field dispatcher" },
+  { id: "rcv-005", name: "Nana Osei", email: "nana.osei@fleet.gh", phone: "024 220 1105", role: "Driver" },
+  { id: "rcv-006", name: "Kwame Frimpong", email: "kwame.frimpong@fleet.gh", phone: "024 220 1106", role: "Field dispatcher" },
+  { id: "rcv-007", name: "Akosua Dede", email: "akosua.dede@fleet.gh", phone: "024 220 1107", role: "Driver" },
+  { id: "rcv-008", name: "Efua Darko", email: "efua.darko@fleet.gh", phone: "024 220 1108", role: "Contractor" },
+  { id: "rcv-009", name: "Adjei Boateng", email: "adjei.boateng@fleet.gh", phone: "024 220 1109", role: "Contractor" },
+  { id: "rcv-010", name: "Selorm Gbeho", email: "selorm.gbeho@fleet.gh", phone: "024 111 0006", role: "Field dispatcher" },
+  { id: "rcv-011", name: "Michael Addo", email: "michael.addo@fleet.gh", phone: "024 111 0005", role: "Driver" },
+  { id: "rcv-012", name: "Ebo Lamptey", email: "ebo.lamptey@fleet.gh", phone: "024 111 0008", role: "Driver" },
+  { id: "rcv-013", name: "Nii Armah Quaye", email: "nii.quaye@fleet.gh", phone: "024 111 0009", role: "Contractor" },
+  { id: "rcv-014", name: "Afia Mensima", email: "afia.mensima@example.com", phone: "024 220 1114", role: "Customer" },
+  { id: "rcv-015", name: "Kojo Baffoe", email: "kojo.baffoe@example.com", phone: "024 220 1115", role: "Walk-in customer" },
 ];
 
 let sessionReceivers = SEED_RECEIVERS.map((row) => ({ ...row }));
@@ -54,6 +59,17 @@ export function getReceiverByName(name) {
   return getReceivers().find((row) => row.name.toLowerCase() === needle) || null;
 }
 
+export function getReceiverContact(name) {
+  const row = getReceiverByName(name);
+  return {
+    name: row?.name || String(name || "").trim(),
+    email: row?.email || "",
+    phone: row?.phone || "",
+    store: row?.store || "",
+    role: row?.role || "",
+  };
+}
+
 export function addReceiver(payload = {}) {
   const name = String(payload.name || "").trim();
   const email = String(payload.email || "").trim();
@@ -72,7 +88,7 @@ export function addReceiver(payload = {}) {
     (row) => row.name.toLowerCase() === name.toLowerCase() || row.email.toLowerCase() === email.toLowerCase(),
   );
   if (duplicate) {
-    throw new Error("A receiver with this name or email already exists.");
+    throw new Error("A person with this name or email already exists.");
   }
 
   const created = {

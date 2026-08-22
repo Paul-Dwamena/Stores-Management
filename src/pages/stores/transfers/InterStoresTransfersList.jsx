@@ -33,6 +33,7 @@ import {
   formatInterStoreTransferDate,
   formatInterStoreTransferStatus,
   getInterStoreTransfers,
+  getInterStoreTransferById,
   markInterStoreTransferArrived,
   receiveInterStoreTransfer,
   rejectInterStoreTransfer,
@@ -42,7 +43,6 @@ import ArriveTransferChoiceModal from "./components/ArriveTransferChoiceModal";
 import InterStoreTransferDetailsModal from "./components/InterStoreTransferDetailsModal";
 import NewInterStoreTransferModal from "./components/NewInterStoreTransferModal";
 import ReceiveTransferToStoreModal from "./components/ReceiveTransferToStoreModal";
-import DispatchTransferModal from "./components/DispatchTransferModal";
 import TransferCommentModal from "./components/TransferCommentModal";
 
 const PAGE_SIZE = 10;
@@ -88,7 +88,6 @@ export default function InterStoresTransfersList({
   const [detailRow, setDetailRow] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [commentAction, setCommentAction] = useState(null);
-  const [dispatchRow, setDispatchRow] = useState(null);
   const [arriveRow, setArriveRow] = useState(null);
   const [receiveRow, setReceiveRow] = useState(null);
 
@@ -102,7 +101,6 @@ export default function InterStoresTransfersList({
     setDetailRow(null);
     setConfirmAction(null);
     setCommentAction(null);
-    setDispatchRow(null);
     setArriveRow(null);
     setReceiveRow(null);
     refreshRows();
@@ -171,7 +169,7 @@ export default function InterStoresTransfersList({
   }, [kindRows, isVehicleParts]);
 
   const liveDetailRow = detailRow
-    ? rows.find((row) => row.id === detailRow.id) || detailRow
+    ? getInterStoreTransferById(detailRow.id) || rows.find((row) => row.id === detailRow.id) || detailRow
     : null;
 
   const handleCreate = (payload) => {
@@ -206,11 +204,11 @@ export default function InterStoresTransfersList({
     }
   };
 
-  const handleDispatch = (row, { dispatcher, comment } = {}) => {
+  const handleDispatch = (row) => {
     try {
-      dispatchInterStoreTransfer(row.id, { note: comment, dispatcher });
+      dispatchInterStoreTransfer(row.id, { dispatcher: row.dispatcher });
       refreshRows();
-      setDispatchRow(null);
+      setConfirmAction(null);
       toast.success(`${row.transferNumber} is now in transit.`);
     } catch (err) {
       toast.error(err.message || "Could not dispatch the transfer.");
@@ -302,6 +300,15 @@ export default function InterStoresTransfersList({
       confirmText: "Cancel transfer",
       isDanger: true,
       onConfirm: handleCancel,
+    },
+    dispatch: {
+      title: "Dispatch this transfer?",
+      message: (row) =>
+        row.dispatcher
+          ? `Dispatch ${row.transferNumber} with ${row.dispatcher}? Items will be marked as in transit.`
+          : `Dispatch ${row.transferNumber}? Items will be marked as in transit.`,
+      confirmText: "Dispatch",
+      onConfirm: handleDispatch,
     },
   };
 
@@ -504,18 +511,11 @@ export default function InterStoresTransfersList({
         onClose={() => setDetailRow(null)}
         transfer={liveDetailRow}
         onApprove={() => liveDetailRow && handleApprove(liveDetailRow)}
-        onDispatch={() => liveDetailRow && setDispatchRow(liveDetailRow)}
+        onDispatch={() => liveDetailRow && setConfirmAction({ type: "dispatch", row: liveDetailRow })}
         onReceive={() => liveDetailRow && setReceiveRow(liveDetailRow)}
         onReject={() => liveDetailRow && setCommentAction({ type: "reject", row: liveDetailRow })}
         onCancel={() => liveDetailRow && setConfirmAction({ type: "cancel", row: liveDetailRow })}
         onMarkArrived={() => liveDetailRow && setArriveRow(liveDetailRow)}
-      />
-
-      <DispatchTransferModal
-        isOpen={Boolean(dispatchRow)}
-        onClose={() => setDispatchRow(null)}
-        onConfirm={(payload) => dispatchRow && handleDispatch(dispatchRow, payload)}
-        transferLabel={dispatchRow?.transferNumber}
       />
 
       <TransferCommentModal

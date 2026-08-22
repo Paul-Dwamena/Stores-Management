@@ -1,0 +1,27 @@
+@import "./theme/tokens.css";
+@import "./theme/components.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-app text-text;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 400;
+    min-height: 100dvh;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100dvh;
+    min-height: 100vh;
+  }
+}

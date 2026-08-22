@@ -68,21 +68,19 @@ function ApprovalBadge({ label, status }) {
 }
 
 const filterSelectClass =
-  "w-full min-w-[150px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none focus:border-emerald-500";
+  "w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none focus:border-emerald-500";
 
 export default function RequestsList() {
   const [requests, setRequests] = useState(getRequests());
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [status, setStatus] = useState("ALL");
-  const [type, setType] = useState("ALL");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   const filtered = useMemo(() => {
     return requests.filter((request) => {
       if (status !== "ALL" && (request.status ?? "").toUpperCase() !== status) return false;
-      if (type !== "ALL" && request.requestType !== type) return false;
 
       if (dateFrom || dateTo) {
         const submitted = new Date(request.submittedDate);
@@ -101,7 +99,7 @@ export default function RequestsList() {
 
       return true;
     });
-  }, [requests, dateFrom, dateTo, status, type]);
+  }, [requests, dateFrom, dateTo, status]);
 
   const summary = useMemo(() => {
     const draft = requests.filter((r) => (r.status ?? "").toUpperCase() === "DRAFT").length;
@@ -149,18 +147,18 @@ export default function RequestsList() {
         <SummaryStatCard title="Approved" value={summary.approved} icon={CheckCircle2} tone="teal" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
             Date Range
           </label>
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+          <div className="flex w-[280px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
             <Calendar size={14} className="shrink-0 text-slate-400" />
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full bg-transparent text-[12px] text-slate-700 outline-none"
+              className="w-full min-w-0 bg-transparent text-[12px] text-slate-700 outline-none"
               aria-label="From date"
             />
             <span className="text-[11px] text-slate-300">–</span>
@@ -168,13 +166,13 @@ export default function RequestsList() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full bg-transparent text-[12px] text-slate-700 outline-none"
+              className="w-full min-w-0 bg-transparent text-[12px] text-slate-700 outline-none"
               aria-label="To date"
             />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
             Status
           </label>
           <select
@@ -183,23 +181,6 @@ export default function RequestsList() {
             className={filterSelectClass}
           >
             {REQUEST_STATUS_FILTERS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Type
-          </label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className={filterSelectClass}
-          >
-            <option value="ALL">All Types</option>
-            {REQUEST_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

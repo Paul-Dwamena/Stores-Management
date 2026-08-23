@@ -18,6 +18,7 @@ export default function CatalogFormModal({
   fields,
   initialValues = {},
   saveLabel = "Save",
+  overlayClassName,
 }) {
   const [form, setForm] = useState(initialValues);
   const [errors, setErrors] = useState({});
@@ -62,6 +63,7 @@ export default function CatalogFormModal({
       subtitle={subtitle}
       saveLabel={saveLabel}
       dialogClassName="max-w-lg"
+      overlayClassName={overlayClassName}
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {fields.map((field) => {

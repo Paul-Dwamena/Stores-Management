@@ -28,7 +28,7 @@ import {
   formatAccessoryMoney,
   getStoreLocationOptions,
 } from "../../../../mockdata/stores";
-import { getActiveSuppliers, getSupplierContact } from "../../../../mockdata/org";
+import { getSupplierContact } from "../../../../mockdata/org";
 import { generateAccessoryItemCode, ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
@@ -39,6 +39,8 @@ import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import BulkInventoryReceiptModal from "./BulkInventoryReceiptModal";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
+import AddSupplierModal from "./AddSupplierModal";
+import SupplierPicker from "./SupplierPicker";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -218,38 +220,18 @@ function applySupplierContact(form, supplierId) {
   return { ...form, supplierId, ...getSupplierContact(supplierId) };
 }
 
-function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys }) {
+function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys, onAddSupplier }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="supplierId">
-        <div className="space-y-1.5">
-          <label
-            htmlFor={`${prefix}Supplier`}
-            className={cn(
-              "text-[10px] font-bold uppercase tracking-wider",
-              errors.supplierId ? "text-red-500" : "text-slate-500",
-            )}
-          >
-            Supplier
-          </label>
-          <select
-            id={`${prefix}Supplier`}
-            value={form.supplierId}
-            onChange={onChange("supplierId")}
-            className={cn(fieldClassName, errors.supplierId && "border-red-500 bg-red-50")}
-          >
-            <option value="">Select supplier…</option>
-            {getActiveSuppliers().map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-              </option>
-            ))}
-          </select>
-          {errors.supplierId && (
-            <p className="text-[10px] font-medium text-red-500">{errors.supplierId}</p>
-          )}
-        </div>
+        <SupplierPicker
+          id={`${prefix}Supplier`}
+          value={form.supplierId}
+          onChange={(next) => onChange("supplierId")({ target: { value: next } })}
+          error={errors.supplierId}
+          onAddClick={onAddSupplier}
+        />
         </ShowConfiguredField>
         <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="waybillNumber">
         <InputField
@@ -330,25 +312,6 @@ function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys }) {
         />
         </ShowConfiguredField>
       </div>
-
-      <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="notes">
-      <div className="space-y-1.5">
-        <label
-          htmlFor={`${prefix}Notes`}
-          className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-        >
-          Notes
-        </label>
-        <textarea
-          id={`${prefix}Notes`}
-          rows={3}
-          value={form.notes}
-          onChange={onChange("notes")}
-          className={cn(fieldClassName, "resize-none")}
-          placeholder="Add delivery, inspection, or receipt notes…"
-        />
-      </div>
-      </ShowConfiguredField>
     </div>
   );
 }
@@ -444,6 +407,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [catalogTick, setCatalogTick] = useState(0);
   const [itemDetailsOpen, setItemDetailsOpen] = useState(true);
   const [supplyingDetailsOpen, setSupplyingDetailsOpen] = useState(true);
+  const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [componentFilterOpen, setComponentFilterOpen] = useState(true);
   const { sections: registeredSections, visibleKeys: registeredVisibleKeys } = useFormTreeSections(
     RECEIVE_REGISTERED_ITEMS_FORM_SETUP_CHANGED_EVENT,
@@ -473,6 +437,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setPendingSave(null);
     setItemDetailsOpen(true);
     setSupplyingDetailsOpen(true);
+    setAddSupplierOpen(false);
     setComponentFilterOpen(true);
     setCatalogTick((tick) => tick + 1);
   }, [isOpen]);
@@ -885,7 +850,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   return (
     <>
       <AddModal
-        isOpen={isOpen && !bulkOpen}
+        isOpen={isOpen && !bulkOpen && !addSupplierOpen}
         onClose={onClose}
         onSave={isSetupStep ? continueFromSetup : handleFormSave}
         title={
@@ -1224,6 +1189,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                 onChange={isRegistered ? handleRegisteredChange : handleAccessoryChange}
                 prefix={isRegistered ? "reg" : "newAcc"}
                 visibleKeys={isRegistered ? registeredVisibleKeys : unregisteredVisibleKeys}
+                onAddSupplier={() => setAddSupplierOpen(true)}
               />
             </CollapsibleSection>
             <ConfiguredCustomFields
@@ -1249,6 +1215,31 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
             : `Add ${pendingSave?.label || "this item"} to inventory?`
         }
         confirmText={pendingSave?.mode === "existing" ? "Submit for approval" : "Save item"}
+      />
+
+      <AddSupplierModal
+        isOpen={addSupplierOpen}
+        onClose={() => setAddSupplierOpen(false)}
+        onCreated={(created) => {
+          const patch = {
+            supplierId: created.id,
+            supplierPhone: created.phone || "",
+            supplierEmail: created.email || "",
+          };
+          if (isRegistered) {
+            setRegisteredForm((prev) => ({ ...prev, ...patch }));
+          } else {
+            setAccessoryForm((prev) => ({ ...prev, ...patch }));
+          }
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next.supplierId;
+            delete next.supplierPhone;
+            delete next.supplierEmail;
+            delete next.supplierContact;
+            return next;
+          });
+        }}
       />
 
       <BulkInventoryReceiptModal

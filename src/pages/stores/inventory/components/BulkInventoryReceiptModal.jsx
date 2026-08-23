@@ -13,7 +13,7 @@ import {
   formatAccessoryMoney,
   getStoreLocationOptions,
 } from "../../../../mockdata/stores";
-import { getActiveSuppliers, getSupplierContact } from "../../../../mockdata/org";
+import { getSupplierContact } from "../../../../mockdata/org";
 import { ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
@@ -23,6 +23,8 @@ import {
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
+import AddSupplierModal from "./AddSupplierModal";
+import SupplierPicker from "./SupplierPicker";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -209,31 +211,20 @@ function CollapsibleSection({ title, description, open, onToggle, children, erro
   );
 }
 
-function SharedSupplyFields({ value, errors, onChange }) {
+function SharedSupplyFields({ value, errors, onChange, onAddSupplier }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <div>
-          <FieldLabel required error={Boolean(errors.supplierId)}>
-            Supplier
-          </FieldLabel>
-          <select
-            value={value.supplierId}
-            onChange={(event) => {
-              const supplierId = event.target.value;
-              const contact = getSupplierContact(supplierId);
-              onChange("supplierId", supplierId);
-              onChange("supplierPhone", contact.supplierPhone);
-              onChange("supplierEmail", contact.supplierEmail);
-            }}
-            className={cn(fieldClassName, errors.supplierId && "border-rose-500 bg-rose-50")}
-          >
-            <option value="">Select supplier</option>
-            {getActiveSuppliers().map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-            ))}
-          </select>
-          <ErrorText>{errors.supplierId}</ErrorText>
-        </div>
+        <SupplierPicker
+          value={value.supplierId}
+          onChange={(supplierId) => {
+            const contact = getSupplierContact(supplierId);
+            onChange("supplierId", supplierId);
+            onChange("supplierPhone", contact.supplierPhone);
+            onChange("supplierEmail", contact.supplierEmail);
+          }}
+          error={errors.supplierId}
+          onAddClick={onAddSupplier}
+        />
         <InputField
           label="Waybill number"
           value={value.waybillNumber}
@@ -281,17 +272,6 @@ function SharedSupplyFields({ value, errors, onChange }) {
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
-        </div>
-        <div className="md:col-span-2 xl:col-span-3">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Default notes
-          </label>
-          <input
-            value={value.notes}
-            onChange={(event) => onChange("notes", event.target.value)}
-            className={fieldClassName}
-            placeholder="Optional delivery notes"
-          />
         </div>
     </div>
   );
@@ -682,29 +662,20 @@ function ExistingLineFields({
 
 function LineOverrideFields({ line, onChange }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Condition override
-        </label>
-        <select
-          value={line.condition}
-          onChange={(event) => onChange("condition", event.target.value)}
-          className={fieldClassName}
-        >
-          <option value="">Use shared condition</option>
-          {CONDITION_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </div>
-      <InputField
-        label="Notes override"
-        value={line.notes}
-        onChange={(event) => onChange("notes", event.target.value)}
-        placeholder="Optional"
-        className={whiteInputClassName}
-      />
+    <div>
+      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        Condition override
+      </label>
+      <select
+        value={line.condition}
+        onChange={(event) => onChange("condition", event.target.value)}
+        className={fieldClassName}
+      >
+        <option value="">Use shared condition</option>
+        {CONDITION_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -908,6 +879,7 @@ export default function BulkInventoryReceiptModal({
   const [errors, setErrors] = useState({ shared: {}, lines: {} });
   const [pendingSave, setPendingSave] = useState(null);
   const [supplyOpen, setSupplyOpen] = useState(true);
+  const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [editor, setEditor] = useState(null);
   const [editorErrors, setEditorErrors] = useState({});
 
@@ -920,6 +892,7 @@ export default function BulkInventoryReceiptModal({
     setErrors({ shared: {}, lines: {} });
     setPendingSave(null);
     setSupplyOpen(true);
+    setAddSupplierOpen(false);
     setEditor(null);
     setEditorErrors({});
   }, [isOpen, inventoryType, forcedMode]);
@@ -1119,6 +1092,7 @@ export default function BulkInventoryReceiptModal({
                 value={shared}
                 errors={errors.shared}
                 onChange={setSharedField}
+                onAddSupplier={() => setAddSupplierOpen(true)}
               />
             </CollapsibleSection>
           </div>
@@ -1284,6 +1258,27 @@ export default function BulkInventoryReceiptModal({
           </Button>
         </div>
       </SlideOverSheet>
+
+      <AddSupplierModal
+        isOpen={addSupplierOpen}
+        onClose={() => setAddSupplierOpen(false)}
+        onCreated={(created) => {
+          setShared((current) => ({
+            ...current,
+            supplierId: created.id,
+            supplierPhone: created.phone || "",
+            supplierEmail: created.email || "",
+          }));
+          setErrors((current) => {
+            const nextShared = { ...current.shared };
+            delete nextShared.supplierId;
+            delete nextShared.supplierPhone;
+            delete nextShared.supplierEmail;
+            delete nextShared.supplierContact;
+            return { ...current, shared: nextShared };
+          });
+        }}
+      />
 
       <ConfirmationModal
         isOpen={Boolean(pendingSave)}

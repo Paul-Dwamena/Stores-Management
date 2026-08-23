@@ -12,7 +12,9 @@ import {
   formatAccessoryMoney,
   getStoreLocationOptions,
 } from "../../../../mockdata/stores";
-import { getActiveSuppliers, getSupplierContact } from "../../../../mockdata/org";
+import { getSupplierContact } from "../../../../mockdata/org";
+import AddSupplierModal from "./AddSupplierModal";
+import SupplierPicker from "./SupplierPicker";
 import {
   SUBMIT_STORE_RECEIPT_FORM_FIELD_CATALOG,
   SUBMIT_STORE_RECEIPT_FORM_SETUP_CHANGED_EVENT,
@@ -55,6 +57,7 @@ export default function ReceiveIntoStoreModal({
   const [form, setForm] = useState(INITIAL);
   const [errors, setErrors] = useState({});
   const [pendingReceive, setPendingReceive] = useState(null);
+  const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const { sections, visibleKeys } = useFormTreeSections(
     SUBMIT_STORE_RECEIPT_FORM_SETUP_CHANGED_EVENT,
     getSubmitStoreReceiptFormSetup,
@@ -67,6 +70,7 @@ export default function ReceiveIntoStoreModal({
     setForm(INITIAL);
     setErrors({});
     setPendingReceive(null);
+    setAddSupplierOpen(false);
   }, [isOpen, item?.id]);
 
   const setField = (key, value) => {
@@ -158,7 +162,7 @@ export default function ReceiveIntoStoreModal({
   return (
     <>
       <AddModal
-        isOpen={isOpen && !pendingReceive}
+        isOpen={isOpen && !pendingReceive && !addSupplierOpen}
         onClose={onClose}
         onSave={handleSave}
         title="Submit stock receipt"
@@ -206,23 +210,16 @@ export default function ReceiveIntoStoreModal({
             if (field.key === "supplierId") {
               return (
                 <div key={field.id}>
-                  <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    {fieldRequiredLabel(field)}
-                  </label>
-                  <select
+                  <SupplierPicker
                     id={id}
+                    label={field.title || "Supplier"}
+                    placeholder={field.placeholder || "Search supplier…"}
+                    required={field.required !== false}
                     value={form.supplierId}
-                    onChange={(e) => setField("supplierId", e.target.value)}
-                    className={cn(fieldClassName, errors.supplierId && "border-rose-500 bg-rose-50")}
-                  >
-                    <option value="">Select supplier</option>
-                    {getActiveSuppliers().map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-                    ))}
-                  </select>
-                  {errors.supplierId && (
-                    <p className="mt-1 text-[11px] text-rose-600 font-medium">{errors.supplierId}</p>
-                  )}
+                    onChange={(next) => setField("supplierId", next)}
+                    error={errors.supplierId}
+                    onAddClick={() => setAddSupplierOpen(true)}
+                  />
                 </div>
               );
             }
@@ -252,22 +249,7 @@ export default function ReceiveIntoStoreModal({
                 </div>
               );
             }
-            if (field.key === "notes") {
-              return (
-                <div key={field.id}>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    {field.title}
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={form.notes}
-                    onChange={(e) => setField("notes", e.target.value)}
-                    className={cn(fieldClassName, "resize-none")}
-                    placeholder={field.placeholder || "Optional delivery or inspection notes"}
-                  />
-                </div>
-              );
-            }
+            if (field.key === "notes") return null;
             const isSupplierContact = field.key === "supplierPhone" || field.key === "supplierEmail";
             const type = field.key === "quantity" || field.key === "unitCost" ? "number" : field.key === "supplierEmail" ? "email" : field.key === "supplierPhone" ? "tel" : "text";
             return (
@@ -291,6 +273,14 @@ export default function ReceiveIntoStoreModal({
           }}
         />
       </AddModal>
+
+      <AddSupplierModal
+        isOpen={addSupplierOpen}
+        onClose={() => setAddSupplierOpen(false)}
+        onCreated={(created) => {
+          setField("supplierId", created.id);
+        }}
+      />
 
       <ConfirmationModal
         isOpen={Boolean(pendingReceive)}

@@ -407,7 +407,7 @@ export default function InventoryList({
 
         <div className="overflow-x-auto">
           {isVehicleParts ? (
-            <table className="w-full text-left min-w-[1100px]">
+            <table className="w-full text-left min-w-[980px]">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
@@ -435,9 +435,6 @@ export default function InventoryList({
                     Quantity
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Shelf location
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">
@@ -448,7 +445,7 @@ export default function InventoryList({
               <tbody className="divide-y divide-slate-50">
                 {pagedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-6 py-12 text-center text-[13px] text-slate-400">
+                    <td colSpan={10} className="px-6 py-12 text-center text-[13px] text-slate-400">
                       No vehicle parts found.
                     </td>
                   </tr>
@@ -473,9 +470,6 @@ export default function InventoryList({
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
                         {row.quantity}
                       </td>
-                      <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                        {row.shelfPosition || "—"}
-                      </td>
                       <td className="px-6 py-3.5">
                         <span
                           className={cn(
@@ -497,7 +491,7 @@ export default function InventoryList({
               </tbody>
             </table>
           ) : (
-            <table className="w-full text-left min-w-[1040px]">
+            <table className="w-full text-left min-w-[920px]">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
@@ -519,9 +513,6 @@ export default function InventoryList({
                     Quantity
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Shelf location
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                     Total purchase cost
                   </th>
                   <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
@@ -535,7 +526,7 @@ export default function InventoryList({
               <tbody className="divide-y divide-slate-50">
                 {pagedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-6 py-12 text-center text-[13px] text-slate-400">
+                    <td colSpan={9} className="px-6 py-12 text-center text-[13px] text-slate-400">
                       No accessories found.
                     </td>
                   </tr>
@@ -557,9 +548,6 @@ export default function InventoryList({
                       </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
                         {row.quantity}
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                        {row.shelfPosition || "—"}
                       </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800 whitespace-nowrap">
                         {formatAccessoryMoney(row.totalPurchaseCost)}

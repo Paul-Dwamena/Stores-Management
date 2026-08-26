@@ -1,7 +1,21 @@
 import axios from "axios";
 
+const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
+
+const resolveApiBaseUrl = () => {
+  const configured = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL);
+
+  // Dev: relative path so Vite can proxy /api → backend.
+  if (import.meta.env.DEV) return "/api/v1";
+
+  // Production (e.g. Netlify): call the API host directly.
+  if (configured) return `${configured}/api/v1`;
+
+  return "/api/v1";
+};
+
 const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: resolveApiBaseUrl(),
   headers: { "Content-Type": "application/json" },
 });
 

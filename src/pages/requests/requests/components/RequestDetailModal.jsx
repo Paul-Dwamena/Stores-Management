@@ -146,7 +146,15 @@ export default function RequestDetailModal({
                 {request.statusHistory.map((entry) => (
                   <div key={entry.id} className="rounded-lg border border-slate-100 px-3 py-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <SupplyStatusBadge status={entry.status} />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {entry.fromStatus ? (
+                          <>
+                            <SupplyStatusBadge status={entry.fromStatus} />
+                            <span className="text-[11px] text-slate-400">→</span>
+                          </>
+                        ) : null}
+                        <SupplyStatusBadge status={entry.toStatus || entry.status} />
+                      </div>
                       <span className="text-[11px] text-slate-400">
                         {formatApiDateTime(entry.createdAt)}
                       </span>

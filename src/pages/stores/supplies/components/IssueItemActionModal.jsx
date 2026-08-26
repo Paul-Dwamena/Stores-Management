@@ -194,14 +194,9 @@ export default function IssueItemActionModal({
         secondaryAction={{ label: "Cancel", onClick: onClose }}
         footerActions={
           busy ? null : (
-          <div className="flex flex-wrap items-center gap-2">
             <Button variant="danger" size="modal" onClick={() => setRejectMode("entire")}>
-              {isPartialRemaining ? "Reject remaining" : "Reject entirely"}
+              Reject
             </Button>
-            <Button variant="warning" size="modal" onClick={() => setRejectMode("store_change")}>
-              {isPartialRemaining ? "Reject remaining for store change" : "Reject for store change"}
-            </Button>
-          </div>
           )
         }
       >
@@ -414,16 +409,10 @@ export default function IssueItemActionModal({
 
       <RejectRequisitionModal
         isOpen={Boolean(rejectMode)}
-        mode={rejectMode || "entire"}
+        mode="entire"
         onClose={() => setRejectMode(null)}
         requestLabel={requisition?.requestNumber}
-        title={
-          isPartialRemaining
-            ? rejectMode === "store_change"
-              ? "Reject remaining for store change"
-              : "Reject remaining quantity"
-            : undefined
-        }
+        title={isPartialRemaining ? "Reject remaining quantity" : undefined}
         onConfirm={(reason, mode) => {
           setRejectMode(null);
           onReject?.(reason, mode);

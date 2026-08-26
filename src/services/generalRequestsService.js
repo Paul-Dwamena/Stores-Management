@@ -17,7 +17,9 @@ const toLine = (row) => ({
 
 const toStatusHistory = (row) => ({
   id: row.id,
-  status: row.status,
+  fromStatus: row.from_status || null,
+  toStatus: row.to_status || row.status || null,
+  status: row.to_status || row.status || null,
   changedBy: row.changed_by,
   comment: row.comment,
   createdAt: row.created_at,
@@ -109,9 +111,13 @@ export const deleteGeneralRequest = async (requestId) => {
   }
 };
 
-export const rejectGeneralRequest = async (requestId) => {
+export const rejectGeneralRequest = async (requestId, reason) => {
   try {
-    const { data } = await api.post(`/general-requests/${requestId}/reject`);
+    const { data } = await api.post(
+      `/general-requests/${requestId}/reject`,
+      null,
+      { params: { reason: String(reason || "").trim() || "Rejected" } },
+    );
     return toRequest(data);
   } catch (err) {
     const error = new Error(extractApiErrorDetail(err, "Unable to reject request."));

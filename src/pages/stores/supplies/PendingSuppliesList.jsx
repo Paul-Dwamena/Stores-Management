@@ -451,11 +451,16 @@ export default function PendingSuppliesList({ embedded = false }) {
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = async (reason) => {
     if (!activeRow || saving) return;
+    const rejectReason = String(reason || "").trim();
+    if (!rejectReason) {
+      toast.error("Enter a rejection reason.");
+      return;
+    }
     setSaving(true);
     try {
-      await rejectGeneralRequest(activeRow.generalRequestId);
+      await rejectGeneralRequest(activeRow.generalRequestId, rejectReason);
       toast.success("Request rejected.");
       closeAction();
       reload();

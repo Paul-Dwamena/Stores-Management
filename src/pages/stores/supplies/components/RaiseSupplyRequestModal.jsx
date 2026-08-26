@@ -26,6 +26,7 @@ import {
   VEHICLE_PART_STATUS_OPTIONS,
 } from "../../../../mockdata/stores";
 import RequisitionRequestSummary from "./RequisitionRequestSummary";
+import RejectRequisitionModal from "./RejectRequisitionModal";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700 resize-none";
@@ -596,22 +597,14 @@ export default function RaiseSupplyRequestModal({
         confirmText="Submit supply request"
       />
 
-      <ConfirmationModal
+      <RejectRequisitionModal
         isOpen={rejectOpen}
         onClose={() => setRejectOpen(false)}
-        onConfirm={() => {
+        requestLabel={requisition?.requestNumber}
+        onConfirm={(reason) => {
           setRejectOpen(false);
-          onReject?.();
+          onReject?.(reason);
         }}
-        className="!z-[10001]"
-        title="Reject request?"
-        message={
-          requisition?.requestNumber
-            ? `${requisition.requestNumber} will be rejected and removed from Supplies.`
-            : "This request will be rejected and removed from Supplies."
-        }
-        confirmText="Reject"
-        isDanger
       />
     </>
   );

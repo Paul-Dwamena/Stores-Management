@@ -2,14 +2,13 @@ import React, { useEffect, useState } from "react";
 import {
   AccordionSection,
   DetailRow,
-  StatusPill,
 } from "../../../../components/common/details/RequestDetailsModal";
 import {
   formatRequisitionDate,
-  formatRequisitionStatus,
   getRequisitionRemainingQuantity,
 } from "../../../../mockdata/stores";
 import { getRequisitionIssuingStores, getRequisitionStoreIssueLines } from "./RaiseSupplyRequestModal";
+import { SupplyStatusBadge } from "../utils/SupplyStatusBadge";
 
 export function StoreAllocationsTable({ allocations = [] }) {
   if (!allocations.length) {
@@ -157,7 +156,7 @@ export default function RequisitionRequestSummary({
         <DetailRow label="Receiver">{requisition.suppliedTo}</DetailRow>
       ) : null}
       <DetailRow label="Status">
-        <StatusPill status={formatRequisitionStatus(requisition.status)} />
+        <SupplyStatusBadge status={requisition.status} />
       </DetailRow>
     </AccordionSection>
   );

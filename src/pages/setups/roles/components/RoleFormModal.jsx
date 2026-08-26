@@ -2,10 +2,12 @@ import React, { useEffect, useState } from "react";
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
+import SectionLoadState from "../../../../components/common/SectionLoadState";
 import { toast } from "../../../../components/common/ToastNotification";
+import { cn } from "../../../../utils/cn";
 import PermissionMatrixTable from "./PermissionMatrixTable";
 import { INITIAL_ROLE_FORM } from "../utils/roleConstants";
-import { clonePermissions, createEmptyPermissions } from "../utils/roleHelpers";
+import { permissionIdsFromRole } from "../utils/roleHelpers";
 import {
   clearRoleFieldError,
   validateRoleForm,
@@ -17,30 +19,35 @@ export default function RoleFormModal({
   onSave,
   editingRole = null,
   existingRoles = [],
+  catalog = [],
+  loading = false,
+  error = null,
+  onRetry,
 }) {
   const [form, setForm] = useState(INITIAL_ROLE_FORM);
   const [errors, setErrors] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const isEdit = Boolean(editingRole);
 
   useEffect(() => {
     if (!isOpen) return;
 
     setErrors({});
     setConfirmOpen(false);
+    setSaving(false);
 
     if (editingRole) {
       setForm({
         name: editingRole.name ?? "",
         description: editingRole.description ?? "",
-        permissions: clonePermissions(editingRole.permissions),
+        permission_ids: permissionIdsFromRole(editingRole),
       });
       return;
     }
 
-    setForm({
-      ...INITIAL_ROLE_FORM,
-      permissions: createEmptyPermissions(),
-    });
+    setForm({ ...INITIAL_ROLE_FORM });
   }, [isOpen, editingRole]);
 
   const handleChange = (field) => (event) => {
@@ -48,17 +55,14 @@ export default function RoleFormModal({
     setErrors((current) => clearRoleFieldError(current, field));
   };
 
-  const handlePermissionChange = (moduleId, action, checked) => {
-    setForm((current) => ({
-      ...current,
-      permissions: {
-        ...current.permissions,
-        [moduleId]: {
-          ...current.permissions[moduleId],
-          [action]: checked,
-        },
-      },
-    }));
+  const handleToggle = (permissionId, checked) => {
+    setForm((current) => {
+      const id = Number(permissionId);
+      const next = new Set(current.permission_ids.map(Number));
+      if (checked) next.add(id);
+      else next.delete(id);
+      return { ...current, permission_ids: [...next] };
+    });
   };
 
   const handleSubmit = () => {
@@ -76,13 +80,18 @@ export default function RoleFormModal({
     setConfirmOpen(true);
   };
 
-  const handleConfirmSave = () => {
-    onSave(form);
-    setConfirmOpen(false);
-    onClose();
+  const handleConfirmSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(form);
+      setConfirmOpen(false);
+      onClose();
+    } catch {
+      setConfirmOpen(false);
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const isEdit = Boolean(editingRole);
 
   return (
     <>
@@ -91,36 +100,53 @@ export default function RoleFormModal({
         onClose={onClose}
         onSave={handleSubmit}
         title={isEdit ? "Edit Role" : "Create New Role"}
-        subtitle="Define a role and assign access across store modules."
-        saveLabel={isEdit ? "Save Changes" : "Create Role"}
-        dialogClassName="max-w-4xl"
+        subtitle={
+          isEdit
+            ? "Update this role and assign permissions."
+            : "Name and describe this role. Assign permissions after it is created."
+        }
+        saveLabel={saving ? "Saving…" : isEdit ? "Save Changes" : "Create Role"}
+        saveDisabled={saving || loading || Boolean(error)}
+        dialogClassName={isEdit ? "max-w-7xl" : "max-w-lg"}
+        contentClassName={isEdit ? "overflow-x-auto" : undefined}
         overlayClassName="!z-[10001]"
       >
-        <div className="space-y-5">
-          <div className="space-y-4">
-            <InputField
-              label="Role Name"
-              id="roleName"
-              value={form.name}
-              onChange={handleChange("name")}
-              placeholder="e.g. Store Manager"
-              error={errors.name}
-            />
-            <InputField
-              label="Description"
-              id="roleDescription"
-              value={form.description}
-              onChange={handleChange("description")}
-              placeholder="Brief summary of this role"
-              error={errors.description}
-            />
-          </div>
+        <SectionLoadState
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          loadingLabel="Loading role…"
+          errorTitle="Couldn’t load this form"
+        >
+          <div className={cn("space-y-5", saving && "pointer-events-none opacity-60")}>
+            <div className="space-y-4">
+              <InputField
+                label="Role Name"
+                id="roleName"
+                value={form.name}
+                onChange={handleChange("name")}
+                placeholder="e.g. Store Manager"
+                error={errors.name}
+              />
+              <InputField
+                label="Description"
+                id="roleDescription"
+                value={form.description}
+                onChange={handleChange("description")}
+                placeholder="Brief summary of this role"
+                error={errors.description}
+              />
+            </div>
 
-          <PermissionMatrixTable
-            permissions={form.permissions}
-            onPermissionChange={handlePermissionChange}
-          />
-        </div>
+            {isEdit ? (
+              <PermissionMatrixTable
+                catalog={catalog}
+                selectedIds={form.permission_ids}
+                onToggle={handleToggle}
+              />
+            ) : null}
+          </div>
+        </SectionLoadState>
       </AddModal>
 
       <ConfirmationModal
@@ -132,7 +158,7 @@ export default function RoleFormModal({
         message={
           isEdit
             ? `Save changes to the "${form.name.trim()}" role?`
-            : `Create the "${form.name.trim()}" role with the selected permissions?`
+            : `Create the "${form.name.trim()}" role?`
         }
         confirmText={isEdit ? "Save changes" : "Create role"}
       />

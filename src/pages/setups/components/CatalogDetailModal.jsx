@@ -1,6 +1,7 @@
 import React from "react";
 import RequestDetailsModal, { DetailRow } from "../../../components/common/details/RequestDetailsModal";
 import Button from "../../../components/common/base/Button";
+import SectionLoadState from "../../../components/common/SectionLoadState";
 
 export default function CatalogDetailModal({
   isOpen,
@@ -14,8 +15,12 @@ export default function CatalogDetailModal({
   editLabel = "Edit",
   onToggleStatus,
   statusActionLabel,
+  loading = false,
+  error = null,
+  onRetry,
 }) {
   const isActive = status === "Active";
+  const busy = loading || Boolean(error);
 
   return (
     <RequestDetailsModal
@@ -27,6 +32,7 @@ export default function CatalogDetailModal({
       identifier={identifier}
       dialogClassName="max-w-lg"
       footerRight={
+        busy ? null : (
         <div className="flex flex-wrap items-center justify-end gap-2">
           {onToggleStatus ? (
             <Button
@@ -43,15 +49,24 @@ export default function CatalogDetailModal({
             </Button>
           ) : null}
         </div>
+        )
       }
     >
-      <div className="rounded-xl border border-slate-100 px-4">
-        {fields.map((field) => (
-          <DetailRow key={field.label} label={field.label}>
-            {field.value || "—"}
-          </DetailRow>
-        ))}
-      </div>
+      <SectionLoadState
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        loadingLabel="Loading details…"
+        errorTitle="Couldn’t load details"
+      >
+        <div className="rounded-xl border border-slate-100 px-4">
+          {fields.map((field) => (
+            <DetailRow key={field.label} label={field.label}>
+              {field.value || "—"}
+            </DetailRow>
+          ))}
+        </div>
+      </SectionLoadState>
     </RequestDetailsModal>
   );
 }

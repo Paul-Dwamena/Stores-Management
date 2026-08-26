@@ -1,8 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "../../../components/common/ToastNotification";
-import { saveUser } from "../../../mockdata/org/users";
-import { getRoleNames } from "../../../mockdata/org/roles";
-import { getStoreLocationOptions } from "../../../mockdata/org/stores";
+import { createUser, updateUser } from "../../../services/usersService";
+import { listRoles } from "../../../services/rolesService";
 import CatalogFormModal from "./CatalogFormModal";
 
 export const EMPTY_USER_FORM = {
@@ -10,9 +9,9 @@ export const EMPTY_USER_FORM = {
   lastName: "",
   email: "",
   phone: "",
-  role: "Staff",
-  store: "",
-  status: "Active",
+  password: "",
+  role_id: "",
+  is_active: true,
 };
 
 export default function UserFormModal({
@@ -21,48 +20,106 @@ export default function UserFormModal({
   onSaved,
   editing = null,
   title,
-  subtitle = "Assign a role from Roles & Permissions. Store managers and staff must be assigned to a store.",
+  subtitle = "Assign a role. Phone is optional.",
   saveLabel,
 }) {
-  const storeOptions = getStoreLocationOptions().map((label) => ({ value: label, label }));
+  const [roles, setRoles] = useState([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState(null);
+  const isEdit = Boolean(editing);
+
+  const loadOptions = async () => {
+    setOptionsLoading(true);
+    setOptionsError(null);
+    try {
+      setRoles(await listRoles());
+    } catch (err) {
+      setOptionsError(err.message || "Unable to load form options.");
+    } finally {
+      setOptionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadOptions();
+  }, [isOpen]);
+
   const fields = useMemo(
     () => [
       { key: "firstName", label: "First name", required: true, placeholder: "Jane" },
       { key: "lastName", label: "Last name", required: true, placeholder: "Mensah" },
-      { key: "email", label: "Email", type: "email", required: true, placeholder: "jane@stores.local" },
-      { key: "phone", label: "Phone", required: true, placeholder: "024 000 0000" },
+      { key: "email", label: "Email", type: "email", required: true, placeholder: "you@example.com" },
+      { key: "phone", label: "Phone", placeholder: "024 000 0000" },
+      ...(!isEdit
+        ? [{ key: "password", label: "Password", type: "password", required: true, placeholder: "At least 8 characters", span: 2 }]
+        : []),
       {
-        key: "role",
+        key: "role_id",
         label: "Role",
         type: "select",
         required: true,
-        options: getRoleNames().map((role) => ({ value: role, label: role })),
+        placeholder: "Select role",
+        options: roles.map((role) => ({
+          value: String(role.id),
+          label: role.label,
+        })),
       },
-      {
-        key: "store",
-        label: "Assigned store",
-        type: "select",
-        required: true,
-        options: storeOptions,
-        hidden: (form) => form.role === "Super Admin",
-      },
-      {
-        key: "status",
-        label: "Active",
-        type: "toggle",
-        span: 2,
-        activeValue: "Active",
-        inactiveValue: "Inactive",
-        description: "Inactive users cannot sign in or be assigned as a receiver or dispatcher.",
-      },
+      ...(isEdit
+        ? [{
+            key: "is_active",
+            label: "Active",
+            type: "toggle",
+            span: 2,
+            activeValue: true,
+            inactiveValue: false,
+            description: "Inactive users cannot sign in.",
+          }]
+        : []),
     ],
-    [storeOptions, isOpen],
+    [roles, isEdit],
   );
 
-  const handleSave = (form) => {
+  const handleSave = async (form) => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.warning("Enter a valid email address.");
+      return;
+    }
+
+    if (isEdit) {
+      try {
+        const saved = await updateUser(editing.id, {
+          first_name: form.firstName.trim(),
+          last_name: form.lastName.trim(),
+          email: form.email.trim(),
+          phone: (form.phone || "").trim() || null,
+          role_id: Number(form.role_id),
+          is_active: form.is_active !== false,
+        });
+        toast.success("User updated.");
+        onSaved?.(saved);
+        onClose?.();
+      } catch (error) {
+        toast.error(error.message || "Could not save user.");
+      }
+      return;
+    }
+
+    if ((form.password || "").length < 8) {
+      toast.warning("Password should have at least 8 characters");
+      return;
+    }
+
     try {
-      const saved = saveUser(form, { id: editing?.id });
-      toast.success(editing ? "User updated." : "User added.");
+      const saved = await createUser({
+        first_name: form.firstName.trim(),
+        last_name: form.lastName.trim(),
+        email: form.email.trim(),
+        phone: (form.phone || "").trim() || null,
+        password: form.password,
+        role_id: Number(form.role_id),
+      });
+      toast.success("User added.");
       onSaved?.(saved);
       onClose?.();
     } catch (error) {
@@ -75,17 +132,24 @@ export default function UserFormModal({
       isOpen={isOpen}
       onClose={onClose}
       onSave={handleSave}
-      title={title || (editing ? "Edit user" : "Add user")}
+      title={title || (isEdit ? "Edit user" : "Add user")}
       subtitle={subtitle}
-      saveLabel={saveLabel || (editing ? "Save changes" : "Add user")}
+      saveLabel={saveLabel || (isEdit ? "Save changes" : "Add user")}
       fields={fields}
+      loading={optionsLoading}
+      error={optionsError}
+      onRetry={loadOptions}
       initialValues={
-        editing
+        isEdit
           ? {
               ...EMPTY_USER_FORM,
               ...editing,
               firstName: editing.firstName || "",
               lastName: editing.lastName || "",
+              email: editing.email || "",
+              phone: editing.phone || "",
+              role_id: editing.roleId != null ? String(editing.roleId) : "",
+              is_active: editing.isActive !== false,
             }
           : EMPTY_USER_FORM
       }

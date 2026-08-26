@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import AddModal from "../../../../components/common/AddModal";
 import Button from "../../../../components/common/base/Button";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import SectionLoadState from "../../../../components/common/SectionLoadState";
 import { ConfiguredCustomFields, ShowConfiguredField } from "../../../../components/common/ConfiguredFormSections";
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
@@ -44,7 +45,11 @@ export default function IssueItemActionModal({
   onSendOtp,
   onConfirmIssue,
   onReject,
+  loading = false,
+  error = null,
+  onRetry,
 }) {
+  const busy = loading || Boolean(error);
   const [suppliedTo, setSuppliedTo] = useState("");
   const [issueStore, setIssueStore] = useState("");
   const [quantityToIssue, setQuantityToIssue] = useState("");
@@ -184,10 +189,11 @@ export default function IssueItemActionModal({
         dialogClassName="max-w-5xl"
         saveLabel="Confirm issue"
         saveVariant="primary"
-        saveDisabled={!otpVerified}
+        saveDisabled={busy || !otpVerified}
         hideCancelButton
         secondaryAction={{ label: "Cancel", onClick: onClose }}
         footerActions={
+          busy ? null : (
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="danger" size="modal" onClick={() => setRejectMode("entire")}>
               {isPartialRemaining ? "Reject remaining" : "Reject entirely"}
@@ -196,8 +202,16 @@ export default function IssueItemActionModal({
               {isPartialRemaining ? "Reject remaining for store change" : "Reject for store change"}
             </Button>
           </div>
+          )
         }
       >
+        <SectionLoadState
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          loadingLabel="Loading request…"
+          errorTitle="Couldn’t load this request"
+        >
         <div className="space-y-4">
           <RequisitionRequestSummary requisition={requisition} />
 
@@ -364,6 +378,7 @@ export default function IssueItemActionModal({
             idPrefix="isi"
           />
         </div>
+        </SectionLoadState>
       </AddModal>
 
       <ConfirmationModal

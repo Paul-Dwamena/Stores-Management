@@ -1,19 +1,17 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import { ChevronDown, Plus, X } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import AddModal from "../../../../components/common/AddModal";
-import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import SectionLoadState from "../../../../components/common/SectionLoadState";
 import { TableViewAction } from "../../../../components/common/tableActions";
 import { cn } from "../../../../utils/cn";
 import {
-  formatAccessoryDate,
-  formatAccessoryMoney,
-  formatAccessoryStatus,
-  getInventoryAverageUnitCost,
-  getInventoryStockByLocation,
-} from "../../../../mockdata/stores";
-import { getSuppliers } from "../../../../mockdata/org";
+  formatInventoryMoney,
+  formatInventoryStatus,
+} from "../../../../services/inventoryService";
+import { formatApiDateTime } from "../../../../utils/apiResponseHelpers";
+import { SupplyStatusBadge } from "../../supplies/utils/SupplyStatusBadge";
 import ReceiveIntoStoreModal from "./ReceiveIntoStoreModal";
 import EditInventoryItemModal from "./EditInventoryItemModal";
 import { ItemPhotoThumb } from "./ItemPhotoField";
@@ -21,17 +19,19 @@ import { ItemPhotoThumb } from "./ItemPhotoField";
 function StatusPill({ status }) {
   const raw = (status ?? "").toString().toUpperCase();
   const tone =
-    raw === "ACTIVE"
+    raw === "IN_STOCK" || raw === "ACTIVE"
       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
       : raw === "LOW_STOCK"
         ? "bg-amber-50 text-amber-700 border-amber-200"
         : raw === "OUT_OF_STOCK"
           ? "bg-rose-50 text-rose-700 border-rose-200"
-          : "bg-slate-50 text-slate-500 border-slate-200";
+          : raw === "INACTIVE"
+            ? "bg-slate-50 text-slate-600 border-slate-200"
+            : "bg-slate-50 text-slate-500 border-slate-200";
 
   return (
     <span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border", tone)}>
-      {formatAccessoryStatus(status)}
+      {formatInventoryStatus(status)}
     </span>
   );
 }
@@ -52,6 +52,11 @@ function formatCondition(value) {
     .toLowerCase()
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function cellValue(value) {
+  if (value == null || value === "") return "—";
+  return value;
 }
 
 function AccordionSection({ title, open, onToggle, action, children }) {
@@ -79,18 +84,23 @@ function AccordionSection({ title, open, onToggle, action, children }) {
   );
 }
 
-function isPendingSupply(row) {
-  return (
-    row?.status === "PENDING_APPROVAL"
-    || (!row?.dateSupplied && String(row?.approvedBy || "").toLowerCase() === "pending")
-  );
-}
-
-function MiniTable({ columns, rows, emptyLabel, onView, onApprove }) {
+function MiniTable({
+  columns,
+  rows,
+  emptyLabel,
+  onView,
+  loading = false,
+  error = null,
+  onRetry,
+  loadingLabel = "Loading…",
+  errorTitle = "Couldn’t load this table",
+}) {
   const tableMinWidth = Math.max(
     960,
     columns.reduce((sum, column) => sum + (column.minWidth ?? 120), 0) + 140,
   );
+  const colSpan = columns.length + 1;
+  const showBodyState = loading || Boolean(error);
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-100 -mx-1">
@@ -115,10 +125,22 @@ function MiniTable({ columns, rows, emptyLabel, onView, onApprove }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
-          {rows.length === 0 ? (
+          {showBodyState ? (
+            <tr>
+              <td colSpan={colSpan} className="px-4 py-2">
+                <SectionLoadState
+                  loading={loading}
+                  error={error}
+                  onRetry={onRetry}
+                  loadingLabel={loadingLabel}
+                  errorTitle={errorTitle}
+                />
+              </td>
+            </tr>
+          ) : rows.length === 0 ? (
             <tr>
               <td
-                colSpan={columns.length + 1}
+                colSpan={colSpan}
                 className="px-4 py-8 text-center text-[12px] text-slate-400"
               >
                 {emptyLabel}
@@ -136,26 +158,16 @@ function MiniTable({ columns, rows, emptyLabel, onView, onApprove }) {
                       column.wrap ? "whitespace-normal break-words" : "whitespace-nowrap",
                     )}
                   >
-                    {column.render ? column.render(row) : row[column.key] ?? "—"}
+                    {column.render
+                      ? column.render(row)
+                      : cellValue(row[column.key])}
                   </td>
                 ))}
                 <td className="px-4 py-3 text-right align-top">
-                  <div className="inline-flex items-center justify-end gap-2">
-                    {onApprove && isPendingSupply(row) ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                        onClick={() => onApprove(row)}
-                      >
-                        Approve
-                      </Button>
-                    ) : null}
-                    <TableViewAction
-                      title="View all details"
-                      onClick={() => onView(row)}
-                    />
-                  </div>
+                  <TableViewAction
+                    title="View all details"
+                    onClick={() => onView(row)}
+                  />
                 </td>
               </tr>
             ))
@@ -166,29 +178,82 @@ function MiniTable({ columns, rows, emptyLabel, onView, onApprove }) {
   );
 }
 
-const ACCESSORY_COLLECTIVE_COLUMNS = [
-  { key: "itemCode", label: "Item code", minWidth: 130 },
-  { key: "name", label: "Name", minWidth: 180 },
-  { key: "brand", label: "Brand", minWidth: 120 },
-  { key: "description", label: "Description", minWidth: 220, wrap: true },
-  { key: "quantity", label: "Quantity", minWidth: 100 },
+const RECEIPT_COLUMNS = [
   {
-    key: "dateCollected",
-    label: "Date received",
-    minWidth: 130,
-    render: (row) => formatAccessoryDate(row.dateCollected),
+    key: "supplierName",
+    label: "Supplier",
+    minWidth: 180,
+    wrap: true,
+    render: (row) => {
+      if (!row.supplierName) return "—";
+      return (
+        <div>
+          <div className="font-medium text-slate-800">{row.supplierName}</div>
+          {row.supplierPhone ? (
+            <div className="mt-0.5 text-[11px] text-slate-500">{row.supplierPhone}</div>
+          ) : null}
+        </div>
+      );
+    },
   },
   {
-    key: "unitCost",
-    label: "Unit cost",
+    key: "storeName",
+    label: "Store",
+    minWidth: 160,
+    wrap: true,
+    render: (row) => {
+      if (!row.storeName && !row.storeCode) return "—";
+      if (row.storeName && row.storeCode) {
+        return `${row.storeName} (${row.storeCode})`;
+      }
+      return row.storeName || row.storeCode;
+    },
+  },
+  {
+    key: "deliveredByName",
+    label: "Delivered by",
+    minWidth: 150,
+    wrap: true,
+    render: (row) => {
+      if (!row.deliveredByName && !row.deliveredByPhone) return "—";
+      return (
+        <div>
+          <div>{row.deliveredByName || "—"}</div>
+          {row.deliveredByPhone ? (
+            <div className="mt-0.5 text-[11px] text-slate-500">{row.deliveredByPhone}</div>
+          ) : null}
+        </div>
+      );
+    },
+  },
+  {
+    key: "condition",
+    label: "Condition",
     minWidth: 120,
-    render: (row) => formatAccessoryMoney(row.unitCost),
+    render: (row) => formatCondition(row.condition),
   },
-  { key: "location", label: "Location", minWidth: 160 },
-  { key: "collectedBy", label: "Received by", minWidth: 150 },
+  {
+    key: "quantity",
+    label: "Quantity",
+    minWidth: 100,
+    render: (row) => cellValue(row.quantity),
+  },
+  {
+    key: "unitPrice",
+    label: "Unit price",
+    minWidth: 120,
+    render: (row) =>
+      row.unitPrice == null ? "—" : formatInventoryMoney(row.unitPrice),
+  },
+  {
+    key: "receivedAt",
+    label: "Received",
+    minWidth: 150,
+    render: (row) => formatApiDateTime(row.receivedAt),
+  },
 ];
 
-const ACCESSORY_SUPPLY_COLUMNS = [
+const SUPPLY_COLUMNS = [
   { key: "itemCode", label: "Item code", minWidth: 130 },
   { key: "name", label: "Name", minWidth: 180 },
   { key: "brand", label: "Brand", minWidth: 120 },
@@ -197,150 +262,25 @@ const ACCESSORY_SUPPLY_COLUMNS = [
   {
     key: "status",
     label: "Status",
-    minWidth: 120,
-    render: (row) =>
-      isPendingSupply(row) ? (
-        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-          Pending approval
-        </span>
-      ) : (
-        <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-          Approved
-        </span>
-      ),
+    minWidth: 140,
+    render: (row) => <SupplyStatusBadge status={row.status} />,
   },
   {
     key: "dateRequested",
     label: "Date requested",
     minWidth: 130,
-    render: (row) => formatAccessoryDate(row.dateRequested),
+    render: (row) => formatApiDateTime(row.dateRequested || row.createdAt),
   },
   {
     key: "dateSupplied",
     label: "Date supplied",
     minWidth: 130,
-    render: (row) => formatAccessoryDate(row.dateSupplied),
-  },
-  {
-    key: "unitCost",
-    label: "Unit cost",
-    minWidth: 120,
-    render: (row) => formatAccessoryMoney(row.unitCost),
+    render: (row) => formatApiDateTime(row.dateSupplied),
   },
   { key: "location", label: "Location", minWidth: 160 },
-  { key: "receivedBy", label: "Received by", minWidth: 150 },
-  {
-    key: "suppliedBy",
-    label: "Supplied by",
-    minWidth: 200,
-    wrap: true,
-    render: (row) => (
-      <div className="space-y-0.5 leading-snug">
-        <p>
-          <span className="text-slate-400 font-medium">Title:</span>{" "}
-          {row.suppliedByTitle || "Fleet manager"}
-        </p>
-        <p>
-          <span className="text-slate-400 font-medium">Name:</span>{" "}
-          {row.suppliedByName || row.suppliedBy || "Emmanuel Tetteh"}
-        </p>
-      </div>
-    ),
-  },
-  { key: "approvedBy", label: "Approved by", minWidth: 150 },
+  { key: "requestedBy", label: "Requested by", minWidth: 150 },
 ];
 
-const VEHICLE_PART_COLLECTIVE_COLUMNS = [
-  { key: "itemCode", label: "Item code", minWidth: 140 },
-  { key: "make", label: "Make", minWidth: 110 },
-  { key: "model", label: "Model", minWidth: 120 },
-  { key: "year", label: "Year", minWidth: 80 },
-  { key: "chassisNumber", label: "Chassis number", minWidth: 180 },
-  { key: "name", label: "Name", minWidth: 180 },
-  { key: "brand", label: "Brand", minWidth: 120 },
-  { key: "description", label: "Description", minWidth: 220, wrap: true },
-  { key: "quantity", label: "Quantity", minWidth: 100 },
-  {
-    key: "dateCollected",
-    label: "Date received",
-    minWidth: 130,
-    render: (row) => formatAccessoryDate(row.dateCollected),
-  },
-  {
-    key: "unitCost",
-    label: "Unit cost",
-    minWidth: 120,
-    render: (row) => formatAccessoryMoney(row.unitCost),
-  },
-  { key: "location", label: "Location", minWidth: 160 },
-  { key: "collectedBy", label: "Received by", minWidth: 150 },
-];
-
-const VEHICLE_PART_SUPPLY_COLUMNS = [
-  { key: "itemCode", label: "Item code", minWidth: 140 },
-  { key: "make", label: "Make", minWidth: 110 },
-  { key: "model", label: "Model", minWidth: 120 },
-  { key: "year", label: "Year", minWidth: 80 },
-  { key: "chassisNumber", label: "Chassis number", minWidth: 180 },
-  { key: "name", label: "Name", minWidth: 180 },
-  { key: "brand", label: "Brand", minWidth: 120 },
-  { key: "description", label: "Description", minWidth: 220, wrap: true },
-  { key: "quantity", label: "Quantity", minWidth: 100 },
-  {
-    key: "status",
-    label: "Status",
-    minWidth: 120,
-    render: (row) =>
-      isPendingSupply(row) ? (
-        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-          Pending approval
-        </span>
-      ) : (
-        <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-          Approved
-        </span>
-      ),
-  },
-  {
-    key: "dateRequested",
-    label: "Date requested",
-    minWidth: 130,
-    render: (row) => formatAccessoryDate(row.dateRequested),
-  },
-  {
-    key: "dateSupplied",
-    label: "Date supplied",
-    minWidth: 130,
-    render: (row) => formatAccessoryDate(row.dateSupplied),
-  },
-  {
-    key: "unitCost",
-    label: "Unit cost",
-    minWidth: 120,
-    render: (row) => formatAccessoryMoney(row.unitCost),
-  },
-  { key: "location", label: "Location", minWidth: 160 },
-  { key: "receivedBy", label: "Received by", minWidth: 150 },
-  {
-    key: "suppliedBy",
-    label: "Supplied by",
-    minWidth: 200,
-    wrap: true,
-    render: (row) => (
-      <div className="space-y-0.5 leading-snug">
-        <p>
-          <span className="text-slate-400 font-medium">Title:</span>{" "}
-          {row.suppliedByTitle || "Fleet manager"}
-        </p>
-        <p>
-          <span className="text-slate-400 font-medium">Name:</span>{" "}
-          {row.suppliedByName || row.suppliedBy || "Emmanuel Tetteh"}
-        </p>
-      </div>
-    ),
-  },
-  { key: "approvedBy", label: "Approved by", minWidth: 150 },
-];
 
 function formatDetailLabel(key) {
   const labels = {
@@ -358,66 +298,65 @@ function formatDetailLabel(key) {
     suppliedBy: "Supplied by",
     approvedBy: "Approved by",
     supplierId: "Supplier",
-    waybillNumber: "Waybill number",
-    deliveredByName: "Delivered by",
+    supplierName: "Supplier",
+    storeName: "Store",
+    storeCode: "Store code",
+    itemBrand: "Item brand",
+    unitPrice: "Unit price",
+    receivedAt: "Received at",
     supplierPhone: "Supplier phone",
     supplierEmail: "Supplier email",
+    deliveredByPhone: "Delivered by (phone)",
+    deliveredByEmail: "Delivered by (email)",
+    deliveredByName: "Delivered by (full name)",
+    waybillNumber: "Waybill number",
     totalPurchaseCost: "Total purchase cost",
     averageUnitCost: "Average unit cost",
     minStock: "Minimum stock",
     createdAt: "Item created",
     updatedAt: "Last updated",
     componentPath: "Component path",
+    quantity: "Total quantity",
+    totalQuantity: "Total quantity",
+    photo: "Photo",
   };
   return labels[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());
 }
 
 function formatDetailValue(key, value) {
   if (value == null || value === "") return "—";
-  if (key === "supplierId") {
-    return getSuppliers().find((supplier) => supplier.id === value)?.name || value;
-  }
+  if (key === "supplierId") return String(value);
   if (key === "condition") return formatCondition(value);
-  if (["unitCost", "averageUnitCost", "totalPurchaseCost"].includes(key)) {
-    return formatAccessoryMoney(value);
+  if (["unitCost", "unitPrice", "averageUnitCost", "totalPurchaseCost"].includes(key)) {
+    return formatInventoryMoney(value);
   }
-  if (key.startsWith("date") || key.endsWith("At")) return formatAccessoryDate(value);
-  if (key === "status") {
-    if (value === "PENDING_APPROVAL") return "Pending approval";
-    if (value === "APPROVED") return "Approved";
-    return formatAccessoryStatus(value);
-  }
+  if (key.startsWith("date") || key.endsWith("At")) return formatApiDateTime(value);
+  if (key === "status") return formatInventoryStatus(value);
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
 
-const RECEIVING_FIELD_KEYS = [
-  "condition",
-  "supplierId",
-  "waybillNumber",
-  "deliveredByName",
-  "supplierPhone",
-  "supplierEmail",
-  "notes",
-];
-
-function scalarEntries(record) {
-  return Object.entries(record || {}).filter(
-    ([, value]) => value == null || typeof value !== "object",
-  );
+function isPhotoValue(key, value) {
+  if (key !== "photo" && key !== "imageUrl") return false;
+  return typeof value === "string" && value.trim().length > 0;
 }
 
-function movementEntries(record, type) {
-  const entries = scalarEntries(record).filter(
-    ([key]) => type === "Receivable" || !RECEIVING_FIELD_KEYS.includes(key),
+function scalarEntries(record) {
+  const skip = new Set([
+    "detailReady",
+    "detailLoading",
+    "detailError",
+    "receiptsLoading",
+    "receiptsError",
+    "receipts",
+    "supplies",
+    "stores",
+  ]);
+  return Object.entries(record || {}).filter(
+    ([key, value]) =>
+      !skip.has(key)
+      && (value == null || typeof value !== "object"),
   );
-  if (type !== "Receivable") return entries;
-
-  const existingKeys = new Set(entries.map(([key]) => key));
-  RECEIVING_FIELD_KEYS.forEach((key) => {
-    if (!existingKeys.has(key)) entries.push([key, ""]);
-  });
-  return entries;
 }
 
 function DetailGrid({ entries }) {
@@ -428,9 +367,15 @@ function DetailGrid({ entries }) {
           <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
             {formatDetailLabel(key)}
           </p>
-          <p className="mt-1 break-words text-[12px] font-medium text-slate-700">
-            {formatDetailValue(key, value)}
-          </p>
+          {isPhotoValue(key, value) ? (
+            <div className="mt-1">
+              <ItemPhotoThumb src={value} name="Item photo" className="h-16 w-16" />
+            </div>
+          ) : (
+            <p className="mt-1 break-words text-[12px] font-medium text-slate-700">
+              {formatDetailValue(key, value)}
+            </p>
+          )}
         </div>
       ))}
     </div>
@@ -473,8 +418,9 @@ export default function AccessoryDetailModal({
   item,
   variant = "accessory",
   onReceiveStock,
-  onApproveSupply,
   onUpdateDetails,
+  onRetryDetail,
+  onRetryReceipts,
 }) {
   const [openSections, setOpenSections] = useState({
     information: true,
@@ -484,9 +430,13 @@ export default function AccessoryDetailModal({
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState(null);
-  const [pendingApprove, setPendingApprove] = useState(null);
 
   const isVehiclePart = variant === "vehicle_part";
+  const detailReady = Boolean(item?.detailReady);
+  const detailLoading = Boolean(item?.detailLoading);
+  const detailError = item?.detailError || null;
+  const receiptsLoading = Boolean(item?.receiptsLoading);
+  const receiptsError = item?.receiptsError || null;
 
   useEffect(() => {
     if (isOpen) {
@@ -495,13 +445,11 @@ export default function AccessoryDetailModal({
       setReceiveOpen(false);
       setEditOpen(false);
       setSelectedMovement(null);
-      setPendingApprove(null);
     } else {
       document.body.style.overflow = "";
       setReceiveOpen(false);
       setEditOpen(false);
       setSelectedMovement(null);
-      setPendingApprove(null);
     }
     return () => {
       document.body.style.overflow = "";
@@ -513,29 +461,30 @@ export default function AccessoryDetailModal({
   const toggle = (key) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  const averageUnitCost = getInventoryAverageUnitCost(item);
-  const stockByLocation = getInventoryStockByLocation(item);
-  const estimatedStockValue = (Number(item.quantity) || 0) * averageUnitCost;
+  const receipts = Array.isArray(item.receipts) ? item.receipts : [];
+  const supplies = item.supplies || [];
+  const averageUnitCost = detailReady && receipts.length
+    ? receipts.reduce((sum, row) => sum + Number(row.unitPrice || 0), 0) / receipts.length
+    : 0;
+  const stockByLocation = detailReady
+    ? (item.stores || []).map((store) => ({
+      id: store.id,
+      location: store.name,
+      quantity: store.quantity,
+    }))
+    : [];
+  const estimatedStockValue = detailReady
+    ? (Number(item.quantity) || 0) * averageUnitCost
+    : 0;
 
-  const handleReceiveSave = (payload) => {
-    onReceiveStock?.(payload);
+  const handleReceiveSave = async (payload) => {
+    await onReceiveStock?.(payload);
     setReceiveOpen(false);
   };
 
-  const requestApprove = (row) => {
-    if (!row) return;
-    setPendingApprove(row);
-  };
-
-  const confirmApprove = () => {
-    if (!pendingApprove) return;
-    onApproveSupply?.(pendingApprove);
-    setPendingApprove(null);
-    setSelectedMovement(null);
-  };
-
-  const viewingPendingSupply =
-    selectedMovement?.type === "Supply" && isPendingSupply(selectedMovement?.row);
+  const receiptsTitle = receiptsLoading || receiptsError
+    ? "Receipts"
+    : `Receipts (${receipts.length})`;
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
@@ -566,8 +515,10 @@ export default function AccessoryDetailModal({
 
         <div className="px-6 py-6 overflow-y-auto space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill status={item.status} />
-            <span className="text-[12px] text-slate-400 font-medium">{item.itemCode}</span>
+            {detailReady ? <StatusPill status={item.status} /> : null}
+            <span className="text-[12px] text-slate-400 font-medium">
+              {item.itemCode || item.name || `Item #${item.id}`}
+            </span>
           </div>
 
           <AccordionSection
@@ -579,6 +530,7 @@ export default function AccessoryDetailModal({
                 type="button"
                 size="sm"
                 variant="primary"
+                disabled={!detailReady}
                 onClick={(e) => {
                   e.stopPropagation();
                   setReceiveOpen(true);
@@ -586,89 +538,103 @@ export default function AccessoryDetailModal({
                 className="inline-flex items-center gap-1.5 shrink-0"
               >
                 <Plus size={14} />
-                Submit stock receipt
+                Receive stock
               </Button>
             }
           >
-            <DetailRow label="Photo">
-              <ItemPhotoThumb src={item.photo} name={item.name} className="h-16 w-16" />
-            </DetailRow>
-            <DetailRow label="Item Code">{item.itemCode}</DetailRow>
-            {isVehiclePart ? (
-              <>
-                <DetailRow label="Make">{item.make}</DetailRow>
-                <DetailRow label="Model">{item.model}</DetailRow>
-                <DetailRow label="Year">{item.year ?? "—"}</DetailRow>
-                <DetailRow label="Chassis Number">{item.chassisNumber}</DetailRow>
-                <DetailRow label="Name">{item.name}</DetailRow>
-                <DetailRow label="Component path">{item.componentPath || "—"}</DetailRow>
-                <DetailRow label="Brand">{item.brand || "—"}</DetailRow>
-              </>
-            ) : (
-              <>
-                <DetailRow label="Name">{item.name}</DetailRow>
-                <DetailRow label="Brand">{item.brand}</DetailRow>
-              </>
-            )}
-            <DetailRow label="Description">{item.description || "—"}</DetailRow>
-            <DetailRow label="Shelf location">{item.shelfPosition || "—"}</DetailRow>
-            <DetailRow label="Quantity on hand">{item.quantity}</DetailRow>
-            <DetailRow label="Average unit cost">
-              {formatAccessoryMoney(averageUnitCost)}
-            </DetailRow>
-            <DetailRow label="Estimated stock value">
-              {formatAccessoryMoney(estimatedStockValue)}
-            </DetailRow>
-            <DetailRow label="Locations">
-              {stockByLocation.length === 0 ? (
-                "—"
-              ) : (
-                <ul className="space-y-1.5">
-                  {stockByLocation.map((row) => (
-                    <li
-                      key={row.location}
-                      className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5"
-                    >
-                      <span>{row.location}</span>
-                      <span className="tabular-nums text-slate-500">
-                        {row.quantity} on hand
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </DetailRow>
-            <DetailRow label="Status">
-              <StatusPill status={item.status} />
-            </DetailRow>
+            <SectionLoadState
+              loading={detailLoading}
+              error={detailError}
+              onRetry={onRetryDetail}
+              loadingLabel="Loading item details…"
+            >
+              {detailReady ? (
+                <>
+                  <DetailRow label="Photo">
+                    <ItemPhotoThumb src={item.photo} name={item.name} className="h-16 w-16" />
+                  </DetailRow>
+                  <DetailRow label="Item Code">{item.itemCode}</DetailRow>
+                  {isVehiclePart ? (
+                    <>
+                      <DetailRow label="Make">{item.make}</DetailRow>
+                      <DetailRow label="Model">{item.model}</DetailRow>
+                      <DetailRow label="Year">{item.year ?? "—"}</DetailRow>
+                      <DetailRow label="Chassis Number">{item.chassisNumber}</DetailRow>
+                      <DetailRow label="Name">{item.name}</DetailRow>
+                      <DetailRow label="Component path">{item.componentPath || "—"}</DetailRow>
+                      <DetailRow label="Brand">{item.brand || "—"}</DetailRow>
+                    </>
+                  ) : (
+                    <>
+                      <DetailRow label="Name">{item.name}</DetailRow>
+                      <DetailRow label="Brand">{item.brand}</DetailRow>
+                    </>
+                  )}
+                  <DetailRow label="Unit">{item.unit || "—"}</DetailRow>
+                  <DetailRow label="Description">{item.description || "—"}</DetailRow>
+                  <DetailRow label="Shelf location">{item.shelfPosition || "—"}</DetailRow>
+                  <DetailRow label="Total quantity">{item.quantity}</DetailRow>
+                  <DetailRow label="Average unit cost">
+                    {formatInventoryMoney(averageUnitCost)}
+                  </DetailRow>
+                  <DetailRow label="Estimated stock value">
+                    {formatInventoryMoney(estimatedStockValue)}
+                  </DetailRow>
+                  <DetailRow label="Locations">
+                    {stockByLocation.length === 0 ? (
+                      "—"
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {stockByLocation.map((row) => (
+                          <li
+                            key={row.id ?? row.location}
+                            className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5"
+                          >
+                            <span>{row.location}</span>
+                            <span className="tabular-nums text-slate-500">
+                              {row.quantity} on hand
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </DetailRow>
+                  <DetailRow label="Status">
+                    <StatusPill status={item.status} />
+                  </DetailRow>
+                </>
+              ) : null}
+            </SectionLoadState>
           </AccordionSection>
 
           <AccordionSection
-            title={`Receivables (${item.collectives?.length ?? 0})`}
+            title={receiptsTitle}
             open={openSections.collectives}
             onToggle={() => toggle("collectives")}
           >
             <MiniTable
-              columns={
-                isVehiclePart ? VEHICLE_PART_COLLECTIVE_COLUMNS : ACCESSORY_COLLECTIVE_COLUMNS
-              }
-              rows={item.collectives ?? []}
-              emptyLabel="No receivables recorded for this item."
-              onView={(row) => setSelectedMovement({ row, type: "Receivable" })}
+              columns={RECEIPT_COLUMNS}
+              rows={receipts}
+              emptyLabel="No receipts recorded for this item."
+              onView={(row) => setSelectedMovement({ row, type: "Receipt" })}
+              loading={receiptsLoading}
+              error={receiptsError}
+              onRetry={onRetryReceipts}
+              loadingLabel="Loading receipts…"
+              errorTitle="Couldn’t load receipts"
             />
           </AccordionSection>
 
           <AccordionSection
-            title={`Supplies (${item.supplies?.length ?? 0})`}
+            title={`Supplies (${supplies.length})`}
             open={openSections.supplies}
             onToggle={() => toggle("supplies")}
           >
             <MiniTable
-              columns={isVehiclePart ? VEHICLE_PART_SUPPLY_COLUMNS : ACCESSORY_SUPPLY_COLUMNS}
-              rows={item.supplies ?? []}
-              emptyLabel="No supply records for this item."
+              columns={SUPPLY_COLUMNS}
+              rows={supplies}
+              emptyLabel="No supplies recorded for this item."
               onView={(row) => setSelectedMovement({ row, type: "Supply" })}
-              onApprove={requestApprove}
             />
           </AccordionSection>
         </div>
@@ -678,7 +644,7 @@ export default function AccessoryDetailModal({
             Close
           </Button>
           {onUpdateDetails && !isVehiclePart ? (
-            <Button size="modal" onClick={() => setEditOpen(true)}>
+            <Button size="modal" disabled={!detailReady} onClick={() => setEditOpen(true)}>
               Edit
             </Button>
           ) : null}
@@ -696,78 +662,45 @@ export default function AccessoryDetailModal({
         isOpen={editOpen}
         onClose={() => setEditOpen(false)}
         item={item}
-        onSave={(payload) => {
-          onUpdateDetails?.(payload);
+        onSave={async (payload) => {
+          await onUpdateDetails?.(payload);
           setEditOpen(false);
         }}
       />
 
       <AddModal
-        isOpen={Boolean(selectedMovement) && !pendingApprove}
+        isOpen={Boolean(selectedMovement)}
         onClose={() => setSelectedMovement(null)}
-        onSave={
-          viewingPendingSupply
-            ? () => requestApprove(selectedMovement.row)
-            : () => setSelectedMovement(null)
+        onSave={() => setSelectedMovement(null)}
+        title={selectedMovement?.type === "Supply" ? "Supply details" : "Receipt details"}
+        subtitle={
+          selectedMovement?.type === "Supply"
+            ? "Supply information and linked item details."
+            : "Stock receipt information and linked item details."
         }
-        title="Inventory Record Details"
-        subtitle={`${selectedMovement?.type || "Movement"} information and complete linked item details.`}
-        saveLabel={viewingPendingSupply ? "Approve receipt" : "Close"}
-        saveVariant={viewingPendingSupply ? "primary" : "ghost"}
-        hideCancelButton={!viewingPendingSupply}
-        secondaryAction={
-          viewingPendingSupply
-            ? { label: "Close", onClick: () => setSelectedMovement(null) }
-            : undefined
-        }
+        saveLabel="Close"
+        saveVariant="ghost"
+        hideCancelButton
         dialogClassName="max-w-2xl"
       >
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <StatusPill status={item.status} />
-          {selectedMovement?.type === "Supply" ? (
-            isPendingSupply(selectedMovement.row) ? (
-              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                Pending approval
-              </span>
-            ) : (
-              <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                Approved
-              </span>
-            )
-          ) : null}
+          {detailReady ? <StatusPill status={item.status} /> : null}
           <span className="text-[12px] font-bold text-slate-900">{item.itemCode}</span>
           <span className="text-[11px] text-slate-500">{item.name}</span>
         </div>
         <div className="space-y-4">
-          <DetailSection title="Item Details">
-            <DetailGrid
-              entries={scalarEntries(item).filter(
-                ([key]) => !RECEIVING_FIELD_KEYS.includes(key),
-              )}
-            />
-          </DetailSection>
-          <DetailSection title={`${selectedMovement?.type || "Movement"} Details`}>
-            <DetailGrid
-              entries={movementEntries(selectedMovement?.row, selectedMovement?.type)}
-            />
+          {detailReady ? (
+            <DetailSection title="Item Details">
+              <DetailGrid entries={scalarEntries(item)} />
+            </DetailSection>
+          ) : null}
+          <DetailSection title={`${selectedMovement?.type || "Record"} Details`}>
+            <DetailGrid entries={scalarEntries(selectedMovement?.row)} />
           </DetailSection>
         </div>
       </AddModal>
-
-      <ConfirmationModal
-        isOpen={Boolean(pendingApprove)}
-        onClose={() => setPendingApprove(null)}
-        onConfirm={confirmApprove}
-        className="!z-[10001]"
-        title="Approve stock receipt?"
-        message={
-          pendingApprove
-            ? `Approve receipt of ${pendingApprove.quantity} ${item.itemCode || "item"} into ${pendingApprove.location || "store"}? This will add it to receivables and update on-hand stock.`
-            : "Approve this stock receipt?"
-        }
-        confirmText="Approve receipt"
-      />
     </div>,
     document.body,
   );
 }
+

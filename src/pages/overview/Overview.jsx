@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle, ClipboardList, Package } from "lucide-react";
 import {
@@ -16,9 +16,10 @@ import {
 import PageHeader from "../../components/common/PageHeader";
 import SummaryStatCard from "../../components/common/SummaryStatCard";
 import { cn } from "../../utils/cn";
-import { getAccessories, getRequisitions } from "../../mockdata/stores";
+import { getRequisitions } from "../../mockdata/stores";
 import { getRequests } from "../../mockdata/requests";
-import { syncApprovalsFromRequests } from "../../mockdata/approvals";
+import { listSupplyRequests } from "../../services/supplyRequestsService";
+import { listInventoryItems } from "../../services/inventoryService";
 
 const STORE_BAR_COLORS = ["#205848", "#276a56", "#3d8b72", "#16d595", "#184338"];
 
@@ -197,10 +198,10 @@ function MiniMeter({ value, max }) {
 }
 
 export default function Overview() {
-  const accessories = useMemo(() => getAccessories(), []);
   const requisitions = useMemo(() => getRequisitions(), []);
+  const [accessories, setAccessories] = useState([]);
   const lowStock = useMemo(
-    () => accessories.filter((item) => item.status === "LOW_STOCK" || item.status === "OUT_OF_STOCK"),
+    () => accessories.filter((item) => item.status === "OUT_OF_STOCK"),
     [accessories],
   );
   const openSupplies = useMemo(
@@ -214,19 +215,39 @@ export default function Overview() {
     () => getRequests().filter((row) => (row.status ?? "").toUpperCase() === "PENDING"),
     [],
   );
-  const pendingApprovals = useMemo(
-    () => syncApprovalsFromRequests(getRequests()).filter((row) => row.queue === "pending"),
-    [],
-  );
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    listSupplyRequests()
+      .then((rows) => {
+        if (!cancelled) {
+          setPendingApprovalsCount(rows.filter((row) => row.queue === "pending").length);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPendingApprovalsCount(0);
+      });
+    listInventoryItems()
+      .then((rows) => {
+        if (!cancelled) setAccessories(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setAccessories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const stockByStore = useMemo(() => {
     const totals = {};
     accessories.forEach((item) => {
-      (item.stockByLocation || []).forEach(({ location, quantity }) => {
-        const name = storeShortName(location);
+      (item.stores || []).forEach((store) => {
+        const name = storeShortName(store.name);
         if (!totals[name]) totals[name] = { label: name, value: 0, skuCount: 0 };
-        totals[name].value += Number(quantity || 0);
-        if (Number(quantity || 0) > 0) totals[name].skuCount += 1;
+        totals[name].value += Number(store.quantity || 0);
+        if (Number(store.quantity || 0) > 0) totals[name].skuCount += 1;
       });
     });
     return Object.values(totals).sort((a, b) => b.value - a.value);
@@ -258,7 +279,7 @@ export default function Overview() {
         <SummaryStatCard title="Accessory SKUs" value={accessories.length} icon={Package} tone="teal" />
         <SummaryStatCard title="Low / out of stock" value={lowStock.length} icon={AlertTriangle} tone="amber" />
         <SummaryStatCard title="Open supplies" value={openSupplies.length} icon={ClipboardList} tone="sky" />
-        <SummaryStatCard title="Pending approvals" value={pendingApprovals.length} icon={CheckCircle} tone="rose" />
+        <SummaryStatCard title="Pending approvals" value={pendingApprovalsCount} icon={CheckCircle} tone="rose" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

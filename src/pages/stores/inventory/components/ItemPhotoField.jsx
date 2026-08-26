@@ -1,10 +1,15 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ImagePlus, Package, Trash2 } from "lucide-react";
 import { cn } from "../../../../utils/cn";
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 
 export function ItemPhotoThumb({ src, name, className = "h-10 w-10" }) {
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
   if (!src || failed) {
     return (
       <div
@@ -36,19 +41,21 @@ export default function ItemPhotoField({
   label = "Item photo",
   value = "",
   onChange,
+  onFileChange,
   error,
 }) {
   const inputRef = useRef(null);
 
-  const setPhoto = (next) => {
+  const setPhoto = (next, file = null) => {
     onChange?.(next || "");
+    onFileChange?.(file);
   };
 
   const handleFile = (file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
-    reader.onload = () => setPhoto(String(reader.result || ""));
+    reader.onload = () => setPhoto(String(reader.result || ""), file);
     reader.readAsDataURL(file);
   };
 
@@ -83,7 +90,7 @@ export default function ItemPhotoField({
             {value ? (
               <button
                 type="button"
-                onClick={() => setPhoto("")}
+                onClick={() => setPhoto("", null)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-bold text-slate-500 hover:text-rose-600 hover:border-rose-200"
               >
                 <Trash2 size={14} />

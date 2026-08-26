@@ -1,86 +1,49 @@
-export const REQUEST_TYPE_OPTIONS = [
-  { value: "request_from_stores", label: "Request from Stores" },
-];
-
-export const REQUEST_TYPE_ACTIONS = {
-  request_from_stores: {
-    mode: "modal",
-    template: "stores",
-    continueLabel: "Continue to item request form",
-    hint: "Opens the New item request form",
-  },
-};
-
-export function getRequestTypeAction(requestType) {
-  return REQUEST_TYPE_ACTIONS[requestType] ?? null;
-}
-
-export function getRequestTypeLabel(requestType) {
-  return REQUEST_TYPE_OPTIONS.find((option) => option.value === requestType)?.label
-    ?? String(requestType ?? "").replace(/_/g, " ");
-}
-
-export const REQUEST_STATUS_FILTERS = [
-  { value: "ALL", label: "All Status" },
-  { value: "DRAFT", label: "Draft" },
-  { value: "PENDING", label: "Pending Approval" },
-  { value: "APPROVED", label: "Approved" },
-  { value: "REJECTED", label: "Rejected" },
-];
-
-export function formatRequestAmount(amount) {
-  const value = Number(amount) || 0;
-  if (value === 0) return "—";
-  return `GHS ${value.toLocaleString()}`;
+export function requestStatusKey(status) {
+  return String(status || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
 }
 
 export function formatRequestStatus(status) {
-  const raw = (status ?? "PENDING").toString().toUpperCase();
-  if (raw === "DRAFT") return "Draft";
-  if (raw === "PENDING") return "Pending";
-  if (raw === "APPROVED") return "Approved";
-  if (raw === "REJECTED") return "Rejected";
-  return raw.replace(/_/g, " ");
+  const key = requestStatusKey(status);
+  if (!key) return "—";
+  return key
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export function formatRequestDateTime(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+export function isDraftRequest(status) {
+  const key = requestStatusKey(status);
+  return !key || key === "DRAFT";
 }
 
-export function buildStoresRequestPayload(requisition) {
-  const itemLabel = requisition?.itemName || "Store item";
-  const qty = requisition?.quantity ?? 1;
+export function isRejectedRequest(status) {
+  return requestStatusKey(status) === "REJECTED";
+}
+
+export function summarizeItems(items = []) {
+  if (!items.length) return "No items";
+  const first = items[0];
+  const name = first.name || "Item";
+  const qty = first.quantity != null ? ` × ${first.quantity}` : "";
+  if (items.length === 1) return `${name}${qty}`;
+  return `${name}${qty} + ${items.length - 1} more`;
+}
+
+export function isPositiveInt(value) {
+  const quantity = Number(value);
+  return value !== "" && Number.isInteger(quantity) && quantity > 0;
+}
+
+export function toGeneralRequestWriteBody(reason, lines = []) {
   return {
-    requestType: "request_from_stores",
-    amount: 0,
-    costCenter: "Accra Central Store — Ringway Estates",
-    budgetLine: "Stores Requisition",
-    requestClass: "Operating",
-    expenseCategory: `${itemLabel} × ${qty}`,
-    purpose:
-      (requisition?.justification || "").trim()
-      || requisition?.description
-      || `Store request ${requisition?.requestNumber || ""}`.trim(),
-    status: "PENDING",
-    approvalStatus: "Pending",
-    paymentStatus: null,
-    storesDetails: {
-      requisitionId: requisition?.id ?? null,
-      requestNumber: requisition?.requestNumber ?? null,
-      kind: "accessories",
-      itemName: itemLabel,
-      itemCode: requisition?.itemCode ?? null,
-      quantity: qty,
-      justification: (requisition?.justification || "").trim() || null,
-    },
+    reason,
+    items: lines.map((line) =>
+      line.source === "catalog"
+        ? { item_id: line.accessoryId, quantity: line.quantity }
+        : { name: line.name, description: line.description, quantity: line.quantity },
+    ),
   };
 }

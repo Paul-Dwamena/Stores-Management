@@ -1,16 +1,21 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import { Shield, X } from "lucide-react";
+import { Shield, X, Info } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
+import SectionLoadState from "../../../../components/common/SectionLoadState";
+import { isProtectedRole } from "../../../../services/rolesService";
 import PermissionMatrixTable from "./PermissionMatrixTable";
-import { countRolePermissions } from "../utils/roleHelpers";
 
 export default function ViewRoleModal({
   isOpen,
   onClose,
   role,
+  catalog = [],
   onEdit,
   onDelete,
+  loading = false,
+  error = null,
+  onRetry,
 }) {
   React.useEffect(() => {
     if (isOpen) {
@@ -25,7 +30,7 @@ export default function ViewRoleModal({
 
   if (!isOpen || !role) return null;
 
-  const permissionCount = countRolePermissions(role.permissions);
+  const permissionCount = role.permissionCount ?? role.permissions?.length ?? 0;
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4">
@@ -35,13 +40,13 @@ export default function ViewRoleModal({
         onClick={onClose}
       />
 
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative flex max-h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-start justify-between border-b border-slate-100 p-4 sm:p-6">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Shield size={18} className="shrink-0 text-emerald-600" />
               <h2 className="truncate text-lg font-extrabold text-slate-900">
-                {role.name}
+                {role.label || role.name}
               </h2>
             </div>
             <p className="mt-1 text-[12px] font-medium text-slate-500">
@@ -49,8 +54,14 @@ export default function ViewRoleModal({
             </p>
             <p className="mt-2 text-[11px] font-bold text-amber-600">
               {permissionCount} permissions assigned
-              {role.isSystem ? " · System role" : ""}
+              {isProtectedRole(role) ? " · System role" : ""}
             </p>
+            {isProtectedRole(role) ? (
+              <div className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-md border border-sky-100 bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-700">
+                <Info size={12} className="shrink-0 text-sky-500" />
+                <span>System roles cannot be edited or deleted.</span>
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -61,8 +72,20 @@ export default function ViewRoleModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
-          <PermissionMatrixTable permissions={role.permissions} readOnly />
+        <div className="relative min-h-[180px] flex-1 overflow-auto px-4 py-4 sm:px-6 sm:py-6">
+          <SectionLoadState
+            loading={loading}
+            error={error}
+            onRetry={onRetry}
+            loadingLabel="Loading role…"
+            errorTitle="Couldn’t load role details"
+          >
+            <PermissionMatrixTable
+              catalog={catalog}
+              selectedIds={(role.permissions || []).map((permission) => permission.id)}
+              readOnly
+            />
+          </SectionLoadState>
         </div>
 
         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:px-6">
@@ -70,18 +93,20 @@ export default function ViewRoleModal({
             <Button onClick={onClose} variant="ghost" size="modal" className="border border-slate-200">
               Close
             </Button>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {!role.isSystem && onDelete ? (
-                <Button variant="danger" size="modal" onClick={onDelete}>
-                  Delete
-                </Button>
-              ) : null}
-              {onEdit ? (
-                <Button size="modal" onClick={onEdit}>
-                  Edit
-                </Button>
-              ) : null}
-            </div>
+            {loading || error ? null : (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {onDelete ? (
+                  <Button variant="danger" size="modal" onClick={onDelete}>
+                    Delete
+                  </Button>
+                ) : null}
+                {onEdit ? (
+                  <Button size="modal" onClick={onEdit}>
+                    Edit
+                  </Button>
+                ) : null}
+              </div>
+            )}
           </div>
         </div>
       </div>

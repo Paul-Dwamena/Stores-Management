@@ -15,6 +15,11 @@ const thClass =
 
 const tdClass = "px-3 py-3 align-middle text-[12px] text-slate-700";
 
+function sameId(a, b) {
+  if (a == null || b == null || a === "" || b === "") return false;
+  return String(a) === String(b);
+}
+
 export function createEmptyAccessoryLine() {
   return {
     id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -91,6 +96,7 @@ export function MultiAccessoryRequisitionTable({
   onAddItem,
   onRemoveLine,
   onChangeQuantity,
+  itemNoun = "accessories",
 }) {
   const [tab, setTab] = useState("catalog");
   const [search, setSearch] = useState("");
@@ -105,10 +111,10 @@ export function MultiAccessoryRequisitionTable({
   const filteredAccessories = useMemo(() => {
     const addedIds = new Set(
       lines
-        .filter((line) => line.source === "catalog" && line.accessoryId)
-        .map((line) => line.accessoryId),
+        .filter((line) => line.source === "catalog" && line.accessoryId != null && line.accessoryId !== "")
+        .map((line) => String(line.accessoryId)),
     );
-    const available = accessories.filter((item) => !addedIds.has(item.id));
+    const available = accessories.filter((item) => !addedIds.has(String(item.id)));
     const q = search.trim().toLowerCase();
     if (!q) return available;
     return available.filter((item) =>
@@ -119,14 +125,14 @@ export function MultiAccessoryRequisitionTable({
   }, [accessories, search, lines]);
 
   const selectedAccessory = useMemo(
-    () => accessories.find((item) => item.id === selectedAccessoryId) || null,
+    () => accessories.find((item) => sameId(item.id, selectedAccessoryId)) || null,
     [accessories, selectedAccessoryId],
   );
 
   useEffect(() => {
     if (!selectedAccessoryId) return;
     const added = lines.some(
-      (line) => line.source === "catalog" && line.accessoryId === selectedAccessoryId,
+      (line) => line.source === "catalog" && sameId(line.accessoryId, selectedAccessoryId),
     );
     if (added) setSelectedAccessoryId("");
   }, [lines, selectedAccessoryId]);
@@ -171,10 +177,10 @@ export function MultiAccessoryRequisitionTable({
     }
 
     const alreadyAdded = lines.some(
-      (line) => line.source === "catalog" && line.accessoryId === selectedAccessory.id,
+      (line) => line.source === "catalog" && sameId(line.accessoryId, selectedAccessory.id),
     );
     if (alreadyAdded) {
-      toast.warning("That accessory is already in the table.");
+      toast.warning(`That ${itemNoun === "items" ? "item" : "accessory"} is already in the table.`);
       return;
     }
 
@@ -306,7 +312,7 @@ export function MultiAccessoryRequisitionTable({
                           formErrors.selectedAccessoryId ? "text-red-500" : "text-slate-500",
                         )}
                       >
-                        Search accessories
+                        Search {itemNoun}
                       </label>
                       <div className="relative">
                         <Search
@@ -336,8 +342,8 @@ export function MultiAccessoryRequisitionTable({
                           {accessories.length > 0
                             && lines.some((line) => line.source === "catalog" && line.accessoryId)
                             && !search.trim()
-                            ? "All matching accessories are already in the table."
-                            : "No accessories match your search."}
+                            ? `All matching ${itemNoun} are already in the table.`
+                            : `No ${itemNoun} match your search.`}
                         </p>
                       ) : (
                         filteredAccessories.map((item) => (
@@ -519,7 +525,7 @@ export function MultiAccessoryRequisitionTable({
               ) : (
                 lines.map((line) => {
                   const rowError = errors[line.id] || {};
-                  const catalogItem = accessories.find((item) => item.id === line.accessoryId);
+                  const catalogItem = accessories.find((item) => sameId(item.id, line.accessoryId));
                   return (
                     <tr key={line.id}>
                       <td className={tdClass}>

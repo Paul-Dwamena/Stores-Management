@@ -18,8 +18,8 @@ const Login = () => {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      toast.success("Welcome back — you're signed in.");
+      const session = await login(email, password);
+      toast.success(`Welcome back, ${session.name}.`);
       navigate("/");
     } catch (err) {
       setError(err?.message || "Unable to sign in.");

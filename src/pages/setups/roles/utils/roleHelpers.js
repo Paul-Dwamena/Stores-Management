@@ -48,3 +48,33 @@ export function countRolePermissions(permissions = {}) {
 export function clonePermissions(permissions = {}) {
   return normalizePermissions(permissions);
 }
+
+export function buildPermissionMatrix(catalog = []) {
+  const resources = [];
+  const actions = [];
+  const seenResources = new Set();
+  const seenActions = new Set();
+  const cell = {};
+
+  catalog.forEach((permission) => {
+    const resource = permission.resource;
+    const action = permission.action;
+    if (!resource || !action) return;
+    if (!seenResources.has(resource)) {
+      seenResources.add(resource);
+      resources.push(resource);
+    }
+    if (!seenActions.has(action)) {
+      seenActions.add(action);
+      actions.push(action);
+    }
+    if (!cell[resource]) cell[resource] = {};
+    cell[resource][action] = permission;
+  });
+
+  return { resources, actions, cell };
+}
+
+export function permissionIdsFromRole(role) {
+  return (role?.permissions || []).map((permission) => permission.id);
+}

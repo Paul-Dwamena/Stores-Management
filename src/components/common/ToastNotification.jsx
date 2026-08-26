@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useLayoutEffect } from "react";
+import ReactDOM from "react-dom";
 import { FiCheckCircle, FiXCircle, FiAlertTriangle, FiInfo, FiX } from "react-icons/fi";
 import { cn } from "../../utils/cn";
 import { subscribeToToasts } from "./toast";
@@ -19,19 +20,22 @@ export { toast } from "./toast";
 export const GlobalToastProvider = () => {
   const [toasts, setToasts] = useState([]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const listener = (newToast) => {
       setToasts((prev) => [...prev, newToast].slice(-MAX_VISIBLE_TOASTS));
-      setTimeout(() => {
+      window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== newToast.id));
       }, TOAST_DURATION);
     };
     return subscribeToToasts(listener);
   }, []);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return ReactDOM.createPortal(
     <div
-      className="fixed top-6 right-6 z-[99999] flex flex-col gap-2 pointer-events-none max-w-[min(100vw-2rem,22rem)]"
+      className="fixed top-6 right-6 flex flex-col gap-2 pointer-events-none max-w-[min(100vw-2rem,22rem)]"
+      style={{ zIndex: 2147483647 }}
       aria-live="polite"
       aria-relevant="additions"
     >
@@ -44,7 +48,8 @@ export const GlobalToastProvider = () => {
           onClose={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
         />
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 };
 
@@ -77,10 +82,7 @@ export const ToastNotification = ({ message, type = "info", duration = TOAST_DUR
   const title = TOAST_TITLES[type] || TOAST_TITLES.info;
 
   return (
-    <div
-      className="pointer-events-auto w-full max-w-[22rem] animate-[toast-panel-enter_0.28s_ease-out_forwards]"
-      role="status"
-    >
+    <div className="pointer-events-auto w-full max-w-[22rem]" role="status">
       <div className="relative overflow-hidden rounded-lg border border-border bg-white shadow-md">
         <div className="flex items-start gap-3 px-3.5 py-3 pr-2">
           <div

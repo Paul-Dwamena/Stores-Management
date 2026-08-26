@@ -16,8 +16,12 @@ const MENU_GAP = 4;
 function optionRows(options = []) {
   return (options ?? []).map((option) =>
     typeof option === "string"
-      ? { value: option, label: option }
-      : { value: option.value, label: option.label ?? option.value },
+      ? { value: option, label: option, description: "" }
+      : {
+          value: option.value,
+          label: option.label ?? option.value,
+          description: option.description || option.subtitle || "",
+        },
   );
 }
 
@@ -61,7 +65,7 @@ export default function ConfiguredSearchSelectField({
     const q = query.trim().toLowerCase();
     const list = q
       ? options.filter((option) =>
-          `${option.label} ${option.value}`.toLowerCase().includes(q),
+          `${option.label} ${option.description || ""} ${option.value}`.toLowerCase().includes(q),
         )
       : options;
     return list.slice(0, 80);
@@ -205,11 +209,23 @@ export default function ConfiguredSearchSelectField({
                           setOpen(false);
                         }}
                         className={cn(
-                          "w-full px-3 py-2 text-left text-[12px] font-medium hover:bg-emerald-50",
+                          "flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left hover:bg-emerald-50",
                           isSelected ? "bg-emerald-50 text-emerald-800" : "text-slate-800",
                         )}
                       >
-                        {option.label}
+                        <span className="min-w-0 truncate text-[12px] font-medium">
+                          {option.label}
+                        </span>
+                        {option.description ? (
+                          <span
+                            className={cn(
+                              "shrink-0 text-[11px] font-medium",
+                              isSelected ? "text-emerald-700/80" : "text-slate-400",
+                            )}
+                          >
+                            {option.description}
+                          </span>
+                        ) : null}
                       </button>
                     </li>
                   );

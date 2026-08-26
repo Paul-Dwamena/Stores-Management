@@ -17,14 +17,14 @@ export default function SetupsHub() {
           id: "users",
           label: "User Management",
           icon: Users,
-          description: "Invite and manage people who work in stores. Assign each person a role and store.",
+          description: "Invite and manage people who work in stores. Assign each person a role.",
           element: <UsersList />,
         },
         {
           id: "roles",
           label: "Roles & Permissions",
           icon: Shield,
-          description: "Define roles and what they can view, add, edit, delete, or print across store modules.",
+          description: "Create roles and assign permissions. System roles cannot be edited or deleted.",
           element: <RolesPermissionsList />,
         },
         {

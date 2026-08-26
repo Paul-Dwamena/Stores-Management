@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Package,
   ClipboardList,
@@ -9,9 +9,11 @@ import { useSearchParams } from "react-router-dom";
 import { cn } from "../../utils/cn";
 import PageHeader from "../../components/common/PageHeader";
 import SummaryStatCard from "../../components/common/SummaryStatCard";
-import { getAccessories, getRequisitions, getInterStoreTransfers } from "../../mockdata/stores";
+import { getInterStoreTransfers } from "../../mockdata/stores";
+import { listPendingSupplyLines } from "../../services/supplyRequestsService";
+import { listInventoryItems } from "../../services/inventoryService";
 import { InventoryList } from "./inventory";
-import { RequisitionsList } from "./supplies";
+import { PendingSuppliesList } from "./supplies";
 import { InterStoresTransfersList } from "./transfers";
 
 const STORES_SUB_TABS = [
@@ -50,27 +52,40 @@ export default function StoresHub() {
     setSearchParams({ sub: subId });
   };
 
+  const [openSupplies, setOpenSupplies] = useState(0);
+  const [inventoryItems, setInventoryItems] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      listPendingSupplyLines().catch(() => []),
+      listInventoryItems().catch(() => []),
+    ]).then(([supplies, items]) => {
+      if (cancelled) return;
+      setOpenSupplies(supplies.length);
+      setInventoryItems(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const hubAnalytics = useMemo(() => {
-    const accessories = getAccessories();
-    const accessoryLow = accessories.filter(
-      (item) => item.status === "LOW_STOCK" || item.status === "OUT_OF_STOCK",
+    const outOfStock = inventoryItems.filter(
+      (item) => item.status === "OUT_OF_STOCK",
     ).length;
-    const openSupplies = getRequisitions().filter((row) => {
-      const status = (row.status ?? "").toString().toUpperCase();
-      return status !== "SUPPLIED" && status !== "REJECTED";
-    }).length;
     const openTransfers = getInterStoreTransfers().filter((row) => {
       const status = (row.status ?? "").toString().toUpperCase();
       return status !== "COMPLETED" && status !== "REJECTED" && status !== "CANCELLED";
     }).length;
 
     return [
-      { label: "Accessory SKUs", value: accessories.length, icon: Package, tone: "teal" },
-      { label: "Low / out of stock", value: accessoryLow, icon: AlertTriangle, tone: "amber" },
+      { label: "Accessory SKUs", value: inventoryItems.length, icon: Package, tone: "teal" },
+      { label: "Low / out of stock", value: outOfStock, icon: AlertTriangle, tone: "amber" },
       { label: "Open supplies", value: openSupplies, icon: ClipboardList, tone: "rose" },
       { label: "Open transfers", value: openTransfers, icon: Truck, tone: "sky" },
     ];
-  }, []);
+  }, [openSupplies, inventoryItems]);
 
   return (
     <div className="space-y-4 pb-8">
@@ -102,10 +117,10 @@ export default function StoresHub() {
         </div>
 
         {storesSub === "inventory" && (
-          <InventoryList embedded view="accessories" />
+          <InventoryList embedded />
         )}
         {storesSub === "requisition" && (
-          <RequisitionsList embedded view="accessories" />
+          <PendingSuppliesList embedded />
         )}
         {storesSub === "transfers" && (
           <InterStoresTransfersList embedded view="accessories" />

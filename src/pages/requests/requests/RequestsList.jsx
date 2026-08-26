@@ -1,136 +1,160 @@
-import React, { useMemo, useState } from "react";
-import {
-  Plus,
-  FileText,
-  Clock3,
-  CheckCircle2,
-  Calendar,
-} from "lucide-react";
-import { cn } from "../../../utils/cn";
+import React, { useEffect, useMemo, useState } from "react";
+import { Plus, FileText, Clock3, Ban } from "lucide-react";
 import PageHeader from "../../../components/common/PageHeader";
 import Button from "../../../components/common/base/Button";
 import SummaryStatCard from "../../../components/common/SummaryStatCard";
 import { TableRowActions, TableViewAction } from "../../../components/common/tableActions";
 import { toast } from "../../../components/common/ToastNotification";
-import { getRequests, saveRequest } from "../../../mockdata/requests";
+import LoadingSpinner from "../../../components/common/LoadingSpinner";
+import ConfirmationModal from "../../../components/common/ConfirmationModal";
+import { formatApiDateTime, formatStatusLabel, sortNewestFirst } from "../../../utils/apiResponseHelpers";
+import { SupplyStatusBadge } from "../../stores/supplies/utils/SupplyStatusBadge";
+import { listUsers } from "../../../services/usersService";
 import {
-  REQUEST_STATUS_FILTERS,
-  REQUEST_TYPE_OPTIONS,
-  formatRequestAmount,
-  getRequestTypeLabel,
+  listGeneralRequests,
+  getGeneralRequest,
+  deleteGeneralRequest,
+} from "../../../services/generalRequestsService";
+import {
+  isDraftRequest,
+  isRejectedRequest,
+  requestStatusKey,
+  summarizeItems,
 } from "./utils/requestHelpers";
 import NewRequestModal from "./components/NewRequestModal";
 import RequestDetailModal from "./components/RequestDetailModal";
 
 const QUICK_TIPS = [
   "Use Request from Stores when you need accessories issued from inventory.",
-  "Pending requests appear in Approvals until they are decided.",
-  "Approved store requests can then be raised and issued from Supplies.",
+  "Submitted requests appear in Stores → Supplies so they can be raised or rejected.",
+  "Raised supply requests then wait in Approvals until they are decided.",
 ];
-
-function TypeBadge({ type }) {
-  const styles = {
-    leave_request: "bg-slate-100 text-slate-700 border-slate-200",
-    vehicle_request: "bg-amber-50 text-amber-700 border-amber-200",
-    maintenance_request: "bg-orange-50 text-orange-700 border-orange-200",
-    work_service_request: "bg-pink-50 text-pink-700 border-pink-200",
-    request_from_stores: "bg-teal-50 text-teal-700 border-teal-200",
-  };
-
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-bold",
-        styles[type] ?? "bg-slate-50 text-slate-600 border-slate-200",
-      )}
-    >
-      {getRequestTypeLabel(type)}
-    </span>
-  );
-}
-
-function ApprovalBadge({ label, status }) {
-  const normalized = (status ?? "").toString().toUpperCase();
-  const styles =
-    normalized === "APPROVED"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-      : normalized === "DRAFT"
-        ? "bg-slate-100 text-slate-600 border-slate-200"
-        : normalized === "REJECTED"
-          ? "bg-rose-50 text-rose-700 border-rose-200"
-          : "bg-amber-50 text-amber-700 border-amber-200";
-
-  return (
-    <span className={cn("inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-bold", styles)}>
-      {label || normalized || "—"}
-    </span>
-  );
-}
 
 const filterSelectClass =
   "w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none focus:border-emerald-500";
 
 export default function RequestsList() {
-  const [requests, setRequests] = useState(getRequests());
+  const [requests, setRequests] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [tableLoading, setTableLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [status, setStatus] = useState("ALL");
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+
+  const requesterName = (request) =>
+    request?.requesterName
+    || users.find((user) => user.id === request?.requestedBy)?.name
+    || "—";
+
+  const reload = async () => {
+    setTableLoading(true);
+    try {
+      setRequests(sortNewestFirst(await listGeneralRequests()));
+    } catch (err) {
+      toast.error(err.message || "Unable to load requests.");
+    } finally {
+      setTableLoading(false);
+    }
+    try {
+      setUsers(await listUsers());
+    } catch {
+      setUsers([]);
+    }
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const statusFilters = useMemo(() => {
+    const seen = new Map();
+    requests.forEach((row) => {
+      const key = requestStatusKey(row.status) || "UNKNOWN";
+      if (!seen.has(key)) seen.set(key, formatStatusLabel(row.status));
+    });
+    return [{ value: "ALL", label: "All status" }, ...[...seen.entries()].map(([value, label]) => ({ value, label }))];
+  }, [requests]);
 
   const filtered = useMemo(() => {
     return requests.filter((request) => {
-      if (status !== "ALL" && (request.status ?? "").toUpperCase() !== status) return false;
-
-      if (dateFrom || dateTo) {
-        const submitted = new Date(request.submittedDate);
-        if (Number.isNaN(submitted.getTime())) return false;
-        if (dateFrom) {
-          const from = new Date(dateFrom);
-          from.setHours(0, 0, 0, 0);
-          if (submitted < from) return false;
-        }
-        if (dateTo) {
-          const to = new Date(dateTo);
-          to.setHours(23, 59, 59, 999);
-          if (submitted > to) return false;
-        }
+      if (status !== "ALL" && requestStatusKey(request.status) !== status) return false;
+      if (!dateFrom && !dateTo) return true;
+      const created = new Date(request.createdAt);
+      if (Number.isNaN(created.getTime())) return false;
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (created < from) return false;
       }
-
+      if (dateTo) {
+        const to = new Date(dateTo);
+        to.setHours(23, 59, 59, 999);
+        if (created > to) return false;
+      }
       return true;
     });
   }, [requests, dateFrom, dateTo, status]);
 
   const summary = useMemo(() => {
-    const draft = requests.filter((r) => (r.status ?? "").toUpperCase() === "DRAFT").length;
-    const pending = requests.filter((r) => (r.status ?? "").toUpperCase() === "PENDING").length;
-    const approved = requests.filter((r) => (r.status ?? "").toUpperCase() === "APPROVED").length;
-    const byType = REQUEST_TYPE_OPTIONS.map((option) => ({
-      ...option,
-      count: requests.filter((r) => r.requestType === option.value).length,
-    }));
-
-    return {
-      draft,
-      pending,
-      approved,
-      total: requests.length,
-      byType,
-    };
+    const draft = requests.filter((row) => isDraftRequest(row.status)).length;
+    const rejected = requests.filter((row) => isRejectedRequest(row.status)).length;
+    const open = requests.length - draft - rejected;
+    const byStatus = [];
+    const counts = new Map();
+    requests.forEach((row) => {
+      const key = requestStatusKey(row.status) || "UNKNOWN";
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    counts.forEach((count, key) => {
+      byStatus.push({ key, label: formatStatusLabel(key), count });
+    });
+    return { draft, open, rejected, total: requests.length, byStatus };
   }, [requests]);
 
-  const handleSaveRequest = (payload) => {
+  const openAdd = () => {
+    setEditing(null);
+    setModalOpen(true);
+  };
+
+  const openView = async (row) => {
+    setViewing(row);
+    setViewLoading(true);
     try {
-      const payloads = Array.isArray(payload) ? payload : [payload];
-      payloads.forEach((row) => saveRequest(row));
-      setRequests(getRequests());
-      toast.success(
-        payloads.length === 1
-          ? "Request submitted."
-          : `${payloads.length} requests submitted.`,
-      );
-    } catch (error) {
-      toast.error(error.message ?? "Could not submit request.");
+      setViewing(await getGeneralRequest(row.id));
+    } catch (err) {
+      toast.error(err.message || "Unable to load request.");
+      setViewing(null);
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const openEdit = async (row) => {
+    try {
+      setEditing(await getGeneralRequest(row.id));
+      setModalOpen(true);
+    } catch (err) {
+      toast.error(err.message || "Unable to load request.");
+    }
+  };
+
+  const refreshViewing = (saved) => {
+    if (saved?.id && viewing?.id === saved.id) setViewing(saved);
+  };
+
+  const runDelete = async (row) => {
+    try {
+      await deleteGeneralRequest(row.id);
+      toast.success("Request deleted.");
+      setViewing(null);
+      reload();
+    } catch (err) {
+      toast.error(err.message || "Unable to delete request.");
     }
   };
 
@@ -138,13 +162,13 @@ export default function RequestsList() {
     <div className="space-y-6 pb-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <PageHeader
         title="Requests"
-        description="View and manage your requests."
+        description="Create and manage general item requests."
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SummaryStatCard title="Draft Requests" value={summary.draft} icon={FileText} tone="orange" />
-        <SummaryStatCard title="Pending Approval" value={summary.pending} icon={Clock3} tone="sky" />
-        <SummaryStatCard title="Approved" value={summary.approved} icon={CheckCircle2} tone="teal" />
+        <SummaryStatCard title="Draft" value={summary.draft} icon={FileText} tone="orange" />
+        <SummaryStatCard title="Open" value={summary.open} icon={Clock3} tone="sky" />
+        <SummaryStatCard title="Rejected" value={summary.rejected} icon={Ban} tone="rose" />
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -153,7 +177,6 @@ export default function RequestsList() {
             Date Range
           </label>
           <div className="flex w-[280px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-            <Calendar size={14} className="shrink-0 text-slate-400" />
             <input
               type="date"
               value={dateFrom}
@@ -180,7 +203,7 @@ export default function RequestsList() {
             onChange={(e) => setStatus(e.target.value)}
             className={filterSelectClass}
           >
-            {REQUEST_STATUS_FILTERS.map((option) => (
+            {statusFilters.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -190,7 +213,8 @@ export default function RequestsList() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+        <div className="space-y-4 lg:col-span-2 relative min-h-[200px]">
+          {tableLoading ? <LoadingSpinner variant="overlay" size="sm" /> : null}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-[15px] font-black text-slate-900">My Requests</h2>
@@ -198,7 +222,7 @@ export default function RequestsList() {
                 {filtered.length} request{filtered.length === 1 ? "" : "s"} found
               </p>
             </div>
-            <Button onClick={() => setModalOpen(true)}>
+            <Button onClick={openAdd}>
               <Plus size={16} />
               New Request
             </Button>
@@ -216,65 +240,34 @@ export default function RequestsList() {
                       <span className="text-[13px] font-bold text-slate-900">
                         {request.requestNumber}
                       </span>
-                      <TypeBadge type={request.requestType} />
-                      <ApprovalBadge
-                        label={request.approvalStatus}
-                        status={request.status}
-                      />
-                      {request.paymentStatus && (
-                        <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600">
-                          Payment Status: {request.paymentStatus}
-                        </span>
-                      )}
+                      <SupplyStatusBadge status={request.status} />
                     </div>
-
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-600">
                       <span>
-                        <span className="font-bold text-slate-800">
-                          {formatRequestAmount(request.amount)}
+                        Requested by{" "}
+                        <span className="font-semibold text-slate-800">
+                          {requesterName(request)}
                         </span>
                       </span>
-                      {request.storesDetails?.itemName ? (
-                        <span>
-                          Item:{" "}
-                          <span className="font-semibold text-slate-800">
-                            {request.storesDetails.itemName}
-                            {request.storesDetails.quantity != null
-                              ? ` × ${request.storesDetails.quantity}`
-                              : ""}
-                          </span>
-                        </span>
-                      ) : null}
-                      {request.storesDetails?.fromStore || request.storesDetails?.toStore ? (
-                        <span>
-                          Store:{" "}
-                          <span className="font-semibold text-slate-800">
-                            {request.storesDetails.fromStore || request.storesDetails.toStore}
-                          </span>
-                        </span>
-                      ) : null}
+                      <span>{summarizeItems(request.items)}</span>
+                      <span>{formatApiDateTime(request.createdAt)}</span>
                     </div>
-
-                    {request.purpose ? (
-                      <p className="text-[11px] text-slate-500">{request.purpose}</p>
+                    {request.reason ? (
+                      <p className="text-[11px] text-slate-500">{request.reason}</p>
                     ) : null}
                   </div>
-
                   <TableRowActions className="mt-0.5">
-                    <TableViewAction
-                      title="View request details"
-                      onClick={() => setSelectedRequest(request)}
-                    />
+                    <TableViewAction title="View request details" onClick={() => openView(request)} />
                   </TableRowActions>
                 </div>
               </div>
             ))}
 
-            {filtered.length === 0 && (
+            {!tableLoading && filtered.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-[12px] text-slate-400">
                 No requests found for the selected filters.
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -286,8 +279,8 @@ export default function RequestsList() {
                 <span className="font-medium text-slate-500">Total Requests</span>
                 <span className="font-bold text-slate-900">{summary.total}</span>
               </div>
-              {summary.byType.map((item) => (
-                <div key={item.value} className="flex items-center justify-between text-[12px]">
+              {summary.byStatus.map((item) => (
+                <div key={item.key} className="flex items-center justify-between text-[12px]">
                   <span className="font-medium text-slate-500">{item.label}</span>
                   <span className="font-bold text-slate-900">{item.count}</span>
                 </div>
@@ -312,13 +305,39 @@ export default function RequestsList() {
       <NewRequestModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSave={handleSaveRequest}
+        editing={editing}
+        onSaved={(saved) => {
+          reload();
+          refreshViewing(saved);
+        }}
       />
 
       <RequestDetailModal
-        isOpen={Boolean(selectedRequest)}
-        onClose={() => setSelectedRequest(null)}
-        request={selectedRequest}
+        isOpen={Boolean(viewing) && !modalOpen && !confirm}
+        onClose={() => setViewing(null)}
+        request={viewing}
+        requesterName={requesterName(viewing)}
+        loading={viewLoading}
+        onEdit={() => openEdit(viewing)}
+        onDelete={() =>
+          setConfirm({
+            title: "Delete request?",
+            message: `${viewing?.requestNumber} will be deleted.`,
+            confirmText: "Delete",
+            isDanger: true,
+            run: () => runDelete(viewing),
+          })
+        }
+      />
+
+      <ConfirmationModal
+        isOpen={Boolean(confirm)}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => confirm?.run?.()}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmText={confirm?.confirmText}
+        isDanger={confirm?.isDanger}
       />
     </div>
   );

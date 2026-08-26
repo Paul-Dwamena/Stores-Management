@@ -1,31 +1,20 @@
 import React, { useEffect, useState } from "react";
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
-import ConfiguredFormSections from "../../../../components/common/ConfiguredFormSections";
 import InputField from "../../../../components/common/fields/InputField";
-import { collectCanonicalFieldErrors } from "../../../../components/common/fields/canonicalConfiguredField";
-import { fieldRequiredLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
-import {
-  formatAccessoryMoney,
-  getStoreLocationOptions,
-} from "../../../../mockdata/stores";
-import { getSupplierContact } from "../../../../mockdata/org";
 import AddSupplierModal from "./AddSupplierModal";
+import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import SupplierPicker from "./SupplierPicker";
-import {
-  SUBMIT_STORE_RECEIPT_FORM_FIELD_CATALOG,
-  SUBMIT_STORE_RECEIPT_FORM_SETUP_CHANGED_EVENT,
-  getActiveSubmitStoreReceiptFormSections,
-  getSubmitStoreReceiptFormSetup,
-} from "../../../../mockdata/setups";
-
-const SYSTEM_KEYS = new Set(SUBMIT_STORE_RECEIPT_FORM_FIELD_CATALOG.map((field) => field.key));
+import StoreSelect from "./StoreSelect";
+import { sendDeliveryOtp } from "../../../../services/inventoryService";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+
+const readOnlyClassName =
+  "bg-slate-100 cursor-not-allowed focus:bg-slate-100";
 
 const CONDITION_OPTIONS = [
   { value: "GOOD", label: "Good" },
@@ -40,12 +29,13 @@ const INITIAL = {
   unitCost: "",
   location: "",
   supplierId: "",
-  waybillNumber: "",
-  deliveredByName: "",
   supplierPhone: "",
   supplierEmail: "",
+  waybillNumber: "",
+  deliveredByName: "",
+  deliveredByPhone: "",
+  deliveredByEmail: "",
   condition: "",
-  notes: "",
 };
 
 export default function ReceiveIntoStoreModal({
@@ -58,12 +48,11 @@ export default function ReceiveIntoStoreModal({
   const [errors, setErrors] = useState({});
   const [pendingReceive, setPendingReceive] = useState(null);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
-  const { sections, visibleKeys } = useFormTreeSections(
-    SUBMIT_STORE_RECEIPT_FORM_SETUP_CHANGED_EVENT,
-    getSubmitStoreReceiptFormSetup,
-    getActiveSubmitStoreReceiptFormSections,
-  );
-  const show = (key) => visibleKeys.has(key);
+  const [supplierTick, setSupplierTick] = useState(0);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,67 +60,108 @@ export default function ReceiveIntoStoreModal({
     setErrors({});
     setPendingReceive(null);
     setAddSupplierOpen(false);
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+    setOtpSending(false);
   }, [isOpen, item?.id]);
 
-  const setField = (key, value) => {
-    setForm((prev) =>
-      key === "supplierId" ? { ...prev, supplierId: value, ...getSupplierContact(value) } : { ...prev, [key]: value },
-    );
+  const resetOtp = () => {
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+  };
+
+  const setField = (key, value, supplier = null) => {
+    setForm((prev) => {
+      if (key !== "supplierId") return { ...prev, [key]: value };
+      return {
+        ...prev,
+        supplierId: value,
+        supplierPhone: supplier?.phone || "",
+        supplierEmail: supplier?.email || "",
+      };
+    });
+    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(key)) {
+      resetOtp();
+    }
     setErrors((prev) => {
-      if (!prev[key] && !["supplierPhone", "supplierEmail"].includes(key)) return prev;
+      if (!prev[key]) return prev;
       const next = { ...prev };
       delete next[key];
-      if (key === "supplierPhone" || key === "supplierEmail" || key === "supplierId") {
-        delete next.supplierContact;
-        delete next.supplierPhone;
-        delete next.supplierEmail;
-      }
       return next;
     });
+  };
+
+  const deliveryContactReady =
+    Boolean(form.deliveredByName.trim())
+    && Boolean(form.deliveredByPhone.trim())
+    && Boolean(form.deliveredByEmail.trim());
+
+  const handleSendOtp = async () => {
+    if (!form.deliveredByName.trim()) {
+      toast.warning("Enter the delivery person’s full name first.");
+      return;
+    }
+    if (!form.deliveredByPhone.trim()) {
+      toast.warning("Enter the delivery person’s phone number to send the OTP.");
+      return;
+    }
+    if (!form.deliveredByEmail.trim()) {
+      toast.warning("Enter the delivery person’s email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.deliveredByEmail.trim())) {
+      toast.warning("Enter a valid delivery email address.");
+      return;
+    }
+    setOtpSending(true);
+    try {
+      await sendDeliveryOtp(form.deliveredByPhone.trim());
+      setOtp("");
+      setOtpVerified(false);
+      setOtpSent(true);
+      toast.success(
+        `OTP sent to ${form.deliveredByName.trim()} on ${form.deliveredByPhone.trim()}.`,
+      );
+    } catch (error) {
+      toast.error(error.message || "Unable to send delivery OTP.");
+    } finally {
+      setOtpSending(false);
+    }
   };
 
   const handleSave = () => {
     const nextErrors = {};
     const quantity = Number(form.quantity);
     const unitCost = Number(form.unitCost);
-    if (show("quantity") && (!form.quantity || Number.isNaN(quantity) || quantity <= 0)) {
+    if (!form.quantity || Number.isNaN(quantity) || quantity <= 0) {
       nextErrors.quantity = "Enter a quantity greater than zero.";
     }
-    if (show("unitCost") && (form.unitCost === "" || Number.isNaN(unitCost) || unitCost < 0)) {
+    if (form.unitCost === "" || Number.isNaN(unitCost) || unitCost < 0) {
       nextErrors.unitCost = "Enter a valid unit cost.";
     }
-    if (show("location") && !form.location.trim()) {
-      nextErrors.location = "Select a store location.";
+    if (!form.location.trim()) nextErrors.location = "Select a store location.";
+    if (!form.supplierId) nextErrors.supplierId = "Select a supplier.";
+    if (!form.deliveredByName.trim()) {
+      nextErrors.deliveredByName = "Enter the delivery person’s full name.";
     }
-    if (show("supplierId") && !form.supplierId) nextErrors.supplierId = "Select a supplier.";
-    if (show("deliveredByName") && !form.deliveredByName.trim()) {
-      nextErrors.deliveredByName = "Enter the name of the person who delivered the items.";
+    if (!form.deliveredByPhone.trim()) {
+      nextErrors.deliveredByPhone = "Enter the delivery person’s phone number.";
     }
-    if (show("condition") && !form.condition) nextErrors.condition = "Select the item condition.";
-    if (
-      (show("supplierPhone") || show("supplierEmail"))
-      && !form.supplierPhone.trim()
-      && !form.supplierEmail.trim()
-    ) {
-      nextErrors.supplierContact = "Enter a supplier phone number or email address.";
+    if (!form.deliveredByEmail.trim()) {
+      nextErrors.deliveredByEmail = "Enter the delivery person’s email address.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.deliveredByEmail.trim())) {
+      nextErrors.deliveredByEmail = "Enter a valid email address.";
     }
-    if (
-      show("supplierEmail")
-      && form.supplierEmail.trim()
-      && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.supplierEmail.trim())
-    ) {
-      nextErrors.supplierEmail = "Enter a valid email address.";
-    }
-    Object.assign(
-      nextErrors,
-      collectCanonicalFieldErrors(
-        sections.flatMap((section) => (section.fields || []).filter((field) => !SYSTEM_KEYS.has(field.key))),
-        form,
-      ),
-    );
+    if (!form.condition) nextErrors.condition = "Select the item condition.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warning("Complete the required fields before receiving stock.");
+      return;
+    }
+    if (!otpVerified) {
+      toast.warning("Confirm the delivery OTP before receiving stock.");
       return;
     }
 
@@ -142,17 +172,19 @@ export default function ReceiveIntoStoreModal({
       supplierId: form.supplierId,
       waybillNumber: form.waybillNumber.trim(),
       deliveredByName: form.deliveredByName.trim(),
+      deliveredByPhone: form.deliveredByPhone.trim(),
+      deliveredByEmail: form.deliveredByEmail.trim(),
       supplierPhone: form.supplierPhone.trim(),
       supplierEmail: form.supplierEmail.trim(),
       condition: form.condition,
-      notes: form.notes.trim(),
+      notes: "",
     });
   };
 
-  const handleConfirmReceive = () => {
+  const handleConfirmReceive = async () => {
     if (!pendingReceive) return;
     try {
-      onSave?.(pendingReceive);
+      await onSave?.(pendingReceive);
       setPendingReceive(null);
     } catch (error) {
       toast.error(error.message ?? "Could not receive stock.");
@@ -165,120 +197,154 @@ export default function ReceiveIntoStoreModal({
         isOpen={isOpen && !pendingReceive && !addSupplierOpen}
         onClose={onClose}
         onSave={handleSave}
-        title="Submit stock receipt"
+        title="Receive stock"
         subtitle={
           item
-            ? `Submit a stock receipt for ${item.itemCode} — ${item.name}. It will appear in receivables after approval.`
-            : "Submit a stock receipt for approval before it is added to receivables."
+            ? `Receive stock for ${item.itemCode} — ${item.name}.`
+            : "Receive stock into a store."
         }
-        saveLabel="Submit for approval"
+        saveLabel="Receive stock"
+        saveDisabled={!otpVerified}
         dialogClassName="max-w-2xl"
         panelClassName="max-w-2xl"
       >
-        <ConfiguredFormSections
-          sections={sections}
-          form={form}
-          formErrors={errors}
-          handleChange={(key) => (event) => setField(key, event?.target ? event.target.value : event)}
-          systemKeys={SYSTEM_KEYS}
-          idPrefix="ssr"
-          renderSystemField={(field) => {
-            const id = `ssr-${field.id}`;
-            if (field.key === "location") {
-              return (
-                <div key={field.id}>
-                  <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    {fieldRequiredLabel(field)}
-                  </label>
-                  <select
-                    id={id}
-                    value={form.location}
-                    onChange={(e) => setField("location", e.target.value)}
-                    className={fieldClassName}
-                  >
-                    <option value="">Select location</option>
-                    {getStoreLocationOptions().map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                  {errors.location && (
-                    <p className="mt-1 text-[11px] text-rose-600 font-medium">{errors.location}</p>
-                  )}
-                </div>
-              );
-            }
-            if (field.key === "supplierId") {
-              return (
-                <div key={field.id}>
-                  <SupplierPicker
-                    id={id}
-                    label={field.title || "Supplier"}
-                    placeholder={field.placeholder || "Search supplier…"}
-                    required={field.required !== false}
-                    value={form.supplierId}
-                    onChange={(next) => setField("supplierId", next)}
-                    error={errors.supplierId}
-                    onAddClick={() => setAddSupplierOpen(true)}
-                  />
-                </div>
-              );
-            }
-            if (field.key === "condition") {
-              const options = (field.options?.length ? field.options : CONDITION_OPTIONS).map((option) =>
-                typeof option === "string" ? { value: option, label: option } : option,
-              );
-              return (
-                <div key={field.id}>
-                  <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    {fieldRequiredLabel(field)}
-                  </label>
-                  <select
-                    id={id}
-                    value={form.condition}
-                    onChange={(e) => setField("condition", e.target.value)}
-                    className={cn(fieldClassName, errors.condition && "border-rose-500 bg-rose-50")}
-                  >
-                    <option value="">Select condition</option>
-                    {options.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  {errors.condition && (
-                    <p className="mt-1 text-[11px] text-rose-600 font-medium">{errors.condition}</p>
-                  )}
-                </div>
-              );
-            }
-            if (field.key === "notes") return null;
-            const isSupplierContact = field.key === "supplierPhone" || field.key === "supplierEmail";
-            const type = field.key === "quantity" || field.key === "unitCost" ? "number" : field.key === "supplierEmail" ? "email" : field.key === "supplierPhone" ? "tel" : "text";
-            return (
-              <div key={field.id}>
-                <InputField
-                  label={field.title}
-                  type={type}
-                  value={form[field.key] ?? ""}
-                  onChange={isSupplierContact ? undefined : (e) => setField(field.key, e.target.value)}
-                  readOnly={isSupplierContact}
-                  placeholder={
-                    isSupplierContact
-                      ? (form.supplierId ? "—" : "Select a supplier")
-                      : field.placeholder
-                  }
-                  className={isSupplierContact ? "bg-slate-100 cursor-not-allowed focus:bg-slate-100" : undefined}
-                  error={errors[field.key] || (field.key === "supplierPhone" ? errors.supplierContact : undefined)}
-                />
-              </div>
-            );
-          }}
-        />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <InputField
+              label="Quantity"
+              type="number"
+              required
+              value={form.quantity}
+              onChange={(e) => setField("quantity", e.target.value)}
+              placeholder="e.g. 10"
+              error={errors.quantity}
+            />
+            <InputField
+              label="Unit cost (GH₵)"
+              type="number"
+              required
+              value={form.unitCost}
+              onChange={(e) => setField("unitCost", e.target.value)}
+              placeholder="e.g. 85.00"
+              error={errors.unitCost}
+            />
+            <div className="sm:col-span-2">
+              <StoreSelect
+                id="ssr-location"
+                value={form.location}
+                onChange={(next) => setField("location", next)}
+                error={errors.location}
+                label="Store location"
+              />
+            </div>
+            <SupplierPicker
+              id="ssr-supplier"
+              label="Supplier"
+              placeholder="Search supplier…"
+              required
+              value={form.supplierId}
+              onChange={(next, supplier) => setField("supplierId", next, supplier)}
+              error={errors.supplierId}
+              onAddClick={() => setAddSupplierOpen(true)}
+              reloadToken={supplierTick}
+            />
+            <InputField
+              label="Supplier phone"
+              type="tel"
+              value={form.supplierPhone}
+              readOnly
+              placeholder={form.supplierId ? "—" : "Select a supplier"}
+              className={readOnlyClassName}
+            />
+            <InputField
+              label="Supplier email"
+              type="email"
+              value={form.supplierEmail}
+              readOnly
+              placeholder={form.supplierId ? "—" : "Select a supplier"}
+              className={readOnlyClassName}
+            />
+            <InputField
+              label="Delivered by (full name)"
+              required
+              value={form.deliveredByName}
+              onChange={(e) => setField("deliveredByName", e.target.value)}
+              placeholder="Full name"
+              error={errors.deliveredByName}
+            />
+            <InputField
+              label="Delivered by (phone)"
+              type="tel"
+              required
+              value={form.deliveredByPhone}
+              onChange={(e) => setField("deliveredByPhone", e.target.value)}
+              placeholder="e.g. +233 24 000 0000"
+              error={errors.deliveredByPhone}
+            />
+            <InputField
+              label="Delivered by (email)"
+              type="email"
+              required
+              value={form.deliveredByEmail}
+              onChange={(e) => setField("deliveredByEmail", e.target.value)}
+              placeholder="e.g. driver@supplier.com"
+              error={errors.deliveredByEmail}
+            />
+            <InputField
+              label="Waybill number"
+              value={form.waybillNumber}
+              onChange={(e) => setField("waybillNumber", e.target.value)}
+              placeholder="e.g. WB-2026-0041"
+            />
+            <div>
+              <label
+                htmlFor="ssr-condition"
+                className={cn(
+                  "block text-[11px] font-bold uppercase tracking-wider mb-1.5",
+                  errors.condition ? "text-rose-500" : "text-slate-400",
+                )}
+              >
+                Item condition *
+              </label>
+              <select
+                id="ssr-condition"
+                value={form.condition}
+                onChange={(e) => setField("condition", e.target.value)}
+                className={cn(fieldClassName, errors.condition && "border-rose-500 bg-rose-50")}
+              >
+                <option value="">Select condition</option>
+                {CONDITION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              {errors.condition && (
+                <p className="mt-1 text-[11px] text-rose-600 font-medium">{errors.condition}</p>
+              )}
+            </div>
+          </div>
+
+          <DeliveryPersonOtpSection
+            deliveredByName={form.deliveredByName}
+            deliveredByPhone={form.deliveredByPhone}
+            deliveredByEmail={form.deliveredByEmail}
+            otpSent={otpSent}
+            otp={otp}
+            otpVerified={otpVerified}
+            onSendOtp={handleSendOtp}
+            onOtpChange={setOtp}
+            onVerifiedChange={setOtpVerified}
+            sendDisabled={!deliveryContactReady}
+            sendLoading={otpSending}
+          />
+        </div>
       </AddModal>
 
       <AddSupplierModal
         isOpen={addSupplierOpen}
         onClose={() => setAddSupplierOpen(false)}
         onCreated={(created) => {
-          setField("supplierId", created.id);
+          setSupplierTick((tick) => tick + 1);
+          setField("supplierId", created.id, created);
         }}
       />
 
@@ -286,13 +352,13 @@ export default function ReceiveIntoStoreModal({
         isOpen={Boolean(pendingReceive)}
         onClose={() => setPendingReceive(null)}
         onConfirm={handleConfirmReceive}
-        title="Submit stock receipt?"
+        title="Receive stock?"
         message={
           pendingReceive
-            ? `Submit receipt of ${pendingReceive.quantity} of ${item?.itemCode || "this item"} into ${pendingReceive.location} for approval?`
-            : "Submit this stock receipt for approval."
+            ? `Receive ${pendingReceive.quantity} of ${item?.itemCode || "this item"} into store?`
+            : "Receive this stock into store."
         }
-        confirmText="Submit for approval"
+        confirmText="Receive stock"
       />
     </>
   );

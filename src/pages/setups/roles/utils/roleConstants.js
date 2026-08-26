@@ -26,5 +26,5 @@ export const PERMISSION_MODULES = [
 export const INITIAL_ROLE_FORM = {
   name: "",
   description: "",
-  permissions: {},
+  permission_ids: [],
 };

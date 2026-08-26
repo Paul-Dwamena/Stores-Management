@@ -2,9 +2,17 @@ import React, { useEffect } from "react";
 import ReactDOM from "react-dom";
 import { X } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
+import SectionLoadState from "../../../../components/common/SectionLoadState";
 import RequisitionRequestSummary from "./RequisitionRequestSummary";
 
-export default function RequisitionDetailModal({ isOpen, onClose, requisition }) {
+export default function RequisitionDetailModal({
+  isOpen,
+  onClose,
+  requisition,
+  loading = false,
+  error = null,
+  onRetry,
+}) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -42,7 +50,15 @@ export default function RequisitionDetailModal({ isOpen, onClose, requisition })
           </button>
         </div>
         <div className="px-4 sm:px-6 py-4 sm:py-6 overflow-y-auto min-h-0 flex-1">
-          <RequisitionRequestSummary requisition={requisition} />
+          <SectionLoadState
+            loading={loading}
+            error={error}
+            onRetry={onRetry}
+            loadingLabel="Loading details…"
+            errorTitle="Couldn’t load details"
+          >
+            <RequisitionRequestSummary requisition={requisition} />
+          </SectionLoadState>
         </div>
         <div className="px-4 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end rounded-b-2xl">
           <Button onClick={onClose} variant="ghost" size="modal">

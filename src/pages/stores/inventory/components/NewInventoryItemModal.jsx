@@ -8,39 +8,25 @@ import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
 import ChoiceOption from "../../../../components/common/fields/ChoiceOption";
-import { ConfiguredCustomFields, ShowConfiguredField } from "../../../../components/common/ConfiguredFormSections";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
-import {
-  NEW_ACCESSORIES_FORM_FIELD_CATALOG,
-  NEW_ACCESSORIES_FORM_SETUP_CHANGED_EVENT,
-  RECEIVE_REGISTERED_ITEMS_FORM_FIELD_CATALOG,
-  RECEIVE_REGISTERED_ITEMS_FORM_SETUP_CHANGED_EVENT,
-  getActiveNewAccessoriesFormSections,
-  getActiveReceiveRegisteredItemsFormSections,
-  getNewAccessoriesFormSetup,
-  getReceiveRegisteredItemsFormSetup,
-} from "../../../../mockdata/setups";
-import {
-  getAccessories,
-  getVehicleParts,
-  formatAccessoryMoney,
-  getStoreLocationOptions,
-} from "../../../../mockdata/stores";
-import { getSupplierContact } from "../../../../mockdata/org";
-import { generateAccessoryItemCode, ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
+import { ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
   getVehiclePartYearOptions,
 } from "../../../../mockdata/stores/vehiclePartsInventory";
+import { formatInventoryMoney } from "../../../../services/inventoryService";
+import { listItems } from "../../../../services/itemsService";
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import BulkInventoryReceiptModal from "./BulkInventoryReceiptModal";
+import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
 import AddSupplierModal from "./AddSupplierModal";
 import SupplierPicker from "./SupplierPicker";
+import StoreSelect from "./StoreSelect";
+import { sendDeliveryOtp } from "../../../../services/inventoryService";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -58,10 +44,12 @@ const ITEM_CONDITION_OPTIONS = [
 
 const SUPPLYING_FIELDS = {
   supplierId: "",
-  waybillNumber: "",
-  deliveredByName: "",
   supplierPhone: "",
   supplierEmail: "",
+  waybillNumber: "",
+  deliveredByName: "",
+  deliveredByPhone: "",
+  deliveredByEmail: "",
   condition: "",
   notes: "",
 };
@@ -75,6 +63,7 @@ const INITIAL_ACCESSORY = {
   unitPrice: "",
   location: "",
   photo: "",
+  photoFile: null,
   ...SUPPLYING_FIELDS,
 };
 
@@ -188,7 +177,7 @@ function SelectedItemCard({ item, onChange }) {
       ? `${item.make} ${item.model || ""} ${item.year || ""}`.trim()
       : null,
     `On hand ${item.quantity ?? 0}`,
-    item.unitCost != null ? `Avg cost ${formatAccessoryMoney(item.unitCost)}` : null,
+    item.unitCost != null ? `Avg cost ${formatInventoryMoney(item.unitCost)}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -216,101 +205,106 @@ function SelectedItemCard({ item, onChange }) {
   );
 }
 
-function applySupplierContact(form, supplierId) {
-  return { ...form, supplierId, ...getSupplierContact(supplierId) };
+function applySupplierContact(form, supplierId, supplier = null) {
+  return {
+    ...form,
+    supplierId,
+    supplierPhone: supplier?.phone || "",
+    supplierEmail: supplier?.email || "",
+  };
 }
 
-function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys, onAddSupplier }) {
+function SupplyingDetails({ form, errors, onChange, prefix, onAddSupplier, supplierTick }) {
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="supplierId">
-        <SupplierPicker
-          id={`${prefix}Supplier`}
-          value={form.supplierId}
-          onChange={(next) => onChange("supplierId")({ target: { value: next } })}
-          error={errors.supplierId}
-          onAddClick={onAddSupplier}
-        />
-        </ShowConfiguredField>
-        <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="waybillNumber">
-        <InputField
-          label="Waybill number"
-          id={`${prefix}Waybill`}
-          value={form.waybillNumber}
-          onChange={onChange("waybillNumber")}
-          placeholder="e.g. WB-2026-0041"
-        />
-        </ShowConfiguredField>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="deliveredByName">
-        <InputField
-          label="Delivered by"
-          id={`${prefix}DeliveredBy`}
-          value={form.deliveredByName}
-          onChange={onChange("deliveredByName")}
-          error={errors.deliveredByName}
-          placeholder="Full name"
-        />
-        </ShowConfiguredField>
-        <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="condition">
-        <div className="space-y-1.5">
-          <label
-            htmlFor={`${prefix}Condition`}
-            className={cn(
-              "text-[10px] font-bold uppercase tracking-wider",
-              errors.condition ? "text-red-500" : "text-slate-500",
-            )}
-          >
-            Item condition
-          </label>
-          <select
-            id={`${prefix}Condition`}
-            value={form.condition}
-            onChange={onChange("condition")}
-            className={cn(fieldClassName, errors.condition && "border-red-500 bg-red-50")}
-          >
-            <option value="">Select condition…</option>
-            {ITEM_CONDITION_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {errors.condition && (
-            <p className="text-[10px] font-medium text-red-500">{errors.condition}</p>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <SupplierPicker
+        id={`${prefix}Supplier`}
+        value={form.supplierId}
+        onChange={(next, supplier) => onChange("supplierId")({ target: { value: next }, supplier })}
+        error={errors.supplierId}
+        onAddClick={onAddSupplier}
+        reloadToken={supplierTick}
+      />
+      <InputField
+        label="Supplier phone"
+        id={`${prefix}SupplierPhone`}
+        type="tel"
+        value={form.supplierPhone}
+        readOnly
+        placeholder={form.supplierId ? "—" : "Select a supplier"}
+        className={readOnlyClassName}
+      />
+      <InputField
+        label="Supplier email"
+        id={`${prefix}SupplierEmail`}
+        type="email"
+        value={form.supplierEmail}
+        readOnly
+        placeholder={form.supplierId ? "—" : "Select a supplier"}
+        className={readOnlyClassName}
+      />
+      <InputField
+        label="Delivered by (full name)"
+        id={`${prefix}DeliveredBy`}
+        required
+        value={form.deliveredByName}
+        onChange={onChange("deliveredByName")}
+        error={errors.deliveredByName}
+        placeholder="Full name"
+      />
+      <InputField
+        label="Delivered by (phone)"
+        id={`${prefix}DeliveredByPhone`}
+        type="tel"
+        required
+        value={form.deliveredByPhone}
+        onChange={onChange("deliveredByPhone")}
+        placeholder="e.g. +233 24 000 0000"
+        error={errors.deliveredByPhone}
+      />
+      <InputField
+        label="Delivered by (email)"
+        id={`${prefix}DeliveredByEmail`}
+        type="email"
+        required
+        value={form.deliveredByEmail}
+        onChange={onChange("deliveredByEmail")}
+        placeholder="e.g. driver@supplier.com"
+        error={errors.deliveredByEmail}
+      />
+      <InputField
+        label="Waybill number"
+        id={`${prefix}Waybill`}
+        value={form.waybillNumber}
+        onChange={onChange("waybillNumber")}
+        placeholder="e.g. WB-2026-0041"
+      />
+      <div className="space-y-1.5">
+        <label
+          htmlFor={`${prefix}Condition`}
+          className={cn(
+            "text-[10px] font-bold uppercase tracking-wider",
+            errors.condition ? "text-red-500" : "text-slate-500",
           )}
-        </div>
-        </ShowConfiguredField>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="supplierPhone">
-        <InputField
-          label="Supplier phone"
-          id={`${prefix}SupplierPhone`}
-          type="tel"
-          value={form.supplierPhone}
-          readOnly
-          placeholder={form.supplierId ? "—" : "Select a supplier"}
-          error={errors.supplierContact}
-          className={readOnlyClassName}
-        />
-        </ShowConfiguredField>
-        <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="supplierEmail">
-        <InputField
-          label="Supplier email"
-          id={`${prefix}SupplierEmail`}
-          type="email"
-          value={form.supplierEmail}
-          readOnly
-          placeholder={form.supplierId ? "—" : "Select a supplier"}
-          error={errors.supplierEmail}
-          className={readOnlyClassName}
-        />
-        </ShowConfiguredField>
+        >
+          Item condition *
+        </label>
+        <select
+          id={`${prefix}Condition`}
+          value={form.condition}
+          onChange={onChange("condition")}
+          className={cn(fieldClassName, errors.condition && "border-red-500 bg-red-50")}
+        >
+          <option value="">Select condition…</option>
+          {ITEM_CONDITION_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {errors.condition && (
+          <p className="text-[10px] font-medium text-red-500">{errors.condition}</p>
+        )}
       </div>
     </div>
   );
@@ -318,78 +312,47 @@ function SupplyingDetails({ form, errors, onChange, prefix, visibleKeys, onAddSu
 
 function StoreLocationField({ id, value, onChange, error }) {
   return (
-    <div className="space-y-1.5">
-      <label
-        htmlFor={id}
-        className={cn(
-          "text-[10px] font-bold uppercase tracking-wider",
-          error ? "text-red-500" : "text-slate-500",
-        )}
-      >
-        Store location
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={onChange}
-        className={cn(fieldClassName, error && "border-red-500 bg-red-50")}
-      >
-        <option value="">Select store location…</option>
-        {getStoreLocationOptions().map((location) => (
-          <option key={location} value={location}>{location}</option>
-        ))}
-      </select>
-      {error ? <p className="text-[10px] font-medium text-red-500">{error}</p> : null}
-    </div>
+    <StoreSelect
+      id={id}
+      value={value}
+      onChange={(next) => onChange({ target: { value: next } })}
+      error={error}
+    />
   );
 }
 
-function validateSupplyingDetails(form, errors, visibleKeys) {
-  const show = (key) => !visibleKeys || visibleKeys.has(key);
-  if (show("supplierId") && !form.supplierId) errors.supplierId = "Select a supplier.";
-  if (show("deliveredByName") && !form.deliveredByName.trim()) {
-    errors.deliveredByName = "Enter the name of the person who delivered the item.";
+function validateSupplyingDetails(form, errors) {
+  if (!form.supplierId) errors.supplierId = "Select a supplier.";
+  if (!form.deliveredByName.trim()) {
+    errors.deliveredByName = "Enter the delivery person’s full name.";
   }
-  if (show("condition") && !form.condition) errors.condition = "Select the item condition.";
-  if (
-    (show("supplierPhone") || show("supplierEmail"))
-    && !form.supplierPhone.trim()
-    && !form.supplierEmail.trim()
-  ) {
-    errors.supplierContact = "Enter a supplier phone number or email address.";
+  if (!form.deliveredByPhone.trim()) {
+    errors.deliveredByPhone = "Enter the delivery person’s phone number.";
   }
-  if (
-    show("supplierEmail")
-    && form.supplierEmail.trim()
-    && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.supplierEmail.trim())
-  ) {
-    errors.supplierEmail = "Enter a valid email address.";
+  if (!form.deliveredByEmail.trim()) {
+    errors.deliveredByEmail = "Enter the delivery person’s email address.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.deliveredByEmail.trim())) {
+    errors.deliveredByEmail = "Enter a valid email address.";
   }
+  if (!form.condition) errors.condition = "Select the item condition.";
 }
 
-function validateStockFields(form, errors, visibleKeys) {
-  const show = (key) => !visibleKeys || visibleKeys.has(key);
+function validateStockFields(form, errors) {
   if (
-    show("quantity")
-    && (
     form.quantity === ""
     || Number.isNaN(Number(form.quantity))
     || Number(form.quantity) <= 0
-    )
   ) {
     errors.quantity = "Enter a valid quantity.";
   }
   if (
-    show("unitPrice")
-    && (
     form.unitPrice === ""
     || Number.isNaN(Number(form.unitPrice))
     || Number(form.unitPrice) < 0
-    )
   ) {
     errors.unitPrice = "Enter a valid unit price.";
   }
-  if (show("location") && !form.location?.trim()) errors.location = "Select a store location.";
+  if (!form.location?.trim()) errors.location = "Select a store location.";
 }
 
 export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkSave }) {
@@ -408,19 +371,13 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [itemDetailsOpen, setItemDetailsOpen] = useState(true);
   const [supplyingDetailsOpen, setSupplyingDetailsOpen] = useState(true);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
+  const [supplierTick, setSupplierTick] = useState(0);
+  const [catalogItems, setCatalogItems] = useState([]);
   const [componentFilterOpen, setComponentFilterOpen] = useState(true);
-  const { sections: registeredSections, visibleKeys: registeredVisibleKeys } = useFormTreeSections(
-    RECEIVE_REGISTERED_ITEMS_FORM_SETUP_CHANGED_EVENT,
-    getReceiveRegisteredItemsFormSetup,
-    getActiveReceiveRegisteredItemsFormSections,
-  );
-  const { sections: unregisteredSections, visibleKeys: unregisteredVisibleKeys } = useFormTreeSections(
-    NEW_ACCESSORIES_FORM_SETUP_CHANGED_EVENT,
-    getNewAccessoriesFormSetup,
-    getActiveNewAccessoriesFormSections,
-  );
-  const registeredSystemKeys = new Set(RECEIVE_REGISTERED_ITEMS_FORM_FIELD_CATALOG.map((field) => field.key));
-  const unregisteredSystemKeys = new Set(NEW_ACCESSORIES_FORM_FIELD_CATALOG.map((field) => field.key));
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -439,13 +396,28 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setSupplyingDetailsOpen(true);
     setAddSupplierOpen(false);
     setComponentFilterOpen(true);
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+    setOtpSending(false);
     setCatalogTick((tick) => tick + 1);
+    setSupplierTick((tick) => tick + 1);
   }, [isOpen]);
 
-  const catalogItems = useMemo(() => {
-    void catalogTick;
-    return itemType === "vehicle_part" ? getVehicleParts() : getAccessories();
-  }, [itemType, catalogTick]);
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    listItems()
+      .then((rows) => {
+        if (!cancelled) setCatalogItems(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, catalogTick]);
 
   const registeredMakeOptions = useMemo(() => {
     if (itemType !== "vehicle_part") return [];
@@ -567,16 +539,16 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
 
   const handleAccessoryChange = (field) => (event) => {
     const value = event?.target ? event.target.value : event;
+    const supplier = event?.supplier;
     setAccessoryForm((prev) =>
-      field === "supplierId" ? applySupplierContact(prev, value) : { ...prev, [field]: value },
+      field === "supplierId" ? applySupplierContact(prev, value, supplier) : { ...prev, [field]: value },
     );
     clearError(field);
-    if (field === "supplierId") {
-      clearError("supplierPhone");
-      clearError("supplierEmail");
-      clearError("supplierContact");
+    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(field)) {
+      setOtpSent(false);
+      setOtp("");
+      setOtpVerified(false);
     }
-    if (field === "supplierPhone" || field === "supplierEmail") clearError("supplierContact");
   };
 
   const handleVehicleChange = (field) => (event) => {
@@ -589,17 +561,16 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         return { ...prev, model: value, year: "" };
       }
       if (field === "supplierId") {
-        return applySupplierContact(prev, value);
+        return applySupplierContact(prev, value, event.supplier);
       }
       return { ...prev, [field]: value };
     });
     clearError(field);
-    if (field === "supplierId") {
-      clearError("supplierPhone");
-      clearError("supplierEmail");
-      clearError("supplierContact");
+    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(field)) {
+      setOtpSent(false);
+      setOtp("");
+      setOtpVerified(false);
     }
-    if (field === "supplierPhone" || field === "supplierEmail") clearError("supplierContact");
     if (field === "make") {
       clearError("model");
       clearError("year");
@@ -611,15 +582,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const handleRegisteredChange = (field) => (event) => {
     const value = event.target.value;
     setRegisteredForm((prev) =>
-      field === "supplierId" ? applySupplierContact(prev, value) : { ...prev, [field]: value },
+      field === "supplierId" ? applySupplierContact(prev, value, event.supplier) : { ...prev, [field]: value },
     );
     clearError(field);
-    if (field === "supplierId") {
-      clearError("supplierPhone");
-      clearError("supplierEmail");
-      clearError("supplierContact");
+    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(field)) {
+      setOtpSent(false);
+      setOtp("");
+      setOtpVerified(false);
     }
-    if (field === "supplierPhone" || field === "supplierEmail") clearError("supplierContact");
   };
 
   const handleRegisteredVehicleFilterChange = (field) => (event) => {
@@ -702,10 +672,13 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setRegisteredForm(INITIAL_REGISTERED);
     setItemSearch("");
     setComponentFilterOpen(true);
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
     setItemType("accessory");
     setAccessoryForm((prev) => ({
       ...prev,
-      itemCode: generateAccessoryItemCode(),
+      itemCode: "",
     }));
     setStep("form");
   };
@@ -715,8 +688,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     if (!registeredForm.itemId || !selectedRegisteredItem) {
       nextErrors.itemId = "Search and select a registered item.";
     }
-    validateStockFields(registeredForm, nextErrors, registeredVisibleKeys);
-    validateSupplyingDetails(registeredForm, nextErrors, registeredVisibleKeys);
+    validateStockFields(registeredForm, nextErrors);
+    validateSupplyingDetails(registeredForm, nextErrors);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       toast.warning("Fix the highlighted fields before saving.");
@@ -735,6 +708,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         supplierId: registeredForm.supplierId,
         waybillNumber: registeredForm.waybillNumber,
         deliveredByName: registeredForm.deliveredByName,
+        deliveredByPhone: registeredForm.deliveredByPhone,
+        deliveredByEmail: registeredForm.deliveredByEmail,
         supplierPhone: registeredForm.supplierPhone,
         supplierEmail: registeredForm.supplierEmail,
         condition: registeredForm.condition,
@@ -747,8 +722,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     const nextErrors = {};
     if (!accessoryForm.name.trim()) nextErrors.name = "Enter an item name.";
     if (!accessoryForm.brand.trim()) nextErrors.brand = "Select a brand.";
-    validateStockFields(accessoryForm, nextErrors, unregisteredVisibleKeys);
-    validateSupplyingDetails(accessoryForm, nextErrors, unregisteredVisibleKeys);
+    validateStockFields(accessoryForm, nextErrors);
+    validateSupplyingDetails(accessoryForm, nextErrors);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       toast.warning("Fix the highlighted fields before saving.");
@@ -770,8 +745,11 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         supplierId: accessoryForm.supplierId,
         location: accessoryForm.location,
         photo: accessoryForm.photo,
+        photoFile: accessoryForm.photoFile || null,
         waybillNumber: accessoryForm.waybillNumber,
         deliveredByName: accessoryForm.deliveredByName,
+        deliveredByPhone: accessoryForm.deliveredByPhone,
+        deliveredByEmail: accessoryForm.deliveredByEmail,
         supplierPhone: accessoryForm.supplierPhone,
         supplierEmail: accessoryForm.supplierEmail,
         condition: accessoryForm.condition,
@@ -786,8 +764,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     if (!vehicleForm.model.trim()) nextErrors.model = "Select a model.";
     if (!vehicleForm.year.trim()) nextErrors.year = "Select a year.";
     if (!vehicleForm.level1) nextErrors.level1 = "Select at least Level 1 component.";
-    validateStockFields(vehicleForm, nextErrors, unregisteredVisibleKeys);
-    validateSupplyingDetails(vehicleForm, nextErrors, unregisteredVisibleKeys);
+    validateStockFields(vehicleForm, nextErrors);
+    validateSupplyingDetails(vehicleForm, nextErrors);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       toast.warning("Fix the highlighted fields before saving.");
@@ -817,6 +795,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         location: vehicleForm.location,
         waybillNumber: vehicleForm.waybillNumber,
         deliveredByName: vehicleForm.deliveredByName,
+        deliveredByPhone: vehicleForm.deliveredByPhone,
+        deliveredByEmail: vehicleForm.deliveredByEmail,
         supplierPhone: vehicleForm.supplierPhone,
         supplierEmail: vehicleForm.supplierEmail,
         condition: vehicleForm.condition,
@@ -825,17 +805,25 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     });
   };
 
-  const handleConfirmSave = () => {
+  const handleConfirmSave = async () => {
     if (!pendingSave) return;
-    onSave({
-      type: pendingSave.type,
-      mode: pendingSave.mode,
-      payload: pendingSave.payload,
-    });
-    setPendingSave(null);
+    try {
+      await onSave?.({
+        type: pendingSave.type,
+        mode: pendingSave.mode,
+        payload: pendingSave.payload,
+      });
+      setPendingSave(null);
+    } catch (error) {
+      toast.error(error.message ?? "Could not save inventory item.");
+    }
   };
 
   const handleFormSave = () => {
+    if (!otpVerified) {
+      toast.warning("Confirm the delivery OTP before receiving stock.");
+      return;
+    }
     if (registrationMode === "registered") {
       submitRegistered();
       return;
@@ -843,9 +831,48 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     submitAccessory();
   };
 
+  const isRegistered = registrationMode === "registered";
+  const activeSupplyForm = isRegistered ? registeredForm : accessoryForm;
+  const deliveryContactReady =
+    Boolean(activeSupplyForm.deliveredByName?.trim())
+    && Boolean(activeSupplyForm.deliveredByPhone?.trim())
+    && Boolean(activeSupplyForm.deliveredByEmail?.trim());
+
+  const handleSendDeliveryOtp = async () => {
+    if (!activeSupplyForm.deliveredByName?.trim()) {
+      toast.warning("Enter the delivery person’s full name first.");
+      return;
+    }
+    if (!activeSupplyForm.deliveredByPhone?.trim()) {
+      toast.warning("Enter the delivery person’s phone number to send the OTP.");
+      return;
+    }
+    if (!activeSupplyForm.deliveredByEmail?.trim()) {
+      toast.warning("Enter the delivery person’s email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(activeSupplyForm.deliveredByEmail.trim())) {
+      toast.warning("Enter a valid delivery email address.");
+      return;
+    }
+    setOtpSending(true);
+    try {
+      await sendDeliveryOtp(activeSupplyForm.deliveredByPhone.trim());
+      setOtp("");
+      setOtpVerified(false);
+      setOtpSent(true);
+      toast.success(
+        `OTP sent to ${activeSupplyForm.deliveredByName.trim()} on ${activeSupplyForm.deliveredByPhone.trim()}.`,
+      );
+    } catch (error) {
+      toast.error(error.message || "Unable to send delivery OTP.");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
   const isSetupStep = step === "setup";
   const isFormStep = step === "form";
-  const isRegistered = registrationMode === "registered";
 
   return (
     <>
@@ -871,9 +898,10 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
           isSetupStep
             ? "Continue"
             : isRegistered
-              ? "Submit for approval"
+              ? "Receive stock"
               : "Save item"
         }
+        saveDisabled={isFormStep && !otpVerified}
         dialogClassName={isSetupStep ? "max-w-lg" : "max-w-3xl"}
         contentClassName="space-y-4"
         secondaryAction={
@@ -1022,26 +1050,24 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ShowConfiguredField visibleKeys={registeredVisibleKeys} fieldKey="quantity">
                   <InputField
                     label="Quantity"
                     id="regQty"
                     type="number"
+                    required
                     value={registeredForm.quantity}
                     onChange={handleRegisteredChange("quantity")}
                     error={errors.quantity}
                   />
-                  </ShowConfiguredField>
-                  <ShowConfiguredField visibleKeys={registeredVisibleKeys} fieldKey="unitPrice">
                   <InputField
                     label="Unit price (GH₵)"
                     id="regUnitPrice"
                     type="number"
+                    required
                     value={registeredForm.unitPrice}
                     onChange={handleRegisteredChange("unitPrice")}
                     error={errors.unitPrice}
                   />
-                  </ShowConfiguredField>
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       Total price (GH₵)
@@ -1051,14 +1077,12 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       Auto-calculated from quantity × unit price
                     </p>
                   </div>
-                  <ShowConfiguredField visibleKeys={registeredVisibleKeys} fieldKey="location">
                   <StoreLocationField
                     id="regLocation"
                     value={registeredForm.location}
                     onChange={handleRegisteredChange("location")}
                     error={errors.location}
                   />
-                  </ShowConfiguredField>
                 </div>
               </>
             ) : (
@@ -1134,28 +1158,27 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                   id="newAccPhoto"
                   value={accessoryForm.photo}
                   onChange={(photo) => handleAccessoryChange("photo")(photo)}
+                  onFileChange={(file) => handleAccessoryChange("photoFile")(file)}
                 />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <ShowConfiguredField visibleKeys={unregisteredVisibleKeys} fieldKey="quantity">
                   <InputField
                     label="Quantity"
                     id="newAccQty"
                     type="number"
+                    required
                     value={accessoryForm.quantity}
                     onChange={handleAccessoryChange("quantity")}
                     error={errors.quantity}
                   />
-                  </ShowConfiguredField>
-                  <ShowConfiguredField visibleKeys={unregisteredVisibleKeys} fieldKey="unitPrice">
                   <InputField
                     label="Unit price (GH₵)"
                     id="newAccUnitPrice"
                     type="number"
+                    required
                     value={accessoryForm.unitPrice}
                     onChange={handleAccessoryChange("unitPrice")}
                     error={errors.unitPrice}
                   />
-                  </ShowConfiguredField>
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       Total price (GH₵)
@@ -1165,14 +1188,12 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       Auto-calculated from quantity × unit price
                     </p>
                   </div>
-                  <ShowConfiguredField visibleKeys={unregisteredVisibleKeys} fieldKey="location">
                   <StoreLocationField
                     id="newAccLocation"
                     value={accessoryForm.location}
                     onChange={handleAccessoryChange("location")}
                     error={errors.location}
                   />
-                  </ShowConfiguredField>
                 </div>
               </>
             )}
@@ -1188,17 +1209,23 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                 errors={errors}
                 onChange={isRegistered ? handleRegisteredChange : handleAccessoryChange}
                 prefix={isRegistered ? "reg" : "newAcc"}
-                visibleKeys={isRegistered ? registeredVisibleKeys : unregisteredVisibleKeys}
                 onAddSupplier={() => setAddSupplierOpen(true)}
+                supplierTick={supplierTick}
               />
             </CollapsibleSection>
-            <ConfiguredCustomFields
-              sections={isRegistered ? registeredSections : unregisteredSections}
-              systemKeys={isRegistered ? registeredSystemKeys : unregisteredSystemKeys}
-              form={isRegistered ? registeredForm : accessoryForm}
-              formErrors={errors}
-              handleChange={isRegistered ? handleRegisteredChange : handleAccessoryChange}
-              idPrefix={isRegistered ? "rri" : "nac"}
+
+            <DeliveryPersonOtpSection
+              deliveredByName={activeSupplyForm.deliveredByName}
+              deliveredByPhone={activeSupplyForm.deliveredByPhone}
+              deliveredByEmail={activeSupplyForm.deliveredByEmail}
+              otpSent={otpSent}
+              otp={otp}
+              otpVerified={otpVerified}
+              onSendOtp={handleSendDeliveryOtp}
+              onOtpChange={setOtp}
+              onVerifiedChange={setOtpVerified}
+              sendDisabled={!deliveryContactReady}
+              sendLoading={otpSending}
             />
           </div>
         )}
@@ -1208,19 +1235,20 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         isOpen={Boolean(pendingSave)}
         onClose={() => setPendingSave(null)}
         onConfirm={handleConfirmSave}
-        title={pendingSave?.mode === "existing" ? "Submit stock receipt?" : "Save item?"}
+        title={pendingSave?.mode === "existing" ? "Receive stock?" : "Save item?"}
         message={
           pendingSave?.mode === "existing"
-            ? `Submit stock receipt for ${pendingSave?.label || "this item"} for approval? It will be added to receivables only after approval.`
+            ? `Receive stock for ${pendingSave?.label || "this item"}?`
             : `Add ${pendingSave?.label || "this item"} to inventory?`
         }
-        confirmText={pendingSave?.mode === "existing" ? "Submit for approval" : "Save item"}
+        confirmText={pendingSave?.mode === "existing" ? "Receive stock" : "Save item"}
       />
 
       <AddSupplierModal
         isOpen={addSupplierOpen}
         onClose={() => setAddSupplierOpen(false)}
         onCreated={(created) => {
+          setSupplierTick((tick) => tick + 1);
           const patch = {
             supplierId: created.id,
             supplierPhone: created.phone || "",
@@ -1234,9 +1262,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
           setErrors((prev) => {
             const next = { ...prev };
             delete next.supplierId;
-            delete next.supplierPhone;
-            delete next.supplierEmail;
-            delete next.supplierContact;
             return next;
           });
         }}
@@ -1247,8 +1272,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         onClose={() => setBulkOpen(false)}
         inventoryType="accessory"
         items={catalogItems}
-        onSave={(payload) => {
-          onBulkSave?.(payload);
+        onSave={async (payload) => {
+          await onBulkSave?.(payload);
           setBulkOpen(false);
         }}
       />

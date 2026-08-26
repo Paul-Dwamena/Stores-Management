@@ -5,7 +5,6 @@ import {
   Wallet,
   Boxes,
   Plus,
-  Wrench,
 } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import Button from "../../../components/common/base/Button";
@@ -13,26 +12,17 @@ import SummaryStatCard from "../../../components/common/SummaryStatCard";
 import SearchInput from "../../../components/common/fields/SearchInput";
 import Pagination from "../../../components/common/Pagination";
 import { TableRowActions, TableViewAction } from "../../../components/common/tableActions";
+import SectionLoadState from "../../../components/common/SectionLoadState";
 import { toast } from "../../../components/common/ToastNotification";
 import {
-  ACCESSORY_STATUS_OPTIONS,
-  VEHICLE_PART_STATUS_OPTIONS,
-  addAccessory,
-  addAccessoriesBatch,
-  updateAccessoryDetails,
-  addVehiclePart,
-  addVehiclePartsBatch,
-  formatAccessoryMoney,
-  formatAccessoryStatus,
-  getAccessories,
-  getVehicleParts,
-  receiveAccessoryStock,
-  receiveAccessoryStockBatch,
-  approveAccessoryStockReceipt,
-  receiveVehiclePartStock,
-  receiveVehiclePartStockBatch,
-  approveVehiclePartStockReceipt,
-} from "../../../mockdata/stores";
+  listInventoryItems,
+  getInventoryItem,
+  listItemReceipts,
+  stockItem,
+  stockItemsBulk,
+  formatInventoryStatus,
+} from "../../../services/inventoryService";
+import { createItem, updateItem } from "../../../services/itemsService";
 import {
   AccessoryDetailModal,
   NewInventoryItemModal,
@@ -41,150 +31,86 @@ import { ItemPhotoThumb } from "./components/ItemPhotoField";
 
 const PAGE_SIZE = 10;
 
+const INVENTORY_STATUS_OPTIONS = [
+  { value: "ALL", label: "All" },
+  { value: "IN_STOCK", label: "In stock" },
+  { value: "OUT_OF_STOCK", label: "Out of stock" },
+  { value: "INACTIVE", label: "Inactive" },
+];
+
 const filterLabelClassName =
   "text-[11px] font-medium text-slate-500 tracking-wider shrink-0";
 
 const filterSelectClassName =
   "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-500";
 
-const dateInputClassName =
-  "w-full min-w-[150px] h-9 px-3 text-[12px] font-medium text-slate-700 bg-white border border-slate-200 rounded-lg outline-none focus:border-emerald-500 cursor-pointer";
-
 function statusBadgeClass(status) {
   const raw = (status ?? "").toString().toUpperCase();
-  if (raw === "ACTIVE") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (raw === "IN_STOCK" || raw === "ACTIVE") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (raw === "INACTIVE") return "bg-slate-50 text-slate-600 border-slate-200";
   if (raw === "LOW_STOCK") return "bg-amber-50 text-amber-700 border-amber-200";
   if (raw === "OUT_OF_STOCK") return "bg-rose-50 text-rose-700 border-rose-200";
   return "bg-slate-50 text-slate-600 border-slate-200";
 }
 
-function openDatePicker(event) {
-  const input = event.currentTarget;
-  try {
-    input.showPicker?.();
-  } catch {
-    /* Unsupported browsers fall back to native focus behaviour. */
-  }
-}
-
-function DateRangeFilter({ dateFrom, dateTo, onFromChange, onToChange }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-2">
-        <label
-          htmlFor="inventoryDateFrom"
-          className="text-[11px] font-medium text-slate-500 tracking-wider shrink-0"
-        >
-          From :
-        </label>
-        <input
-          id="inventoryDateFrom"
-          type="date"
-          value={dateFrom}
-          max={dateTo || undefined}
-          onChange={onFromChange}
-          onClick={openDatePicker}
-          onFocus={openDatePicker}
-          className={dateInputClassName}
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <label
-          htmlFor="inventoryDateTo"
-          className="text-[11px] font-medium text-slate-500 tracking-wider shrink-0"
-        >
-          To :
-        </label>
-        <input
-          id="inventoryDateTo"
-          type="date"
-          value={dateTo}
-          min={dateFrom || undefined}
-          onChange={onToChange}
-          onClick={openDatePicker}
-          onFocus={openDatePicker}
-          className={dateInputClassName}
-        />
-      </div>
-    </div>
-  );
-}
-
-function matchesDateRange(createdAt, dateFrom, dateTo) {
-  if (!dateFrom && !dateTo) return true;
-  const created = new Date(createdAt);
-  if (Number.isNaN(created.getTime())) return false;
-  if (dateFrom) {
-    const from = new Date(dateFrom);
-    from.setHours(0, 0, 0, 0);
-    if (created < from) return false;
-  }
-  if (dateTo) {
-    const to = new Date(dateTo);
-    to.setHours(23, 59, 59, 999);
-    if (created > to) return false;
-  }
-  return true;
-}
-
 export default function InventoryList({
   embedded = false,
   tabsSlot = null,
-  view = "accessories",
   onCreatedItemType,
 }) {
-  const isVehicleParts = view === "vehicle_parts";
-  const [accessoryItems, setAccessoryItems] = useState(() => getAccessories());
-  const [vehiclePartItems, setVehiclePartItems] = useState(() => getVehicleParts());
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
 
-  const items = isVehicleParts ? vehiclePartItems : accessoryItems;
-  const statusOptions = isVehicleParts ? VEHICLE_PART_STATUS_OPTIONS : ACCESSORY_STATUS_OPTIONS;
+  const reload = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setItems(
+        (await listInventoryItems()).sort((a, b) => Number(b.id) - Number(a.id)),
+      );
+    } catch (err) {
+      setLoadError(err.message || "Unable to load inventory.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setPage(0);
-    setSearchQuery("");
-    setStatusFilter("ALL");
-    setDateFrom("");
-    setDateTo("");
-    setSelected(null);
-    setAddOpen(false);
-  }, [view]);
+    reload();
+  }, []);
+
+  const toStockBody = (payload) => ({
+    supplierId: payload.supplierId,
+    location: payload.location,
+    condition: payload.condition,
+    quantity: payload.quantity,
+    unitCost: payload.unitCost ?? payload.unitPrice,
+    deliveredByName: payload.deliveredByName,
+    deliveredByPhone: payload.deliveredByPhone,
+    deliveredByEmail: payload.deliveredByEmail,
+    waybillNumber: payload.waybillNumber,
+    notes: payload.notes,
+  });
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return items.filter((item) => {
       if (statusFilter !== "ALL" && item.status !== statusFilter) return false;
-      if (!matchesDateRange(item.createdAt, dateFrom, dateTo)) return false;
       if (!q) return true;
-
-      if (isVehicleParts) {
-        return (
-          item.itemCode.toLowerCase().includes(q) ||
-          item.name.toLowerCase().includes(q) ||
-          (item.make || "").toLowerCase().includes(q) ||
-          (item.model || "").toLowerCase().includes(q) ||
-          String(item.year ?? "").includes(q) ||
-          (item.chassisNumber || "").toLowerCase().includes(q) ||
-          (item.brand || "").toLowerCase().includes(q)
-        );
-      }
-
       return (
-        item.itemCode.toLowerCase().includes(q) ||
-        item.name.toLowerCase().includes(q) ||
-        item.brand.toLowerCase().includes(q) ||
-        (item.description || "").toLowerCase().includes(q) ||
-        (item.shelfPosition || "").toLowerCase().includes(q)
+        item.itemCode?.toLowerCase().includes(q) ||
+        item.name?.toLowerCase().includes(q) ||
+        item.brand?.toLowerCase().includes(q) ||
+        (item.description || "").toLowerCase().includes(q)
       );
     });
-  }, [items, searchQuery, statusFilter, dateFrom, dateTo, isVehicleParts]);
+  }, [items, searchQuery, statusFilter]);
 
   const totalElements = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalElements / PAGE_SIZE));
@@ -197,133 +123,187 @@ export default function InventoryList({
 
   const stats = useMemo(() => {
     const totalQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-    const totalCost = items.reduce((sum, item) => sum + (Number(item.totalPurchaseCost) || 0), 0);
-    const lowStock = items.filter(
-      (item) => item.status === "LOW_STOCK" || item.status === "OUT_OF_STOCK",
-    ).length;
+    const outOfStock = items.filter((item) => item.status === "OUT_OF_STOCK").length;
+    const inactive = items.filter((item) => item.status === "INACTIVE").length;
     return [
-      {
-        label: isVehicleParts ? "Vehicle part SKUs" : "Accessory items",
-        value: String(items.length),
-        icon: isVehicleParts ? Wrench : Package,
-        tone: "teal",
-      },
+      { label: "Accessory items", value: String(items.length), icon: Package, tone: "teal" },
       { label: "Total quantity", value: String(totalQty), icon: Boxes, tone: "sky" },
-      { label: "Purchase value", value: formatAccessoryMoney(totalCost), icon: Wallet, tone: "violet" },
-      { label: "Attention needed", value: String(lowStock), icon: AlertTriangle, tone: "amber" },
+      { label: "Out of stock", value: String(outOfStock), icon: AlertTriangle, tone: "amber" },
+      { label: "Inactive", value: String(inactive), icon: Wallet, tone: "violet" },
     ];
-  }, [items, isVehicleParts]);
+  }, [items]);
 
-  const handleSaveItem = ({ type, mode = "new", payload }) => {
-    try {
-      if (mode === "existing") {
-        const updated =
-          type === "vehicle_part"
-            ? receiveVehiclePartStock(payload.itemId, payload)
-            : receiveAccessoryStock(payload.itemId, payload);
-        if (type === "vehicle_part") {
-          setVehiclePartItems(getVehicleParts());
-          onCreatedItemType?.("vehicle_parts");
-        } else {
-          setAccessoryItems(getAccessories());
-          onCreatedItemType?.("accessories");
+  const applyDetailResult = (itemId, result) => {
+    setSelected((prev) => {
+      if (!prev || prev.id !== itemId) return prev;
+      if (result.status === "fulfilled") {
+        return {
+          ...prev,
+          ...result.value,
+          detailReady: true,
+          detailLoading: false,
+          detailError: null,
+        };
+      }
+      return {
+        ...prev,
+        detailReady: false,
+        detailLoading: false,
+        detailError: result.reason?.message || "Unable to load item details.",
+      };
+    });
+  };
+
+  const applyReceiptsResult = (itemId, result) => {
+    setSelected((prev) => {
+      if (!prev || prev.id !== itemId) return prev;
+      if (result.status === "fulfilled") {
+        return {
+          ...prev,
+          receipts: result.value,
+          receiptsLoading: false,
+          receiptsError: null,
+        };
+      }
+      return {
+        ...prev,
+        receipts: [],
+        receiptsLoading: false,
+        receiptsError: result.reason?.message || "Unable to load receipts.",
+      };
+    });
+  };
+
+  const loadSelectedSections = async (itemId, { detail = true, receipts = true } = {}) => {
+    if (!itemId) return;
+    setSelected((prev) => {
+      if (!prev || prev.id !== itemId) return prev;
+      return {
+        ...prev,
+        ...(detail ? { detailLoading: true, detailError: null } : null),
+        ...(receipts ? { receiptsLoading: true, receiptsError: null } : null),
+      };
+    });
+
+    const tasks = [];
+    if (detail) tasks.push(["detail", getInventoryItem(itemId)]);
+    if (receipts) tasks.push(["receipts", listItemReceipts(itemId)]);
+
+    const settled = await Promise.all(
+      tasks.map(async ([key, promise]) => {
+        try {
+          return [key, { status: "fulfilled", value: await promise }];
+        } catch (error) {
+          return [key, { status: "rejected", reason: error }];
         }
-        toast.success(
-          `Submitted receipt of ${payload.quantity} of ${updated.name} for approval.`,
-        );
-      } else if (type === "accessory") {
-        const created = addAccessory(payload);
-        setAccessoryItems(getAccessories());
-        toast.success(`${created.name} added to accessories inventory.`);
-        onCreatedItemType?.("accessories");
-      } else {
-        const created = addVehiclePart(payload);
-        setVehiclePartItems(getVehicleParts());
-        toast.success(`${created.name} added to vehicle parts inventory.`);
-        onCreatedItemType?.("vehicle_parts");
-      }
-      setAddOpen(false);
-      setPage(0);
-    } catch (error) {
-      toast.error(error.message ?? "Could not add inventory item.");
-    }
+      }),
+    );
+
+    settled.forEach(([key, result]) => {
+      if (key === "detail") applyDetailResult(itemId, result);
+      if (key === "receipts") applyReceiptsResult(itemId, result);
+    });
   };
 
-  const handleUpdateDetails = (payload) => {
-    if (!selected) return;
-    try {
-      const updated = updateAccessoryDetails(selected.id, payload);
-      setAccessoryItems(getAccessories());
-      setSelected(updated);
-      toast.success("Item details updated.");
-    } catch (error) {
-      toast.error(error.message ?? "Could not update item.");
-      throw error;
-    }
+  const openView = async (row) => {
+    setSelected({
+      id: row.id,
+      name: row.name || "",
+      itemCode: row.itemCode || "",
+      status: row.status || "",
+      detailReady: false,
+      detailLoading: true,
+      detailError: null,
+      receipts: [],
+      receiptsLoading: true,
+      receiptsError: null,
+    });
+    await loadSelectedSections(row.id);
   };
 
-  const handleReceiveStock = (payload) => {
-    if (!selected) return;
-    try {
-      const updated = isVehicleParts
-        ? receiveVehiclePartStock(selected.id, payload)
-        : receiveAccessoryStock(selected.id, payload);
-      if (isVehicleParts) {
-        setVehiclePartItems(getVehicleParts());
-      } else {
-        setAccessoryItems(getAccessories());
-      }
-      setSelected(updated);
-      toast.success(
-        `Stock receipt submitted for approval. It will appear in receivables after approval.`,
-      );
-    } catch (error) {
-      toast.error(error.message ?? "Could not submit stock receipt.");
-      throw error;
-    }
+  const refreshSelected = async (itemId) => {
+    await loadSelectedSections(itemId);
   };
 
-  const handleApproveSupply = (supply) => {
-    if (!selected?.id || !supply?.id) return;
-    try {
-      const updated = isVehicleParts
-        ? approveVehiclePartStockReceipt(selected.id, supply.id)
-        : approveAccessoryStockReceipt(selected.id, supply.id);
-      if (isVehicleParts) {
-        setVehiclePartItems(getVehicleParts());
-      } else {
-        setAccessoryItems(getAccessories());
-      }
-      setSelected(updated);
-      toast.success("Stock receipt approved. Receivables and on-hand stock updated.");
-    } catch (error) {
-      toast.error(error.message ?? "Could not approve stock receipt.");
-    }
+  const retryItemDetail = async () => {
+    if (!selected?.id) return;
+    await loadSelectedSections(selected.id, { detail: true, receipts: false });
   };
 
-  const handleBulkReceipt = ({ mode, inventoryType, shared, lines }) => {
-    let updated;
-    if (inventoryType === "vehicle_part") {
-      updated =
-        mode === "new"
-          ? addVehiclePartsBatch(lines, shared)
-          : receiveVehiclePartStockBatch(lines, shared);
-      setVehiclePartItems(getVehicleParts());
+  const retryReceipts = async () => {
+    if (!selected?.id) return;
+    await loadSelectedSections(selected.id, { detail: false, receipts: true });
+  };
+
+  const handleSaveItem = async ({ type, mode = "new", payload }) => {
+    if (type === "vehicle_part") {
+      toast.info("Vehicle parts are not available on this API.");
+      return;
+    }
+    if (mode === "existing") {
+      await stockItem(payload.itemId, toStockBody(payload));
+      toast.success("Stock received.");
     } else {
-      updated =
-        mode === "new"
-          ? addAccessoriesBatch(lines, shared)
-          : receiveAccessoryStockBatch(lines, shared);
-      setAccessoryItems(getAccessories());
+      const created = await createItem({
+        name: payload.name.trim(),
+        brand: payload.brand.trim(),
+        unit: "pcs",
+        description: payload.description?.trim() || null,
+        photo: payload.photoFile || null,
+      });
+      await stockItem(created.id, toStockBody(payload));
+      toast.success(`${created.name} added to inventory.`);
     }
     setAddOpen(false);
     setPage(0);
-    onCreatedItemType?.(inventoryType === "vehicle_part" ? "vehicle_parts" : "accessories");
+    onCreatedItemType?.("accessories");
+    reload();
+  };
+
+  const handleUpdateDetails = async (payload) => {
+    if (!selected) return;
+    const updated = await updateItem(selected.id, {
+      name: payload.name?.trim() || null,
+      code: payload.code?.trim() || null,
+      brand: payload.brand?.trim() || null,
+      description: payload.description?.trim() || null,
+      unit: payload.unit?.trim() || null,
+      is_active: payload.isActive !== false,
+    });
+    toast.success("Item details updated.");
+    await reload();
+    await loadSelectedSections(selected.id);
+    setSelected((prev) => {
+      if (!prev || prev.id !== selected.id) return prev;
+      return {
+        ...prev,
+        unit: updated.unit || prev.unit || payload.unit?.trim() || "",
+        itemCode: updated.itemCode || prev.itemCode,
+        isActive: updated.isActive,
+      };
+    });
+  };
+
+  const handleReceiveStock = async (payload) => {
+    if (!selected) return;
+    await stockItem(selected.id, toStockBody(payload));
+    toast.success("Stock received.");
+    await Promise.all([reload(), refreshSelected(selected.id)]);
+  };
+
+  const handleBulkReceipt = async ({ mode, inventoryType, shared, lines }) => {
+    if (inventoryType === "vehicle_part") {
+      toast.info("Vehicle parts are not available on this API.");
+      return;
+    }
+    await stockItemsBulk({ mode, shared, lines });
     toast.success(
-      mode === "existing"
-        ? `${updated.length} stock receipt${updated.length === 1 ? "" : "s"} submitted for approval.`
-        : `${updated.length} ${inventoryType === "vehicle_part" ? "vehicle part" : "accessory"} receipt${updated.length === 1 ? "" : "s"} recorded.`,
+      `${lines.length} stock receipt${lines.length === 1 ? "" : "s"} recorded.`,
     );
+    setAddOpen(false);
+    setPage(0);
+    onCreatedItemType?.("accessories");
+    reload();
   };
 
   return (
@@ -331,7 +311,7 @@ export default function InventoryList({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
           <SummaryStatCard
-          variant={embedded ? "light" : "filled"}
+            variant={embedded ? "light" : "filled"}
             key={stat.label}
             title={stat.label}
             value={stat.value}
@@ -341,7 +321,7 @@ export default function InventoryList({
         ))}
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-hidden relative min-h-[200px]">
         <div className="border-b border-slate-100">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-2 sm:px-4 bg-slate-50/30">
             <div className="min-w-0 flex-1">{tabsSlot}</div>
@@ -354,11 +334,7 @@ export default function InventoryList({
 
           <div className="p-4 bg-slate-50/30 flex flex-col xl:flex-row justify-between gap-4">
             <SearchInput
-              placeholder={
-                isVehicleParts
-                  ? "Search by code, make, model, chassis, or component…"
-                  : "Search by code, name, brand, or description…"
-              }
+              placeholder="Search by code, name, brand, or description…"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -366,23 +342,8 @@ export default function InventoryList({
               }}
             />
             <div className="flex flex-wrap items-center gap-3">
-              <DateRangeFilter
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                onFromChange={(e) => {
-                  setDateFrom(e.target.value);
-                  setPage(0);
-                }}
-                onToChange={(e) => {
-                  setDateTo(e.target.value);
-                  setPage(0);
-                }}
-              />
               <div className="flex items-center gap-2">
-                <label
-                  htmlFor="inventoryStatusFilter"
-                  className={filterLabelClassName}
-                >
+                <label htmlFor="inventoryStatusFilter" className={filterLabelClassName}>
                   Status :
                 </label>
                 <select
@@ -394,7 +355,7 @@ export default function InventoryList({
                   }}
                   className={filterSelectClassName}
                 >
-                  {statusOptions.map((option) => (
+                  {INVENTORY_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -406,194 +367,117 @@ export default function InventoryList({
         </div>
 
         <div className="overflow-x-auto">
-          {isVehicleParts ? (
-            <table className="w-full text-left min-w-[980px]">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
-                    Photo
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Item code
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Make
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Model
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Year
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Chassis number
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">
-                    Actions
-                  </th>
+          <table className="w-full text-left min-w-[920px]">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
+                  Photo
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Item code
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Brand
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Quantity
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {loading || loadError ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-2">
+                    <SectionLoadState
+                      loading={loading}
+                      error={loadError}
+                      onRetry={reload}
+                      loadingLabel="Loading inventory…"
+                      errorTitle="Couldn’t load inventory"
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {pagedRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="px-6 py-12 text-center text-[13px] text-slate-400">
-                      No vehicle parts found.
+              ) : pagedRows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center text-[13px] text-slate-400">
+                    No accessories found.
+                  </td>
+                </tr>
+              ) : (
+                pagedRows.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50/50">
+                    <td className="px-6 py-3.5">
+                      <ItemPhotoThumb src={row.photo} name={row.name} />
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
+                      {row.itemCode}
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800">
+                      {row.name}
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] text-slate-700">{row.brand}</td>
+                    <td className="px-6 py-3.5 text-[12px] text-slate-600 max-w-[240px]">
+                      <span className="line-clamp-2">{row.description || "—"}</span>
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
+                      {row.quantity}
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <span
+                        className={cn(
+                          "inline-flex px-2 py-0.5 rounded text-[9px] font-bold border capitalize",
+                          statusBadgeClass(row.status),
+                        )}
+                      >
+                        {formatInventoryStatus(row.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5 text-right">
+                      <TableRowActions>
+                        <TableViewAction title="View item" onClick={() => openView(row)} />
+                      </TableRowActions>
                     </td>
                   </tr>
-                ) : (
-                  pagedRows.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-3.5">
-                        <ItemPhotoThumb src={row.photo} name={row.name} />
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
-                        {row.itemCode}
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] text-slate-700">{row.make}</td>
-                      <td className="px-6 py-3.5 text-[12px] text-slate-700">{row.model}</td>
-                      <td className="px-6 py-3.5 text-[12px] text-slate-700">{row.year ?? "—"}</td>
-                      <td className="px-6 py-3.5 text-[12px] font-medium text-slate-800 whitespace-nowrap">
-                        {row.chassisNumber}
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800">
-                        {row.name}
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
-                        {row.quantity}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span
-                          className={cn(
-                            "inline-flex px-2 py-0.5 rounded text-[9px] font-bold border capitalize",
-                            statusBadgeClass(row.status),
-                          )}
-                        >
-                          {formatAccessoryStatus(row.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-right">
-                        <TableRowActions>
-                          <TableViewAction title="View item" onClick={() => setSelected(row)} />
-                        </TableRowActions>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          ) : (
-            <table className="w-full text-left min-w-[920px]">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
-                    Photo
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Item code
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Brand
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Description
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Total purchase cost
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider text-right">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {pagedRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-[13px] text-slate-400">
-                      No accessories found.
-                    </td>
-                  </tr>
-                ) : (
-                  pagedRows.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-3.5">
-                        <ItemPhotoThumb src={row.photo} name={row.name} />
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
-                        {row.itemCode}
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800">
-                        {row.name}
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] text-slate-700">{row.brand}</td>
-                      <td className="px-6 py-3.5 text-[12px] text-slate-600 max-w-[240px]">
-                        <span className="line-clamp-2">{row.description || "—"}</span>
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
-                        {row.quantity}
-                      </td>
-                      <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800 whitespace-nowrap">
-                        {formatAccessoryMoney(row.totalPurchaseCost)}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span
-                          className={cn(
-                            "inline-flex px-2 py-0.5 rounded text-[9px] font-bold border capitalize",
-                            statusBadgeClass(row.status),
-                          )}
-                        >
-                          {formatAccessoryStatus(row.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-right">
-                        <TableRowActions>
-                          <TableViewAction title="View item" onClick={() => setSelected(row)} />
-                        </TableRowActions>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
 
-        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-start">
-          <Pagination
-            page={safePage}
-            size={PAGE_SIZE}
-            totalElements={totalElements}
-            onPageChange={setPage}
-            showWhenEmpty={false}
-          />
-        </div>
+        {!loading && !loadError ? (
+          <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-start">
+            <Pagination
+              page={safePage}
+              size={PAGE_SIZE}
+              totalElements={totalElements}
+              onPageChange={setPage}
+              showWhenEmpty={false}
+            />
+          </div>
+        ) : null}
       </div>
 
       <AccessoryDetailModal
         isOpen={Boolean(selected)}
         onClose={() => setSelected(null)}
         item={selected}
-        variant={isVehicleParts ? "vehicle_part" : "accessory"}
+        variant="accessory"
         onReceiveStock={handleReceiveStock}
-        onApproveSupply={handleApproveSupply}
         onUpdateDetails={handleUpdateDetails}
+        onRetryDetail={retryItemDetail}
+        onRetryReceipts={retryReceipts}
       />
 
       <NewInventoryItemModal

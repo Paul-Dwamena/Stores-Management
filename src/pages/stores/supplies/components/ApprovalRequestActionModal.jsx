@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import AddModal from "../../../../components/common/AddModal";
 import Button from "../../../../components/common/base/Button";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import SectionLoadState from "../../../../components/common/SectionLoadState";
 import {
   ConfiguredCustomFields,
   ShowConfiguredField,
@@ -37,7 +38,11 @@ export default function ApprovalRequestActionModal({
   requisition,
   onSubmit,
   onReject,
+  loading = false,
+  error = null,
+  onRetry,
 }) {
+  const busy = loading || Boolean(error);
   const [approvalComment, setApprovalComment] = useState("");
   const [customValues, setCustomValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -84,14 +89,24 @@ export default function ApprovalRequestActionModal({
         subtitle="Review the raised supply details, then approve or reject with a comment."
         dialogClassName="max-w-3xl"
         saveLabel="Approve"
+        saveDisabled={busy}
         hideCancelButton
         secondaryAction={{ label: "Cancel", onClick: onClose }}
         footerActions={
-          <Button variant="danger" size="modal" onClick={() => setRejectOpen(true)}>
-            Reject
-          </Button>
+          busy ? null : (
+            <Button variant="danger" size="modal" onClick={() => setRejectOpen(true)}>
+              Reject
+            </Button>
+          )
         }
       >
+        <SectionLoadState
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          loadingLabel="Loading request…"
+          errorTitle="Couldn’t load this request"
+        >
         <div className="space-y-4">
           <RequisitionRequestSummary requisition={requisition} />
           <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="requestComment">
@@ -132,6 +147,7 @@ export default function ApprovalRequestActionModal({
             idPrefix="asr"
           />
         </div>
+        </SectionLoadState>
       </AddModal>
 
       <ConfirmationModal

@@ -1,79 +1,66 @@
-import React, { useState } from "react";
-import { loginUser, registerUser } from "../services/authService";
+import React, { useEffect, useState } from "react";
+import { getMe, loginUser } from "../services/authService";
 import { AuthContext } from "./useAuth";
-import { buildDemoStoreSession, normalizeStoreLoginResponse } from "../utils/demoSession";
 
 const readStoredUser = () => {
-  const userInfo = localStorage.getItem("userInfo");
-  return userInfo ? JSON.parse(userInfo) : null;
+  try {
+    const userInfo = localStorage.getItem("userInfo");
+    return userInfo ? JSON.parse(userInfo) : null;
+  } catch {
+    localStorage.removeItem("userInfo");
+    return null;
+  }
+};
+
+const persist = (session) => {
+  if (session) localStorage.setItem("userInfo", JSON.stringify(session));
+  else localStorage.removeItem("userInfo");
+  return session;
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(readStoredUser);
-  const [loading] = useState(false);
 
-  const login = async (email, password) => {
-    try {
-      const data = await loginUser(email, password);
-      const session = normalizeStoreLoginResponse(data, email);
-      setUser(session);
-      localStorage.setItem("userInfo", JSON.stringify(session));
-      return session;
-    } catch {
-      const fallback = buildDemoStoreSession(email);
-      setUser(fallback);
-      localStorage.setItem("userInfo", JSON.stringify(fallback));
-      return fallback;
-    }
-  };
-
-  const register = async (userData) => {
-    try {
-      const data = await registerUser(userData);
-      const session = normalizeStoreLoginResponse(data, userData?.email);
-      setUser(session);
-      localStorage.setItem("userInfo", JSON.stringify(session));
-      return session;
-    } catch {
-      const fallback = {
-        ...buildDemoStoreSession(userData?.email),
-        ...userData,
-        role: userData.userType || "admin",
-      };
-      setUser(fallback);
-      localStorage.setItem("userInfo", JSON.stringify(fallback));
-      return fallback;
-    }
+  const applyProfile = (profile) => {
+    setUser((current) => persist({ ...current, ...profile, token: current?.token }));
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("userInfo");
+    persist(null);
   };
 
-  const updateProfile = (patch = {}) => {
-    setUser((current) => {
-      if (!current) return current;
-      const firstName = patch.firstName ?? current.firstName ?? "";
-      const lastName = patch.lastName ?? current.lastName ?? "";
-      const composed = [firstName, lastName]
-        .map((part) => String(part).trim())
-        .filter(Boolean)
-        .join(" ");
-      const next = {
-        ...current,
-        ...patch,
-        firstName,
-        lastName,
-        name: patch.name ?? (composed || current.name),
-      };
-      localStorage.setItem("userInfo", JSON.stringify(next));
-      return next;
-    });
+  useEffect(() => {
+    const hydrate = async () => {
+      if (!readStoredUser()?.token) return;
+      try {
+        applyProfile(await getMe());
+      } catch (err) {
+        if (err?.response?.status === 401 || err?.status === 401) {
+          logout();
+        }
+      }
+    };
+
+    hydrate();
+    const onExpired = () => logout();
+    window.addEventListener("auth-expired", onExpired);
+    return () => window.removeEventListener("auth-expired", onExpired);
+  }, []);
+
+  const login = async (email, password) => {
+    const session = persist(await loginUser(email, password));
+    setUser(session);
+    try {
+      applyProfile(await getMe());
+    } catch {
+      // keep the login session if /me fails
+    }
+    return session;
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, login, logout, applyProfile }}>
       {children}
     </AuthContext.Provider>
   );

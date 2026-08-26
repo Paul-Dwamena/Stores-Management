@@ -9,11 +9,7 @@ import TableIconAction from "../../../../components/common/tableActions/TableIco
 import TableRowActions from "../../../../components/common/tableActions/TableRowActions";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import {
-  formatAccessoryMoney,
-  getStoreLocationOptions,
-} from "../../../../mockdata/stores";
-import { getSupplierContact } from "../../../../mockdata/org";
+import { formatInventoryMoney, sendDeliveryOtp } from "../../../../services/inventoryService";
 import { ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
@@ -24,7 +20,9 @@ import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
 import AddSupplierModal from "./AddSupplierModal";
+import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import SupplierPicker from "./SupplierPicker";
+import StoreSelect from "./StoreSelect";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
@@ -44,10 +42,12 @@ const CONDITION_OPTIONS = [
 
 const INITIAL_SHARED = {
   supplierId: "",
-  waybillNumber: "",
-  deliveredByName: "",
   supplierPhone: "",
   supplierEmail: "",
+  waybillNumber: "",
+  deliveredByName: "",
+  deliveredByPhone: "",
+  deliveredByEmail: "",
   condition: "GOOD",
   notes: "",
 };
@@ -211,35 +211,19 @@ function CollapsibleSection({ title, description, open, onToggle, children, erro
   );
 }
 
-function SharedSupplyFields({ value, errors, onChange, onAddSupplier }) {
+function SharedSupplyFields({ value, errors, onChange, onAddSupplier, supplierTick }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <SupplierPicker
           value={value.supplierId}
-          onChange={(supplierId) => {
-            const contact = getSupplierContact(supplierId);
+          onChange={(supplierId, supplier) => {
             onChange("supplierId", supplierId);
-            onChange("supplierPhone", contact.supplierPhone);
-            onChange("supplierEmail", contact.supplierEmail);
+            onChange("supplierPhone", supplier?.phone || "");
+            onChange("supplierEmail", supplier?.email || "");
           }}
           error={errors.supplierId}
           onAddClick={onAddSupplier}
-        />
-        <InputField
-          label="Waybill number"
-          value={value.waybillNumber}
-          onChange={(event) => onChange("waybillNumber", event.target.value)}
-          placeholder="e.g. WB-2026-0041"
-        className={whiteInputClassName}
-        />
-        <InputField
-          label="Delivered by"
-          required
-          value={value.deliveredByName}
-          onChange={(event) => onChange("deliveredByName", event.target.value)}
-          error={errors.deliveredByName}
-          placeholder="Full name"
-        className={whiteInputClassName}
+          reloadToken={supplierTick}
         />
         <InputField
           label="Supplier phone"
@@ -247,7 +231,6 @@ function SharedSupplyFields({ value, errors, onChange, onAddSupplier }) {
           value={value.supplierPhone}
           readOnly
           placeholder={value.supplierId ? "—" : "Select a supplier"}
-          error={errors.supplierContact}
           className={readOnlyClassName}
         />
         <InputField
@@ -256,12 +239,47 @@ function SharedSupplyFields({ value, errors, onChange, onAddSupplier }) {
           value={value.supplierEmail}
           readOnly
           placeholder={value.supplierId ? "—" : "Select a supplier"}
-          error={errors.supplierEmail}
           className={readOnlyClassName}
+        />
+        <InputField
+          label="Delivered by (full name)"
+          required
+          value={value.deliveredByName}
+          onChange={(event) => onChange("deliveredByName", event.target.value)}
+          error={errors.deliveredByName}
+          placeholder="Full name"
+        className={whiteInputClassName}
+        />
+        <InputField
+          label="Delivered by (phone)"
+          required
+          type="tel"
+          value={value.deliveredByPhone}
+          onChange={(event) => onChange("deliveredByPhone", event.target.value)}
+          placeholder="e.g. +233 24 000 0000"
+          error={errors.deliveredByPhone}
+          className={whiteInputClassName}
+        />
+        <InputField
+          label="Delivered by (email)"
+          type="email"
+          required
+          value={value.deliveredByEmail}
+          onChange={(event) => onChange("deliveredByEmail", event.target.value)}
+          placeholder="e.g. driver@supplier.com"
+          error={errors.deliveredByEmail}
+          className={whiteInputClassName}
+        />
+        <InputField
+          label="Waybill number"
+          value={value.waybillNumber}
+          onChange={(event) => onChange("waybillNumber", event.target.value)}
+          placeholder="e.g. WB-2026-0041"
+        className={whiteInputClassName}
         />
         <div>
           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Default condition
+            Item condition *
           </label>
           <select
             value={value.condition}
@@ -279,22 +297,12 @@ function SharedSupplyFields({ value, errors, onChange, onAddSupplier }) {
 
 function LocationSelect({ value, onChange, error }) {
   return (
-    <div>
-      <FieldLabel required error={Boolean(error)}>
-        Store location
-      </FieldLabel>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(fieldClassName, "mt-1", error && "border-rose-500 bg-rose-50")}
-      >
-        <option value="">Select store location</option>
-        {getStoreLocationOptions().map((location) => (
-          <option key={location} value={location}>{location}</option>
-        ))}
-      </select>
-      <ErrorText>{error}</ErrorText>
-    </div>
+    <StoreSelect
+      value={value}
+      onChange={onChange}
+      error={error}
+      className="mt-1 bg-white"
+    />
   );
 }
 
@@ -328,7 +336,7 @@ function ReceiveLineFields({ line, errors, onChange }) {
           Total price (GH₵)
         </p>
         <div className={cn(readOnlyClassName, "mt-1")}>
-          {total == null ? "—" : formatAccessoryMoney(total).replace("GH₵ ", "")}
+          {total == null ? "—" : formatInventoryMoney(total).replace("GH₵ ", "")}
         </div>
       </div>
       <LocationSelect
@@ -880,8 +888,13 @@ export default function BulkInventoryReceiptModal({
   const [pendingSave, setPendingSave] = useState(null);
   const [supplyOpen, setSupplyOpen] = useState(true);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
+  const [supplierTick, setSupplierTick] = useState(0);
   const [editor, setEditor] = useState(null);
   const [editorErrors, setEditorErrors] = useState({});
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -895,6 +908,10 @@ export default function BulkInventoryReceiptModal({
     setAddSupplierOpen(false);
     setEditor(null);
     setEditorErrors({});
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+    setOtpSending(false);
   }, [isOpen, inventoryType, forcedMode]);
 
   const lines = mode === "new" ? newLines : existingLines;
@@ -978,26 +995,72 @@ export default function BulkInventoryReceiptModal({
 
   const setSharedField = (key, value) => {
     setShared((current) => ({ ...current, [key]: value }));
+    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(key)) {
+      setOtpSent(false);
+      setOtp("");
+      setOtpVerified(false);
+    }
     setErrors((current) => {
       const nextShared = { ...current.shared };
       delete nextShared[key];
-      if (key === "supplierPhone" || key === "supplierEmail") delete nextShared.supplierContact;
+      if (key === "deliveredByPhone" || key === "deliveredByEmail") {
+        delete nextShared.deliveredByContact;
+      }
       return { ...current, shared: nextShared };
     });
+  };
+
+  const deliveryContactReady =
+    Boolean(shared.deliveredByName.trim())
+    && Boolean(shared.deliveredByPhone.trim())
+    && Boolean(shared.deliveredByEmail.trim());
+
+  const handleSendDeliveryOtp = async () => {
+    if (!shared.deliveredByName.trim()) {
+      toast.warning("Enter the delivery person’s full name first.");
+      return;
+    }
+    if (!shared.deliveredByPhone.trim()) {
+      toast.warning("Enter the delivery person’s phone number to send the OTP.");
+      return;
+    }
+    if (!shared.deliveredByEmail.trim()) {
+      toast.warning("Enter the delivery person’s email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shared.deliveredByEmail.trim())) {
+      toast.warning("Enter a valid delivery email address.");
+      return;
+    }
+    setOtpSending(true);
+    try {
+      await sendDeliveryOtp(shared.deliveredByPhone.trim());
+      setOtp("");
+      setOtpVerified(false);
+      setOtpSent(true);
+      toast.success(
+        `OTP sent to ${shared.deliveredByName.trim()} on ${shared.deliveredByPhone.trim()}.`,
+      );
+    } catch (error) {
+      toast.error(error.message || "Unable to send delivery OTP.");
+    } finally {
+      setOtpSending(false);
+    }
   };
 
   const validate = () => {
     const sharedErrors = {};
     if (!shared.supplierId) sharedErrors.supplierId = "Select a supplier.";
-    if (!shared.deliveredByName.trim()) sharedErrors.deliveredByName = "Enter who delivered the items.";
-    if (!shared.supplierPhone.trim() && !shared.supplierEmail.trim()) {
-      sharedErrors.supplierContact = "Enter a supplier phone number or email.";
+    if (!shared.deliveredByName.trim()) {
+      sharedErrors.deliveredByName = "Enter the delivery person’s full name.";
     }
-    if (
-      shared.supplierEmail.trim()
-      && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shared.supplierEmail.trim())
-    ) {
-      sharedErrors.supplierEmail = "Enter a valid email address.";
+    if (!shared.deliveredByPhone.trim()) {
+      sharedErrors.deliveredByPhone = "Enter the delivery person’s phone number.";
+    }
+    if (!shared.deliveredByEmail.trim()) {
+      sharedErrors.deliveredByEmail = "Enter the delivery person’s email address.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shared.deliveredByEmail.trim())) {
+      sharedErrors.deliveredByEmail = "Enter a valid email address.";
     }
 
     const lineErrors = {};
@@ -1024,6 +1087,10 @@ export default function BulkInventoryReceiptModal({
       toast.warning("Complete the required supply and item fields.");
       return;
     }
+    if (!otpVerified) {
+      toast.warning("Confirm the delivery OTP before receiving stock.");
+      return;
+    }
     setPendingSave({
       mode,
       inventoryType,
@@ -1039,10 +1106,10 @@ export default function BulkInventoryReceiptModal({
     });
   };
 
-  const confirmSave = () => {
+  const confirmSave = async () => {
     if (!pendingSave) return;
     try {
-      onSave?.(pendingSave);
+      await onSave?.(pendingSave);
       setPendingSave(null);
     } catch (error) {
       toast.error(error.message ?? "Could not receive inventory items.");
@@ -1061,19 +1128,20 @@ export default function BulkInventoryReceiptModal({
         flushViewport
         title={
           mode === "existing"
-            ? "Submit registered stock receipts"
+            ? "Receive registered stock"
             : "Add unregistered items"
         }
         subtitle={
           mode === "existing"
-            ? `Search and submit stock receipts for existing ${typeLabel} under one supply. They appear in receivables after approval.`
+            ? `Search and receive stock for existing ${typeLabel} under one supply.`
             : `Create several new ${typeLabel} under one supply.`
         }
         saveLabel={
           mode === "existing"
-            ? `Submit ${lines.length} for approval`
+            ? `Receive ${lines.length} item${lines.length === 1 ? "" : "s"}`
             : `Receive ${lines.length} item${lines.length === 1 ? "" : "s"}`
         }
+        saveDisabled={!otpVerified}
         contentClassName="!p-0 overflow-hidden flex flex-col min-h-0"
       >
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -1093,8 +1161,22 @@ export default function BulkInventoryReceiptModal({
                 errors={errors.shared}
                 onChange={setSharedField}
                 onAddSupplier={() => setAddSupplierOpen(true)}
+                supplierTick={supplierTick}
               />
             </CollapsibleSection>
+            <DeliveryPersonOtpSection
+              deliveredByName={shared.deliveredByName}
+              deliveredByPhone={shared.deliveredByPhone}
+              deliveredByEmail={shared.deliveredByEmail}
+              otpSent={otpSent}
+              otp={otp}
+              otpVerified={otpVerified}
+              onSendOtp={handleSendDeliveryOtp}
+              onOtpChange={setOtp}
+              onVerifiedChange={setOtpVerified}
+              sendDisabled={!deliveryContactReady}
+              sendLoading={otpSending}
+            />
           </div>
 
             <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -1105,7 +1187,7 @@ export default function BulkInventoryReceiptModal({
                   Item details ({lines.length})
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Total quantity {totalQuantity} · {formatAccessoryMoney(totalValue)}
+                  Total quantity {totalQuantity} · {formatInventoryMoney(totalValue)}
                 </p>
               </div>
             </div>
@@ -1164,10 +1246,10 @@ export default function BulkInventoryReceiptModal({
                           <td className={tdClass}>
                             {line.unitCost === ""
                               ? "—"
-                              : formatAccessoryMoney(Number(line.unitCost))}
+                              : formatInventoryMoney(Number(line.unitCost))}
                           </td>
                           <td className={tdClass}>
-                            {total == null ? "—" : formatAccessoryMoney(total)}
+                            {total == null ? "—" : formatInventoryMoney(total)}
                           </td>
                           <td className={cn(tdClass, "max-w-[180px] truncate")}>
                             {line.location || "—"}
@@ -1263,6 +1345,7 @@ export default function BulkInventoryReceiptModal({
         isOpen={addSupplierOpen}
         onClose={() => setAddSupplierOpen(false)}
         onCreated={(created) => {
+          setSupplierTick((tick) => tick + 1);
           setShared((current) => ({
             ...current,
             supplierId: created.id,
@@ -1272,9 +1355,6 @@ export default function BulkInventoryReceiptModal({
           setErrors((current) => {
             const nextShared = { ...current.shared };
             delete nextShared.supplierId;
-            delete nextShared.supplierPhone;
-            delete nextShared.supplierEmail;
-            delete nextShared.supplierContact;
             return { ...current, shared: nextShared };
           });
         }}
@@ -1286,15 +1366,15 @@ export default function BulkInventoryReceiptModal({
         onConfirm={confirmSave}
         title={
           mode === "existing"
-            ? "Submit stock receipts for approval?"
+            ? "Receive stock?"
             : "Receive multiple inventory items?"
         }
         message={
           mode === "existing"
-            ? `Submit ${pendingSave?.lines.length || 0} ${typeLabel} receipt${(pendingSave?.lines.length || 0) === 1 ? "" : "s"} for approval? They will be added to receivables only after approval.`
+            ? `Receive ${pendingSave?.lines.length || 0} ${typeLabel} receipt${(pendingSave?.lines.length || 0) === 1 ? "" : "s"}?`
             : `Receive ${pendingSave?.lines.length || 0} ${typeLabel} with a total quantity of ${pendingSave?.lines.reduce((sum, line) => sum + line.quantity, 0) || 0}?`
         }
-        confirmText={mode === "existing" ? "Submit for approval" : "Confirm receipt"}
+        confirmText="Receive stock"
       />
     </>
   );

@@ -4,7 +4,6 @@ import { getUserContact } from "../org/users";
 import { getReceiverByName } from "./receivers";
 import { getAccessories, getInventoryStockByLocation } from "./accessories";
 import { getStoreLocationOptions } from "../org/stores";
-import { getVehicleParts } from "./vehiclePartsInventory";
 
 export const INTER_STORE_TRANSFER_STATUS_OPTIONS = [
   { value: "ALL", label: "All" },
@@ -19,7 +18,6 @@ export const INTER_STORE_TRANSFER_STATUS_OPTIONS = [
 
 export const INTER_STORE_TRANSFER_KIND_TABS = [
   { id: "accessories", label: "Accessories" },
-  { id: "vehicle_parts", label: "Vehicle Parts" },
 ];
 
 export const INTER_STORE_TRANSFER_ACTOR = "Current user";
@@ -69,7 +67,7 @@ export function mapInventoryLocationToStore(location) {
 
 export function getInterStoreFromStoreOptions() {
   const withStock = new Set();
-  [...getAccessories(), ...getVehicleParts()].forEach((item) => {
+  [...getAccessories()].forEach((item) => {
     getInventoryStockByLocation(item).forEach((row) => {
       if (!row.location || Number(row.quantity) <= 0) return;
       const store = mapInventoryLocationToStore(row.location);
@@ -107,7 +105,6 @@ export function getInterStoreItemsInStore(fromStore) {
 
   return [
     ...collect(getAccessories(), "accessories"),
-    ...collect(getVehicleParts(), "vehicle_parts"),
   ];
 }
 

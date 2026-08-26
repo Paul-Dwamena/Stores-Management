@@ -1,16 +1,16 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import { toast } from "../../../../components/common/ToastNotification";
-import { saveSupplier } from "../../../../mockdata/org/suppliers";
+import { createSupplier } from "../../../../services/suppliersService";
 import CatalogFormModal from "../../../setups/components/CatalogFormModal";
 
-const EMPTY_FORM = { name: "", phone: "", email: "", city: "", status: "Active" };
+const EMPTY_FORM = { name: "", phone: "", email: "", address: "" };
 
 const FIELDS = [
   { key: "name", label: "Supplier name", required: true, placeholder: "Accra Auto Spares Ltd.", span: 2 },
-  { key: "phone", label: "Phone", required: true, placeholder: "030 276 4410" },
-  { key: "email", label: "Email", type: "email", required: true, placeholder: "sales@supplier.gh" },
-  { key: "city", label: "City", placeholder: "Accra", span: 2 },
+  { key: "phone", label: "Phone", placeholder: "030 276 4410" },
+  { key: "email", label: "Email", type: "email", placeholder: "sales@supplier.gh" },
+  { key: "address", label: "Address", placeholder: "Ringway Estates", span: 2 },
 ];
 
 export function AddSupplierButton({ onClick }) {
@@ -27,9 +27,19 @@ export function AddSupplierButton({ onClick }) {
 }
 
 export default function AddSupplierModal({ isOpen, onClose, onCreated }) {
-  const handleSave = (form) => {
+  const handleSave = async (form) => {
+    const email = form.email?.trim() || "";
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.warning("Enter a valid email address.");
+      return;
+    }
     try {
-      const created = saveSupplier({ ...form, status: "Active" });
+      const created = await createSupplier({
+        name: form.name.trim(),
+        phone: form.phone?.trim() || null,
+        email: email || null,
+        address: form.address?.trim() || null,
+      });
       toast.success(`${created.name} added.`);
       onCreated?.(created);
       onClose?.();

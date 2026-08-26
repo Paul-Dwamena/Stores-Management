@@ -1,15 +1,27 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { cn } from "../../../../utils/cn";
-import {
-  PERMISSION_ACTIONS,
-  PERMISSION_ACTION_LABELS,
-  PERMISSION_MODULES,
-} from "../utils/roleConstants";
+import { formatRoleName } from "../../../../services/rolesService";
+import { buildPermissionMatrix } from "../utils/roleHelpers";
 
-function PermissionCheckbox({ checked, onChange, readOnly, label }) {
+function PermissionCheckbox({ checked, onChange, readOnly, label, disabled }) {
+  if (disabled) {
+    return (
+      <div className="flex cursor-not-allowed justify-center py-2" title="Not available">
+        <input
+          type="checkbox"
+          checked={false}
+          disabled
+          readOnly
+          aria-label={label}
+          className="h-4 w-4 cursor-not-allowed rounded border-slate-100 bg-slate-100 text-slate-300 opacity-30"
+        />
+      </div>
+    );
+  }
+
   if (readOnly) {
     return (
-      <div className="flex justify-center py-2">
+      <div className="flex justify-center py-2" title={label}>
         <span
           className={cn(
             "inline-flex h-4 w-4 items-center justify-center rounded border",
@@ -30,7 +42,7 @@ function PermissionCheckbox({ checked, onChange, readOnly, label }) {
   }
 
   return (
-    <label className="flex cursor-pointer justify-center py-2">
+    <label className="flex cursor-pointer justify-center py-2" title={label}>
       <input
         type="checkbox"
         checked={checked}
@@ -43,46 +55,64 @@ function PermissionCheckbox({ checked, onChange, readOnly, label }) {
 }
 
 export default function PermissionMatrixTable({
-  permissions,
-  onPermissionChange,
+  catalog = [],
+  selectedIds = [],
+  onToggle,
   readOnly = false,
 }) {
+  const matrix = useMemo(() => buildPermissionMatrix(catalog), [catalog]);
+  const selected = useMemo(
+    () => new Set(selectedIds.map((id) => Number(id))),
+    [selectedIds],
+  );
+
+  if (!catalog.length) {
+    return (
+      <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-center text-[12px] text-slate-500">
+        No permissions available.
+      </p>
+    );
+  }
+
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200">
-      <table className="w-full min-w-[640px] text-left">
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <table className="w-max min-w-full text-left border-separate border-spacing-0">
         <thead className="bg-slate-50">
           <tr className="border-b border-slate-200">
-            <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <th className="sticky left-0 z-20 bg-slate-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap border-b border-r border-slate-200">
               Permission Name
             </th>
-            {PERMISSION_ACTIONS.map((action) => (
+            {matrix.actions.map((action) => (
               <th
                 key={action}
-                className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap border-b border-slate-200"
               >
-                {PERMISSION_ACTION_LABELS[action]}
+                {formatRoleName(action)}
               </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
-          {PERMISSION_MODULES.map((module) => (
-            <tr key={module.id} className="hover:bg-slate-50/40">
-              <td className="px-4 py-2 text-[12px] font-semibold text-slate-800">
-                {module.label}
+          {matrix.resources.map((resource) => (
+            <tr key={resource} className="group hover:bg-slate-50/40">
+              <td className="sticky left-0 z-20 bg-white px-4 py-2 text-[12px] font-semibold text-slate-800 whitespace-nowrap border-b border-r border-slate-200 group-hover:bg-slate-50">
+                {formatRoleName(resource)}
               </td>
-              {PERMISSION_ACTIONS.map((action) => (
-                <td key={`${module.id}-${action}`} className="px-3 py-1">
-                  <PermissionCheckbox
-                    checked={Boolean(permissions?.[module.id]?.[action])}
-                    readOnly={readOnly}
-                    label={`${module.label} ${PERMISSION_ACTION_LABELS[action]}`}
-                    onChange={(checked) =>
-                      onPermissionChange?.(module.id, action, checked)
-                    }
-                  />
-                </td>
-              ))}
+              {matrix.actions.map((action) => {
+                const permission = matrix.cell[resource]?.[action];
+                const label = `${formatRoleName(action)} - ${formatRoleName(resource)}`;
+                return (
+                  <td key={`${resource}-${action}`} className="relative z-0 px-4 py-1 whitespace-nowrap border-b border-slate-100">
+                    <PermissionCheckbox
+                      checked={Boolean(permission && selected.has(Number(permission.id)))}
+                      readOnly={readOnly}
+                      disabled={!permission}
+                      label={label}
+                      onChange={(checked) => onToggle?.(permission.id, checked)}
+                    />
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

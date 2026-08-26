@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Boxes } from "lucide-react";
 import AddModal from "../../../../components/common/AddModal";
+import SectionLoadState from "../../../../components/common/SectionLoadState";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import Button from "../../../../components/common/base/Button";
 import CheckboxMultiSelect from "../../../../components/common/fields/CheckboxMultiSelect";
 import { ConfiguredCustomFields } from "../../../../components/common/ConfiguredFormSections";
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
@@ -175,7 +177,13 @@ export default function RaiseSupplyRequestModal({
   onClose,
   requisition,
   onSubmit,
+  onReject,
+  storeOptions,
+  loading = false,
+  error = null,
+  onRetry,
 }) {
+  const busy = loading || Boolean(error);
   const [quantityRequested, setQuantityRequested] = useState("");
   const [selectedLocations, setSelectedLocations] = useState([]);
   const [quantitiesByLocation, setQuantitiesByLocation] = useState({});
@@ -184,6 +192,7 @@ export default function RaiseSupplyRequestModal({
   const [errors, setErrors] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
   const { sections, visibleKeys } = useFormTreeSections(
     RAISE_SUPPLY_REQUEST_FORM_SETUP_CHANGED_EVENT,
     getRaiseSupplyRequestFormSetup,
@@ -191,23 +200,35 @@ export default function RaiseSupplyRequestModal({
   );
   const systemKeys = new Set(RAISE_SUPPLY_REQUEST_FORM_FIELD_CATALOG.map((field) => field.key));
 
-  const stockLocations = useMemo(
-    () => getStockLocationsForRequisition(requisition),
-    [requisition],
-  );
+  const stockLocations = useMemo(() => {
+    if (Array.isArray(storeOptions)) {
+      return storeOptions.map((store) => ({
+        location: String(store.id),
+        name: store.name,
+        quantity: store.quantity,
+        storeId: store.id,
+      }));
+    }
+    return getStockLocationsForRequisition(requisition);
+  }, [storeOptions, requisition]);
 
   const locationOptions = useMemo(
     () =>
       stockLocations.map((row) => ({
         value: row.location,
-        label: row.location,
-        description: `Available Stock: ${row.quantity}`,
+        label: row.name || row.location,
+        description:
+          row.quantity == null ? "Store" : `Available Stock: ${row.quantity}`,
       })),
     [stockLocations],
   );
 
   const totalStock = useMemo(
-    () => stockLocations.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0),
+    () =>
+      stockLocations.reduce((sum, row) => {
+        const qty = Number(row.quantity);
+        return Number.isFinite(qty) ? sum + qty : sum;
+      }, 0),
     [stockLocations],
   );
 
@@ -257,6 +278,7 @@ export default function RaiseSupplyRequestModal({
     setCustomValues({});
     setErrors({});
     setConfirmOpen(false);
+    setRejectOpen(false);
     setPendingPayload(null);
   }, [isOpen, requisition]);
 
@@ -296,10 +318,11 @@ export default function RaiseSupplyRequestModal({
     }
     selectedLocations.forEach((location) => {
       const qty = Number(quantitiesByLocation[location]);
-      const stock = getLocationStock(stockLocations, location);
+      const stockRow = stockLocations.find((row) => row.location === location);
+      const stock = stockRow?.quantity;
       if (quantitiesByLocation[location] === "" || Number.isNaN(qty) || qty <= 0) {
         nextErrors[`qty-${location}`] = "Enter a quantity for this store.";
-      } else if (qty > stock) {
+      } else if (stock != null && qty > Number(stock)) {
         nextErrors[`qty-${location}`] = `Cannot exceed stock (${stock}).`;
       }
     });
@@ -312,10 +335,14 @@ export default function RaiseSupplyRequestModal({
       return;
     }
 
-    const storeAllocations = selectedLocations.map((location) => ({
-      location,
-      quantity: Number(quantitiesByLocation[location]),
-    }));
+    const storeAllocations = selectedLocations.map((location) => {
+      const stockRow = stockLocations.find((row) => row.location === location);
+      return {
+        location: stockRow?.name || location,
+        storeId: stockRow?.storeId ?? Number(location),
+        quantity: Number(quantitiesByLocation[location]),
+      };
+    });
     const nextRequested = requested || allocated;
     setPendingPayload({
       quantityRequested: nextRequested,
@@ -337,7 +364,7 @@ export default function RaiseSupplyRequestModal({
   return (
     <>
       <AddModal
-        isOpen={isOpen && !confirmOpen}
+        isOpen={isOpen && !confirmOpen && !rejectOpen}
         onClose={onClose}
         onSave={handleSubmit}
         title="Raise supply request"
@@ -348,7 +375,24 @@ export default function RaiseSupplyRequestModal({
         }
         dialogClassName="max-w-2xl"
         saveLabel="Submit supply request"
+        saveDisabled={busy}
+        hideCancelButton
+        secondaryAction={{ label: "Cancel", onClick: onClose }}
+        footerActions={
+          busy || !onReject ? null : (
+            <Button variant="danger" size="modal" onClick={() => setRejectOpen(true)}>
+              Reject
+            </Button>
+          )
+        }
       >
+        <SectionLoadState
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          loadingLabel="Loading request…"
+          errorTitle="Couldn’t load this request"
+        >
         <div className="space-y-4">
           <RequisitionRequestSummary requisition={requisition} />
 
@@ -458,12 +502,15 @@ export default function RaiseSupplyRequestModal({
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {selectedLocations.map((location) => {
-                          const stock = getLocationStock(stockLocations, location);
+                          const stockRow = stockLocations.find((row) => row.location === location);
+                          const stock = stockRow?.quantity;
                           return (
                             <tr key={location}>
-                              <td className="px-3 py-2 text-[12px] text-slate-800">{location}</td>
+                              <td className="px-3 py-2 text-[12px] text-slate-800">
+                                {stockRow?.name || location}
+                              </td>
                               <td className="px-3 py-2 text-[12px] font-semibold text-slate-700 whitespace-nowrap">
-                                {stock}
+                                {stock == null ? "—" : stock}
                               </td>
                               <td className="px-3 py-2 w-36">
                                 <input
@@ -529,6 +576,7 @@ export default function RaiseSupplyRequestModal({
             idPrefix="rsq"
           />
         </div>
+        </SectionLoadState>
       </AddModal>
 
       <ConfirmationModal
@@ -546,6 +594,24 @@ export default function RaiseSupplyRequestModal({
             : "Submit this supply request for approval?"
         }
         confirmText="Submit supply request"
+      />
+
+      <ConfirmationModal
+        isOpen={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        onConfirm={() => {
+          setRejectOpen(false);
+          onReject?.();
+        }}
+        className="!z-[10001]"
+        title="Reject request?"
+        message={
+          requisition?.requestNumber
+            ? `${requisition.requestNumber} will be rejected and removed from Supplies.`
+            : "This request will be rejected and removed from Supplies."
+        }
+        confirmText="Reject"
+        isDanger
       />
     </>
   );

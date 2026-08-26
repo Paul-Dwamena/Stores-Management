@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import Button from "../../../components/common/base/Button";
 import SearchInput from "../../../components/common/fields/SearchInput";
 import Pagination from "../../../components/common/Pagination";
+import SectionLoadState from "../../../components/common/SectionLoadState";
 import { TableIconAction, TableRowActions } from "../../../components/common/tableActions";
 import { cn } from "../../../utils/cn";
 
@@ -31,6 +32,9 @@ export default function CatalogTable({
   addLabel,
   onAdd,
   renderActions,
+  loading = false,
+  error = null,
+  onRetry,
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -46,6 +50,8 @@ export default function CatalogTable({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const paged = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const colSpan = columns.length + (renderActions ? 1 : 0);
+  const showBodyState = loading || Boolean(error);
 
   return (
     <div className="card overflow-hidden">
@@ -85,10 +91,22 @@ export default function CatalogTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {paged.length === 0 ? (
+            {showBodyState ? (
+              <tr>
+                <td colSpan={colSpan} className="px-4 py-2">
+                  <SectionLoadState
+                    loading={loading}
+                    error={error}
+                    onRetry={onRetry}
+                    loadingLabel="Loading…"
+                    errorTitle="Couldn’t load this table"
+                  />
+                </td>
+              </tr>
+            ) : paged.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length + (renderActions ? 1 : 0)}
+                  colSpan={colSpan}
                   className="px-6 py-12 text-center text-[13px] text-slate-400"
                 >
                   {emptyLabel}
@@ -113,15 +131,17 @@ export default function CatalogTable({
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-100">
-        <Pagination
-          page={safePage}
-          size={PAGE_SIZE}
-          totalElements={filtered.length}
-          onPageChange={setPage}
-          showWhenEmpty={false}
-        />
-      </div>
+      {!showBodyState ? (
+        <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-100">
+          <Pagination
+            page={safePage}
+            size={PAGE_SIZE}
+            totalElements={filtered.length}
+            onPageChange={setPage}
+            showWhenEmpty={false}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

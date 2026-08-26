@@ -1,92 +1,214 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "../../components/common/ToastNotification";
-import ConfirmationModal from "../../components/common/ConfirmationModal";
 import { TableViewAction } from "../../components/common/tableActions";
-import { getStores, saveStore, setStoreStatus } from "../../mockdata/org/stores";
-import { getStoreManagers, getUsers } from "../../mockdata/org/users";
+import { listStores, getStore, createStore, updateStore, formatStoreManagerName } from "../../services/storesService";
+import { listUsers } from "../../services/usersService";
+import { listRoles } from "../../services/rolesService";
+import { formatApiDateTime, sortNewestFirst } from "../../utils/apiResponseHelpers";
 import CatalogTable, { StatusBadge } from "./components/CatalogTable";
 import CatalogDetailModal from "./components/CatalogDetailModal";
 import CatalogFormModal from "./components/CatalogFormModal";
 
 const EMPTY_FORM = {
   name: "",
+  code: "",
+  address: "",
   city: "",
-  area: "",
-  phone: "",
-  managerId: "",
-  status: "Active",
+  region: "",
+  manager_id: "",
+  is_active: true,
 };
 
-function resolveManagerId(store) {
-  if (!store) return "";
-  if (store.managerId) return store.managerId;
-  return getUsers().find((user) => user.name === store.manager)?.id || "";
-}
-
-function storeManagerOptions(editing) {
-  const options = getStoreManagers().map((user) => ({
-    value: user.id,
-    label: user.name,
-  }));
-  if (!editing) return options;
-  const alreadyListed = options.some(
-    (option) => option.value === editing.managerId || option.label === editing.manager,
-  );
-  if (alreadyListed) return options;
-  const match = getUsers().find(
-    (user) => user.id === editing.managerId || user.name === editing.manager,
-  );
-  if (match) return [{ value: match.id, label: match.name }, ...options];
-  if (editing.manager) {
-    return [{ value: editing.managerId || editing.manager, label: editing.manager }, ...options];
-  }
-  return options;
-}
+const isStoreManagerRole = (role) =>
+  String(role?.name || "").toUpperCase() === "STORE_MANAGER";
 
 export default function StoreManagementList() {
-  const [rows, setRows] = useState(() => getStores());
+  const [rows, setRows] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [storeManagerRoleId, setStoreManagerRoleId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
-  const [statusTarget, setStatusTarget] = useState(null);
+  const [tableLoading, setTableLoading] = useState(true);
+  const [tableError, setTableError] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
 
-  const reload = () => setRows(getStores());
+  const roleLabel = (roleId) =>
+    roles.find((role) => Number(role.id) === Number(roleId))?.label || "—";
+
+  const storeManagers = useMemo(() => {
+    const managers = users.filter(
+      (user) =>
+        user.isActive !== false
+        && storeManagerRoleId != null
+        && Number(user.roleId) === Number(storeManagerRoleId),
+    );
+    // Keep a currently assigned manager visible even if role filter would hide them.
+    const assignedId = editing?.manager?.id ?? viewing?.manager?.id;
+    if (assignedId != null && !managers.some((user) => user.id === assignedId)) {
+      const assigned = users.find((user) => user.id === assignedId);
+      if (assigned) return [...managers, assigned];
+    }
+    return managers;
+  }, [users, storeManagerRoleId, editing, viewing]);
+
+  const storeManagerOptions = useMemo(
+    () =>
+      storeManagers.map((user) => ({
+        value: String(user.id),
+        label: user.name,
+        description: roleLabel(user.roleId),
+      })),
+    [storeManagers, roles],
+  );
+
+  const reload = async () => {
+    setTableLoading(true);
+    setTableError(null);
+    try {
+      setRows(sortNewestFirst(await listStores()));
+    } catch (err) {
+      setTableError(err.message || "Unable to load stores.");
+    } finally {
+      setTableLoading(false);
+    }
+    try {
+      const [userRows, roleRows] = await Promise.all([listUsers(), listRoles()]);
+      setUsers(userRows);
+      setRoles(roleRows);
+      setStoreManagerRoleId(roleRows.find(isStoreManagerRole)?.id ?? null);
+    } catch {
+      /* manager options are optional for the list view */
+    }
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const openAdd = () => {
+    setEditing(null);
+    setEditTarget(null);
+    setFormError(null);
+    setModalOpen(true);
+  };
+
+  const openView = async (row) => {
+    setViewing(row);
+    setViewLoading(true);
+    setViewError(null);
+    try {
+      setViewing(await getStore(row.id));
+    } catch (err) {
+      setViewError(err.message || "Unable to load store.");
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const openEdit = async (row) => {
+    setEditTarget(row);
+    setEditing(row);
+    setFormLoading(true);
+    setFormError(null);
+    setModalOpen(true);
+    try {
+      setEditing(await getStore(row.id));
+    } catch (err) {
+      setFormError(err.message || "Unable to load store.");
+    } finally {
+      setFormLoading(false);
+    }
+  };
 
   const fields = useMemo(
     () => [
       { key: "name", label: "Store name", required: true, placeholder: "Accra Central Store", span: 2 },
-      { key: "city", label: "City", required: true, placeholder: "Accra" },
-      { key: "area", label: "Area", required: true, placeholder: "Ringway Estates" },
-      { key: "phone", label: "Phone", placeholder: "030 222 1100" },
       {
-        key: "managerId",
-        label: "Store manager",
+        key: "code",
+        label: "Code",
+        placeholder: "ACS",
+        hidden: () => !editing,
+      },
+      { key: "address", label: "Address", placeholder: "Ringway Estates" },
+      { key: "city", label: "City", placeholder: "Accra" },
+      { key: "region", label: "Region", placeholder: "Greater Accra" },
+      {
+        key: "manager_id",
+        label: "Store manager (Optional)",
         type: "search-select",
-        placeholder: "Search store managers…",
-        options: storeManagerOptions(editing),
+        placeholder: storeManagerOptions.length
+          ? "Search store managers…"
+          : "No store managers available",
+        options: storeManagerOptions,
       },
       {
-        key: "status",
+        key: "is_active",
         label: "Active",
         type: "toggle",
         span: 2,
-        activeValue: "Active",
-        inactiveValue: "Inactive",
+        activeValue: true,
+        inactiveValue: false,
         description: "Inactive stores are hidden from inventory, supplies, and transfers.",
       },
     ],
-    [editing, modalOpen],
+    [storeManagerOptions, editing],
   );
 
-  const handleSave = (form) => {
+  const handleSave = async (form) => {
+    const payload = {
+      name: (form.name || "").trim(),
+      address: (form.address || "").trim() || null,
+      city: (form.city || "").trim() || null,
+      region: (form.region || "").trim() || null,
+      manager_id: form.manager_id ? Number(form.manager_id) : null,
+      is_active: form.is_active !== false,
+    };
+
+    if (editing) {
+      try {
+        const saved = await updateStore(editing.id, payload);
+        toast.success("Store updated.");
+        setModalOpen(false);
+        if (viewing?.id === saved.id) setViewing(saved);
+        reload();
+      } catch (error) {
+        toast.error(error.message || "Could not save store.");
+      }
+      return;
+    }
+
     try {
-      const saved = saveStore(form, { id: editing?.id });
-      toast.success(editing ? "Store updated." : "Store added.");
+      await createStore(payload);
+      toast.success("Store added.");
       setModalOpen(false);
-      if (saved?.id && viewing?.id === saved.id) setViewing(saved);
       reload();
     } catch (error) {
       toast.error(error.message || "Could not save store.");
+    }
+  };
+
+  const toggleStoreStatus = async () => {
+    if (!viewing) return;
+    try {
+      const saved = await updateStore(viewing.id, {
+        name: viewing.name,
+        address: viewing.address || null,
+        city: viewing.city || null,
+        region: viewing.region || null,
+        manager_id: viewing.manager?.id ?? null,
+        is_active: !viewing.isActive,
+      });
+      toast.success(saved.isActive ? "Store activated." : "Store deactivated.");
+      setViewing(saved);
+      reload();
+    } catch (err) {
+      toast.error(err.message || "Unable to update store status.");
     }
   };
 
@@ -94,99 +216,98 @@ export default function StoreManagementList() {
     <>
       <CatalogTable
         rows={rows}
-        searchKeys={["code", "name", "area", "city", "manager", "label"]}
+        searchKeys={["name", "address", "city", "region", "code", "managerName"]}
         searchPlaceholder="Search stores..."
         emptyLabel="No stores yet."
         addLabel="Add store"
-        onAdd={() => {
-          setEditing(null);
-          setModalOpen(true);
-        }}
+        onAdd={openAdd}
+        loading={tableLoading}
+        error={tableError}
+        onRetry={reload}
         columns={[
-          {
-            key: "code",
-            label: "Code",
-            render: (row) => <span className="font-mono font-bold text-slate-800">{row.code}</span>,
-          },
+          { key: "code", label: "Code", render: (row) => row.code || "—" },
           {
             key: "name",
             label: "Store",
             render: (row) => (
               <div>
                 <p className="font-semibold text-slate-900">{row.name}</p>
-                <p className="text-[11px] text-slate-400">{row.area}</p>
+                <p className="text-[11px] text-slate-400">{row.address || "—"}</p>
               </div>
             ),
           },
           { key: "city", label: "City" },
-          { key: "manager", label: "Manager" },
-          { key: "phone", label: "Phone" },
+          { key: "region", label: "Region" },
+          {
+            key: "manager",
+            label: "Store manager",
+            render: (row) => formatStoreManagerName(row.manager),
+          },
+          { key: "createdAt", label: "Date created", render: (row) => formatApiDateTime(row.createdAt) },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
         ]}
         renderActions={(row) => (
-          <TableViewAction title="View store" onClick={() => setViewing(row)} />
+          <TableViewAction title="View store" onClick={() => openView(row)} />
         )}
       />
 
       <CatalogDetailModal
-        isOpen={Boolean(viewing) && !modalOpen && !statusTarget}
-        onClose={() => setViewing(null)}
+        isOpen={Boolean(viewing) && !modalOpen}
+        onClose={() => {
+          setViewing(null);
+          setViewError(null);
+        }}
         title="Store details"
         subtitle="Store locations used in inventory, supplies, and transfers."
         status={viewing?.status}
-        identifier={viewing?.code}
+        identifier={viewing?.name}
         fields={[
-          { label: "Code", value: viewing?.code },
           { label: "Store", value: viewing?.name },
-          { label: "Area", value: viewing?.area },
+          { label: "Code", value: viewing?.code },
+          { label: "Address", value: viewing?.address || "—" },
           { label: "City", value: viewing?.city },
-          { label: "Phone", value: viewing?.phone },
-          { label: "Manager", value: viewing?.manager },
+          { label: "Region", value: viewing?.region || "—" },
+          { label: "Store manager", value: formatStoreManagerName(viewing?.manager) },
+          { label: "Date created", value: formatApiDateTime(viewing?.createdAt) },
           { label: "Status", value: viewing?.status },
         ]}
         editLabel="Edit store"
-        onEdit={() => {
-          setEditing(viewing);
-          setModalOpen(true);
-        }}
-        onToggleStatus={() => setStatusTarget(viewing)}
+        onEdit={() => openEdit(viewing)}
+        onToggleStatus={toggleStoreStatus}
+        loading={viewLoading}
+        error={viewError}
+        onRetry={() => viewing && openView(viewing)}
       />
 
       <CatalogFormModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setFormError(null);
+          setEditTarget(null);
+        }}
         onSave={handleSave}
         title={editing ? "Edit store" : "Add store"}
         subtitle="Stores added here appear in inventory, supplies, and inter-store transfers."
         saveLabel={editing ? "Save changes" : "Add store"}
         fields={fields}
+        dialogClassName="max-w-2xl"
+        loading={formLoading}
+        error={formError}
+        onRetry={() => editTarget && openEdit(editTarget)}
         initialValues={
           editing
-            ? { ...EMPTY_FORM, ...editing, managerId: resolveManagerId(editing) }
+            ? {
+                ...EMPTY_FORM,
+                ...editing,
+                address: editing.address || "",
+                city: editing.city || "",
+                region: editing.region || "",
+                manager_id: editing.manager?.id != null ? String(editing.manager.id) : "",
+                is_active: editing.isActive !== false,
+              }
             : EMPTY_FORM
         }
-      />
-
-      <ConfirmationModal
-        isOpen={Boolean(statusTarget)}
-        onClose={() => setStatusTarget(null)}
-        onConfirm={() => {
-          if (!statusTarget) return;
-          const next = statusTarget.status === "Active" ? "Inactive" : "Active";
-          const updated = setStoreStatus(statusTarget.id, next);
-          toast.success(`${statusTarget.name} is now ${next.toLowerCase()}.`);
-          setStatusTarget(null);
-          if (updated) setViewing(updated);
-          reload();
-        }}
-        title={statusTarget?.status === "Active" ? "Deactivate store?" : "Activate store?"}
-        message={
-          statusTarget
-            ? `Inactive stores are hidden from inventory and transfer dropdowns.`
-            : ""
-        }
-        confirmText={statusTarget?.status === "Active" ? "Deactivate" : "Activate"}
-        isDanger={statusTarget?.status === "Active"}
       />
     </>
   );

@@ -27,9 +27,8 @@ export const ACCESSORY_REQUISITION_FORM_FIELD_CATALOG = [
     placeholder: "",
     options: [
       { value: "accessories", label: "Accessories" },
-      { value: "vehicle_parts", label: "Vehicle parts" },
     ],
-    description: "First-step choice: accessories or vehicle parts.",
+    description: "First-step choice for requisition category.",
   },
   {
     id: "arq_quantityMode",
@@ -76,14 +75,14 @@ export const ACCESSORY_REQUISITION_FORM_FIELD_CATALOG = [
   {
     id: "arq_justification",
     key: "justification",
-    title: "Justification",
+    title: "Reason",
     fieldType: "textarea",
     sectionId: "main_form",
     required: true,
     isDefaultLocked: true,
     isActive: true,
     colSpan: 2,
-    placeholder: "Why this item is needed",
+    placeholder: "Why these items are needed",
   },
 ];
 

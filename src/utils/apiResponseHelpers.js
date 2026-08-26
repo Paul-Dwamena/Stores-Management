@@ -44,6 +44,14 @@ export function formatApiDateTime(value) {
   });
 }
 
+export function sortNewestFirst(rows, key = "createdAt") {
+  return [...rows].sort((a, b) => {
+    const aTime = a?.[key] ? new Date(a[key]).getTime() : 0;
+    const bTime = b?.[key] ? new Date(b[key]).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
 /** Human-readable labels for API codes — e.g. DAILY_POST_TRIP → "Daily Post Trip" */
 export function formatStatusLabel(status) {
   if (status == null || status === "") return "—";
@@ -85,6 +93,9 @@ export function formatStatusLabel(status) {
     COMPLETION_CERTIFICATE: "Completion Certificate",
     PAYMENT_PENDING: "Payment Pending",
     PENDING_APPROVAL: "Pending Approval",
+    PENDING_SUPPLY_REQUEST: "Pending Supply Request",
+    PENDING_SUPPLY_APPROVAL: "Pending Supply Approval",
+    PENDING_ISSUANCE: "Pending Issuance",
     READY_FOR_INSPECTION: "Ready for Inspection",
     INSPECTION_COMPLETE: "Inspection Complete",
     NOT_STARTED: "Not Started",
@@ -248,7 +259,7 @@ export function resolveVehicleLabel(vehicleId, vehicleMap = {}, fallback = {}) {
   return name ?? plate ?? "Unknown vehicle";
 }
 
-/** 401/403 — stay on page; no error banners or forced logout */
+/** 401/403 — skip extra toasts; expired sessions are cleared in the API interceptor */
 export function isSilentApiError(err) {
   if (!err) return false;
   if (err.suppressUi) return true;
@@ -256,8 +267,29 @@ export function isSilentApiError(err) {
   return status === 401 || status === 403;
 }
 
+/** Pull human-readable message from axios/API errors (FastAPI `detail` or `message`) */
+export function extractApiErrorDetail(err, fallback = "Something went wrong. Please try again.") {
+  const detail = err?.response?.data?.detail ?? err?.response?.data?.message;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length) {
+    const parts = detail
+      .map((item) => {
+        const msg = typeof item === "string" ? item : item?.msg;
+        if (!msg) return null;
+        const loc = Array.isArray(item?.loc) ? item.loc.join(" ") : "";
+        if (loc.includes("password") && msg.startsWith("String should")) {
+          return msg.replace("String should", "Password should");
+        }
+        return msg;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(", ");
+  }
+  return err?.message ?? fallback;
+}
+
 /** Pull human-readable message from axios/API errors */
 export function extractApiError(err, fallback = "Something went wrong. Please try again.") {
   if (isSilentApiError(err)) return null;
-  return err?.response?.data?.message ?? err?.message ?? fallback;
+  return extractApiErrorDetail(err, fallback);
 }

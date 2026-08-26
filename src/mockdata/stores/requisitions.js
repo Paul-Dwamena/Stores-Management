@@ -17,7 +17,6 @@ export const REQUISITION_STATUS_OPTIONS = [
 
 export const REQUISITION_KIND_TABS = [
   { id: "accessories", label: "Accessories" },
-  { id: "vehicle_parts", label: "Vehicle Parts" },
 ];
 
 export const PENDING_REQUISITION_STATUSES = [

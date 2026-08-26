@@ -25,13 +25,13 @@ export default function CollapsibleFormSection({
         <ChevronDown
           size={14}
           className={cn(
-            "text-emerald-600 shrink-0 transition-transform duration-200",
+            "text-primary shrink-0 transition-transform duration-200",
             !open && "-rotate-90",
           )}
         />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
-            <span className="block text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+            <span className="block text-[10px] font-bold text-primary uppercase tracking-wider">
               {title}
             </span>
             {errorCount > 0 ? (

@@ -22,7 +22,7 @@ import RejectRequisitionModal from "./RejectRequisitionModal";
 import AddReceiverModal from "./AddReceiverModal";
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 function itemLabel(row) {
   return (
@@ -49,9 +49,9 @@ function RowCheckbox({ checked, indeterminate = false, onChange, label, disabled
         className={cn(
           "flex size-4 items-center justify-center rounded border transition-colors",
           checked
-            ? "border-emerald-500 bg-emerald-500 text-white"
+            ? "border-slate-900 bg-slate-900 text-white"
             : indeterminate
-              ? "border-emerald-500 bg-emerald-500 text-white"
+              ? "border-slate-900 bg-slate-900 text-white"
               : "border-slate-300 bg-white text-transparent",
         )}
       >
@@ -408,7 +408,7 @@ export default function BatchIssueItemActionModal({
                       <tr
                         key={row.id}
                         className={cn(
-                          isChecked && "bg-emerald-50/40",
+                          isChecked && "bg-slate-50",
                           !canIssue && "bg-slate-50/60 text-slate-400",
                         )}
                       >

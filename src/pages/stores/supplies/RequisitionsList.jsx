@@ -50,7 +50,7 @@ const filterLabelClassName =
   "text-[11px] font-medium text-slate-500 tracking-wider shrink-0";
 
 const filterSelectClassName =
-  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-500";
+  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 function statusBadgeClass(status) {
   switch (status) {
@@ -61,7 +61,7 @@ function statusBadgeClass(status) {
     case "PENDING_ISSUANCE":
       return "bg-violet-50 text-violet-700 border-violet-200";
     case "SUPPLIED":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      return "bg-success-muted text-success border-[#b7d4c8]";
     case "PARTIAL_SUPPLIED":
       return "bg-sky-50 text-sky-700 border-sky-200";
     case "REJECTED":
@@ -665,7 +665,7 @@ export default function RequisitionsList({
                       checked={allPagedSelected}
                       onChange={toggleSelectAllPaged}
                       aria-label="Select all on page"
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      className="rounded border-slate-300 text-primary focus:ring-slate-900/25"
                     />
                   </th>
                 )}
@@ -775,7 +775,7 @@ export default function RequisitionsList({
                             onChange={() => toggleRowSelected(row.id)}
                             disabled={showIssueSelection && !isRequisitionIssuable(row)}
                             aria-label={`Select ${row.requestNumber || row.itemCode}`}
-                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-40"
+                            className="rounded border-slate-300 text-primary focus:ring-slate-900/25 disabled:opacity-40"
                           />
                         </td>
                       )}

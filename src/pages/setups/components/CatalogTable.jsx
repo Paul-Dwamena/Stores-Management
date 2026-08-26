@@ -15,7 +15,7 @@ export function StatusBadge({ status }) {
     <span
       className={cn(
         "inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border",
-        active ? "bg-brand-muted text-brand border-brand/20" : "bg-slate-50 text-slate-500 border-slate-200",
+        active ? "bg-success-muted text-success border-[#b7d4c8]" : "bg-slate-50 text-slate-500 border-slate-200",
       )}
     >
       {status || "—"}

@@ -56,8 +56,8 @@ export const GlobalToastProvider = () => {
 const TYPE_STYLES = {
   success: {
     icon: FiCheckCircle,
-    iconWrap: "bg-brand-muted text-brand",
-    bar: "bg-brand",
+    iconWrap: "bg-success-muted text-success",
+    bar: "bg-success",
   },
   error: {
     icon: FiXCircle,

@@ -8,40 +8,40 @@ import { cn } from "../../utils/cn";
  * detail-page cards (pastel fills, dark text).
  */
 const TONES = {
-  teal: "bg-teal-600 hover:bg-teal-700",
-  emerald: "bg-emerald-700 hover:bg-emerald-800",
-  navy: "bg-slate-900 hover:bg-slate-950",
-  violet: "bg-indigo-700 hover:bg-indigo-800",
+  teal: "bg-success hover:bg-[#184338]",
+  emerald: "bg-success hover:bg-[#184338]",
+  navy: "bg-slate-900 hover:bg-black",
+  violet: "bg-slate-800 hover:bg-slate-900",
   rose: "bg-rose-700 hover:bg-rose-800",
   slate: "bg-slate-600 hover:bg-slate-700",
   amber: "bg-amber-600 hover:bg-amber-700",
   orange: "bg-orange-600 hover:bg-orange-700",
   sky: "bg-sky-700 hover:bg-sky-800",
   indigo: "bg-indigo-800 hover:bg-indigo-900",
-  forest: "bg-teal-800 hover:bg-teal-900",
-  mint: "bg-teal-500 hover:bg-teal-600",
-  moss: "bg-[#3f6212] hover:bg-[#365314]",
+  forest: "bg-[#184338] hover:bg-[#123028]",
+  mint: "bg-success-accent hover:bg-success",
+  moss: "bg-slate-700 hover:bg-slate-800",
   pine: "bg-slate-800 hover:bg-slate-900",
-  sage: "bg-[#4d7c5a] hover:bg-[#3f664a]",
+  sage: "bg-success hover:bg-[#184338]",
 };
 
 /** Lighter versions of the filled KPI tones (tab-level cards). */
 const LIGHT_TONES = {
   sky: { bg: "#EFF6FF", title: "text-sky-800/70", value: "text-sky-950", icon: "text-sky-600/45" },
-  teal: { bg: "#F0FDF4", title: "text-emerald-800/70", value: "text-emerald-950", icon: "text-emerald-600/45" },
-  emerald: { bg: "#F0FDF4", title: "text-emerald-800/70", value: "text-emerald-950", icon: "text-emerald-600/45" },
-  mint: { bg: "#F0FDF4", title: "text-emerald-800/70", value: "text-emerald-950", icon: "text-emerald-600/45" },
-  forest: { bg: "#F0FDF4", title: "text-emerald-800/70", value: "text-emerald-950", icon: "text-emerald-600/45" },
-  sage: { bg: "#F0FDF4", title: "text-emerald-800/70", value: "text-emerald-950", icon: "text-emerald-600/45" },
-  moss: { bg: "#F0FDF4", title: "text-emerald-800/70", value: "text-emerald-950", icon: "text-emerald-600/45" },
+  teal: { bg: "#e8f2ee", title: "text-success/70", value: "text-success", icon: "text-success/45" },
+  emerald: { bg: "#e8f2ee", title: "text-success/70", value: "text-success", icon: "text-success/45" },
+  mint: { bg: "#e8f2ee", title: "text-success/70", value: "text-success", icon: "text-success/45" },
+  forest: { bg: "#e8f2ee", title: "text-success/70", value: "text-success", icon: "text-success/45" },
+  sage: { bg: "#e8f2ee", title: "text-success/70", value: "text-success", icon: "text-success/45" },
+  moss: { bg: "#F5F5F5", title: "text-slate-600", value: "text-slate-900", icon: "text-slate-400" },
   indigo: { bg: "#EEF2FF", title: "text-indigo-800/70", value: "text-indigo-950", icon: "text-indigo-600/45" },
   violet: { bg: "#F5F3FF", title: "text-violet-800/70", value: "text-violet-950", icon: "text-violet-600/45" },
   amber: { bg: "#FFFBEB", title: "text-amber-800/70", value: "text-amber-950", icon: "text-amber-600/45" },
   orange: { bg: "#FFF7ED", title: "text-orange-800/70", value: "text-orange-950", icon: "text-orange-600/45" },
   rose: { bg: "#FEF2F2", title: "text-rose-800/70", value: "text-rose-950", icon: "text-rose-600/45" },
-  slate: { bg: "#F1F5F9", title: "text-slate-600", value: "text-slate-900", icon: "text-slate-400" },
+  slate: { bg: "#F5F5F5", title: "text-slate-600", value: "text-slate-900", icon: "text-slate-400" },
   navy: { bg: "#F5F5F5", title: "text-neutral-600", value: "text-neutral-900", icon: "text-neutral-400" },
-  pine: { bg: "#F3F4F6", title: "text-slate-600", value: "text-slate-900", icon: "text-slate-400" },
+  pine: { bg: "#F5F5F5", title: "text-slate-600", value: "text-slate-900", icon: "text-slate-400" },
 };
 
 export default function SummaryStatCard({

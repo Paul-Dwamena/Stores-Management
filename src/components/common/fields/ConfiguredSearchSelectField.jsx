@@ -8,7 +8,7 @@ import { resolveSearchSelectChoices } from "../../../mockdata/setups/searchSelec
 import { resolveDropdownOptionChoices } from "../../../mockdata/setups/dropdownOptionChoices";
 
 const inputClassName =
-  "w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 focus:bg-white text-slate-700 placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed";
+  "w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 focus:bg-white text-slate-700 placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed";
 
 const MENU_MAX_HEIGHT = 208;
 const MENU_GAP = 4;
@@ -209,8 +209,8 @@ export default function ConfiguredSearchSelectField({
                           setOpen(false);
                         }}
                         className={cn(
-                          "flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left hover:bg-emerald-50",
-                          isSelected ? "bg-emerald-50 text-emerald-800" : "text-slate-800",
+                          "flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50",
+                          isSelected ? "bg-slate-50 text-primary" : "text-slate-800",
                         )}
                       >
                         <span className="min-w-0 truncate text-[12px] font-medium">
@@ -220,7 +220,7 @@ export default function ConfiguredSearchSelectField({
                           <span
                             className={cn(
                               "shrink-0 text-[11px] font-medium",
-                              isSelected ? "text-emerald-700/80" : "text-slate-400",
+                              isSelected ? "text-primary/70" : "text-slate-400",
                             )}
                           >
                             {option.description}

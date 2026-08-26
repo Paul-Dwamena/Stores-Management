@@ -22,13 +22,13 @@ import EmployeeSearchSelect from "./EmployeeSearchSelect";
 const SYSTEM_KEYS = new Set(LEAVE_REQUEST_FORM_FIELD_CATALOG.map((field) => field.key));
 
 const selectFieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 const readOnlyValueClassName =
   "w-full rounded-lg border border-slate-200 bg-slate-200/35 px-3 py-2 text-[12px] text-slate-600 cursor-default transition-colors hover:cursor-not-allowed hover:bg-slate-200/55";
 
 const textareaClassName =
-  "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-emerald-500";
+  "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 function AutoField({ label, value, hint, spanClass }) {
   return (

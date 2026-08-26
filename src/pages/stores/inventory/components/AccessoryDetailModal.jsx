@@ -1,4 +1,4 @@
-ï»¿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import { ChevronDown, Plus, X } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
@@ -20,7 +20,7 @@ function StatusPill({ status }) {
   const raw = (status ?? "").toString().toUpperCase();
   const tone =
     raw === "IN_STOCK" || raw === "ACTIVE"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      ? "bg-success-muted text-success border-[#b7d4c8]"
       : raw === "LOW_STOCK"
         ? "bg-amber-50 text-amber-700 border-amber-200"
         : raw === "OUT_OF_STOCK"
@@ -46,7 +46,7 @@ function DetailRow({ label, children }) {
 }
 
 function formatCondition(value) {
-  if (!value) return "â€”";
+  if (!value) return "—";
   return value
     .toString()
     .toLowerCase()
@@ -55,7 +55,7 @@ function formatCondition(value) {
 }
 
 function cellValue(value) {
-  if (value == null || value === "") return "â€”";
+  if (value == null || value === "") return "—";
   return value;
 }
 
@@ -92,8 +92,8 @@ function MiniTable({
   loading = false,
   error = null,
   onRetry,
-  loadingLabel = "Loadingâ€¦",
-  errorTitle = "Couldnâ€™t load this table",
+  loadingLabel = "Loading…",
+  errorTitle = "Couldn’t load this table",
 }) {
   const tableMinWidth = Math.max(
     960,
@@ -185,7 +185,7 @@ const RECEIPT_COLUMNS = [
     minWidth: 180,
     wrap: true,
     render: (row) => {
-      if (!row.supplierName) return "â€”";
+      if (!row.supplierName) return "—";
       return (
         <div>
           <div className="font-medium text-slate-800">{row.supplierName}</div>
@@ -202,7 +202,7 @@ const RECEIPT_COLUMNS = [
     minWidth: 160,
     wrap: true,
     render: (row) => {
-      if (!row.storeName && !row.storeCode) return "â€”";
+      if (!row.storeName && !row.storeCode) return "—";
       if (row.storeName && row.storeCode) {
         return `${row.storeName} (${row.storeCode})`;
       }
@@ -215,10 +215,10 @@ const RECEIPT_COLUMNS = [
     minWidth: 150,
     wrap: true,
     render: (row) => {
-      if (!row.deliveredByName && !row.deliveredByPhone) return "â€”";
+      if (!row.deliveredByName && !row.deliveredByPhone) return "—";
       return (
         <div>
-          <div>{row.deliveredByName || "â€”"}</div>
+          <div>{row.deliveredByName || "—"}</div>
           {row.deliveredByPhone ? (
             <div className="mt-0.5 text-[11px] text-slate-500">{row.deliveredByPhone}</div>
           ) : null}
@@ -243,7 +243,7 @@ const RECEIPT_COLUMNS = [
     label: "Unit price",
     minWidth: 120,
     render: (row) =>
-      row.unitPrice == null ? "â€”" : formatInventoryMoney(row.unitPrice),
+      row.unitPrice == null ? "—" : formatInventoryMoney(row.unitPrice),
   },
   {
     key: "receivedAt",
@@ -324,7 +324,7 @@ function formatDetailLabel(key) {
 }
 
 function formatDetailValue(key, value) {
-  if (value == null || value === "") return "â€”";
+  if (value == null || value === "") return "—";
   if (key === "supplierId") return String(value);
   if (key === "condition") return formatCondition(value);
   if (["unitCost", "unitPrice", "averageUnitCost", "totalPurchaseCost"].includes(key)) {
@@ -546,7 +546,7 @@ export default function AccessoryDetailModal({
               loading={detailLoading}
               error={detailError}
               onRetry={onRetryDetail}
-              loadingLabel="Loading item detailsâ€¦"
+              loadingLabel="Loading item details…"
             >
               {detailReady ? (
                 <>
@@ -558,11 +558,11 @@ export default function AccessoryDetailModal({
                     <>
                       <DetailRow label="Make">{item.make}</DetailRow>
                       <DetailRow label="Model">{item.model}</DetailRow>
-                      <DetailRow label="Year">{item.year ?? "â€”"}</DetailRow>
+                      <DetailRow label="Year">{item.year ?? "—"}</DetailRow>
                       <DetailRow label="Chassis Number">{item.chassisNumber}</DetailRow>
                       <DetailRow label="Name">{item.name}</DetailRow>
-                      <DetailRow label="Component path">{item.componentPath || "â€”"}</DetailRow>
-                      <DetailRow label="Brand">{item.brand || "â€”"}</DetailRow>
+                      <DetailRow label="Component path">{item.componentPath || "—"}</DetailRow>
+                      <DetailRow label="Brand">{item.brand || "—"}</DetailRow>
                     </>
                   ) : (
                     <>
@@ -570,9 +570,9 @@ export default function AccessoryDetailModal({
                       <DetailRow label="Brand">{item.brand}</DetailRow>
                     </>
                   )}
-                  <DetailRow label="Unit">{item.unit || "â€”"}</DetailRow>
-                  <DetailRow label="Description">{item.description || "â€”"}</DetailRow>
-                  <DetailRow label="Shelf location">{item.shelfPosition || "â€”"}</DetailRow>
+                  <DetailRow label="Unit">{item.unit || "—"}</DetailRow>
+                  <DetailRow label="Description">{item.description || "—"}</DetailRow>
+                  <DetailRow label="Shelf location">{item.shelfPosition || "—"}</DetailRow>
                   <DetailRow label="Total quantity">{item.quantity}</DetailRow>
                   <DetailRow label="Average unit cost">
                     {formatInventoryMoney(averageUnitCost)}
@@ -582,7 +582,7 @@ export default function AccessoryDetailModal({
                   </DetailRow>
                   <DetailRow label="Locations">
                     {stockByLocation.length === 0 ? (
-                      "â€”"
+                      "—"
                     ) : (
                       <ul className="space-y-1.5">
                         {stockByLocation.map((row) => (
@@ -620,8 +620,8 @@ export default function AccessoryDetailModal({
               loading={receiptsLoading}
               error={receiptsError}
               onRetry={onRetryReceipts}
-              loadingLabel="Loading receiptsâ€¦"
-              errorTitle="Couldnâ€™t load receipts"
+              loadingLabel="Loading receipts…"
+              errorTitle="Couldn’t load receipts"
             />
           </AccordionSection>
 

@@ -21,7 +21,7 @@ import RejectRequisitionModal from "./RejectRequisitionModal";
 const readOnlyClassName =
   "w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-700";
 const fieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700 resize-none";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700 resize-none";
 
 function ReadOnlyField({ label, value }) {
   return (

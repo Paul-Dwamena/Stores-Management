@@ -25,7 +25,7 @@ import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 const readOnlyClassName =
   "w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-600 cursor-not-allowed";
@@ -184,13 +184,13 @@ function CollapsibleSection({ title, description, open, onToggle, children, erro
         <ChevronDown
           size={14}
           className={cn(
-            "text-emerald-600 shrink-0 transition-transform duration-200",
+            "text-primary shrink-0 transition-transform duration-200",
             !open && "-rotate-90",
           )}
         />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
-            <span className="block text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+            <span className="block text-[10px] font-bold text-primary uppercase tracking-wider">
               {title}
             </span>
             {errorCount > 0 ? (
@@ -352,7 +352,7 @@ function EditorPane({ step, title, children }) {
   return (
     <section className="flex min-h-0 min-w-0 flex-col border-b border-slate-100 lg:border-b-0 lg:border-r lg:last:border-r-0">
       <div className="border-b border-slate-100 px-4 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
           {step}. {title}
         </p>
       </div>
@@ -612,7 +612,7 @@ function ExistingLineFields({
           )}
         </>
       ) : (
-        <p className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-3 text-[12px] text-slate-600">
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-[12px] text-slate-600">
           Selected <span className="font-semibold text-slate-900">{selected.name}</span>. Change it from Item details.
         </p>
       )}
@@ -621,7 +621,7 @@ function ExistingLineFields({
 
   const detailsBlock = selected ? (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-lg border border-emerald-100 bg-emerald-50/50">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
         <div className="flex items-center justify-between gap-3 px-3 py-2">
           <div className="flex min-w-0 items-center gap-2.5">
             <ItemPhotoThumb src={selected.photo} name={selected.name} className="h-9 w-9" />
@@ -642,7 +642,7 @@ function ExistingLineFields({
           <button
             type="button"
             onClick={() => onChange("itemId", "")}
-            className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
+            className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-hover"
           >
             <Replace size={12} />
             Change
@@ -1183,7 +1183,7 @@ export default function BulkInventoryReceiptModal({
             <div className="h-full overflow-y-auto">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
                   Item details ({lines.length})
                 </p>
                 <p className="text-[11px] text-slate-500">
@@ -1224,7 +1224,7 @@ export default function BulkInventoryReceiptModal({
                           key={line.clientId}
                           className={cn(
                             "border-b border-slate-100",
-                            selected && "bg-emerald-50/70",
+                            selected && "bg-slate-50",
                           )}
                         >
                           <td className={tdClass}>{index + 1}</td>
@@ -1284,7 +1284,7 @@ export default function BulkInventoryReceiptModal({
             <button
               type="button"
               onClick={openAddEditor}
-              className="absolute bottom-5 right-5 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-200/80 hover:bg-emerald-700"
+              className="absolute bottom-5 right-5 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg shadow-slate-200/80 hover:bg-black"
               aria-label="Add item"
             >
               <Plus size={22} />

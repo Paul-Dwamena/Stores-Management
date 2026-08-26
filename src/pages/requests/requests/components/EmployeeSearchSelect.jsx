@@ -3,7 +3,7 @@ import { Search, X } from "lucide-react";
 import { cn } from "../../../../utils/cn";
 
 const inputClassName =
-  "w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 focus:bg-white text-slate-700 placeholder:text-slate-400";
+  "w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 focus:bg-white text-slate-700 placeholder:text-slate-400";
 
 function employeeSearchText(employee) {
   return [employee.name, employee.department, employee.position]

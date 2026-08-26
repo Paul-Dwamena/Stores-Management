@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle, ClipboardList, Package } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle, ClipboardList, Package } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -21,15 +21,15 @@ import { getRequests } from "../../mockdata/requests";
 import { listSupplyRequests } from "../../services/supplyRequestsService";
 import { listInventoryItems } from "../../services/inventoryService";
 
-const STORE_BAR_COLORS = ["#205848", "#276a56", "#3d8b72", "#16d595", "#184338"];
+const STORE_BAR_COLORS = ["#0a0a0a", "#404040", "#737373", "#b91c1c", "#991b1b"];
 
 const STATUS_COLORS = {
   "Pending Supply Request": "#d97706",
   "Pending Supply Approval": "#b45309",
-  "Pending Issuance": "#0284c7",
+  "Pending Issuance": "#525252",
   Supplied: "#205848",
   "Partial Supplied": "#16d595",
-  Rejected: "#dc2626",
+  Rejected: "#b91c1c",
 };
 
 function storeShortName(location) {
@@ -59,8 +59,12 @@ function ChartCard({ title, to, linkLabel, children }) {
     <div className="card flex flex-col min-h-[280px]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
         <h2 className="section-header">{title}</h2>
-        <Link to={to} className="text-[11px] font-bold text-brand hover:text-brand-hover">
+        <Link
+          to={to}
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-danger hover:text-[#991b1b]"
+        >
           {linkLabel}
+          <ArrowRight size={12} className="shrink-0" strokeWidth={2.5} />
         </Link>
       </div>
       <div className="p-4 flex-1">{children}</div>
@@ -178,7 +182,7 @@ function StatusBadge({ status, tone = "warning" }) {
   const tones = {
     warning: "bg-amber-50 text-amber-700 border-amber-200",
     danger: "bg-rose-50 text-rose-700 border-rose-200",
-    brand: "bg-brand-muted text-brand border-brand/20",
+    brand: "bg-success-muted text-success border-[#b7d4c8]",
   };
   return (
     <span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap", tones[tone])}>

@@ -4,7 +4,7 @@ import { ChevronDown, Search } from "lucide-react";
 import { cn } from "../../../utils/cn";
 
 const triggerClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 focus:bg-white text-left text-slate-700 flex items-center justify-between gap-2";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 focus:bg-white text-left text-slate-700 flex items-center justify-between gap-2";
 
 const MENU_MAX_HEIGHT = 240;
 const MENU_GAP = 4;
@@ -138,7 +138,7 @@ const CheckboxMultiSelect = ({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2.5 text-[11px] text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white"
+                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2.5 text-[11px] text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-900 focus:bg-white"
                 autoFocus
               />
             </div>
@@ -156,8 +156,8 @@ const CheckboxMultiSelect = ({
                 <label
                   key={option.value}
                   className={cn(
-                    "flex items-start gap-2.5 px-3 py-2.5 cursor-pointer transition-colors hover:bg-emerald-50",
-                    isSelected && "bg-emerald-50/60",
+                    "flex items-start gap-2.5 px-3 py-2.5 cursor-pointer transition-colors hover:bg-slate-50",
+                    isSelected && "bg-slate-50",
                   )}
                 >
                   <input
@@ -222,7 +222,7 @@ const CheckboxMultiSelect = ({
           className={cn(
             triggerClassName,
             disabled && "opacity-60 cursor-not-allowed",
-            open && "border-emerald-500 bg-white",
+            open && "border-primary bg-white",
             error && "border-red-500 bg-red-50/30",
           )}
         >

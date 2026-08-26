@@ -56,7 +56,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="mt-1 block w-full border border-border rounded-lg py-2.5 px-3 placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand sm:text-sm"
+                className="mt-1 block w-full border border-border rounded-lg py-2.5 px-3 placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-slate-900/25 focus:border-slate-900 sm:text-sm"
               />
             </div>
             <div>
@@ -67,18 +67,18 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="mt-1 block w-full border border-border rounded-lg py-2.5 px-3 placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand sm:text-sm"
+                className="mt-1 block w-full border border-border rounded-lg py-2.5 px-3 placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-slate-900/25 focus:border-slate-900 sm:text-sm"
               />
             </div>
             <div className="flex items-center justify-between">
-              <Link to="/forgot-password" className="text-sm font-medium text-brand hover:text-brand-hover">
+              <Link to="/forgot-password" className="text-sm font-medium text-danger hover:text-[#991b1b]">
                 Forgot password?
               </Link>
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-2 px-4 rounded-md text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50"
+              className="w-full flex justify-center py-2 px-4 rounded-md text-sm font-medium text-white bg-slate-900 hover:bg-black disabled:opacity-50"
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>

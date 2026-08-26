@@ -22,7 +22,7 @@ import IssueOtpSection from "../../supplies/components/IssueOtpSection";
 import AddReceiverModal from "../../supplies/components/AddReceiverModal";
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 const thClass =
   "px-3 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-left";
@@ -281,14 +281,14 @@ export default function NewInterStoreTransferModal({
                         key={lineKey(item)}
                         className={cn(
                           "flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors",
-                          selected ? "bg-brand-muted" : "hover:bg-slate-50",
+                          selected ? "bg-slate-50" : "hover:bg-slate-50",
                         )}
                       >
                         <input
                           type="checkbox"
                           checked={selected}
                           onChange={() => toggleItem(item)}
-                          className="mt-1 rounded border-slate-300 text-brand focus:ring-brand"
+                          className="mt-1 rounded border-slate-300 text-primary focus:ring-slate-900/25"
                         />
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">

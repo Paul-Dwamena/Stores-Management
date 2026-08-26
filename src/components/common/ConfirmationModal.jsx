@@ -44,9 +44,9 @@ const ConfirmationModal = ({
       />
 
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 m-4 flex flex-col p-6 text-center">
-        <div className={cn("mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-4", isDanger ? "bg-red-50" : "bg-emerald-50")}>
-          {Icon ? <Icon className={cn("w-8 h-8", isDanger ? "text-red-600" : "text-emerald-600")} /> :
-           isDanger ? <AlertTriangle className="w-8 h-8 text-red-600" /> : <CheckCircle className="w-8 h-8 text-emerald-600" />}
+        <div className={cn("mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-4", isDanger ? "bg-red-50" : "bg-success-muted")}>
+          {Icon ? <Icon className={cn("w-8 h-8", isDanger ? "text-red-600" : "text-success")} /> :
+           isDanger ? <AlertTriangle className="w-8 h-8 text-red-600" /> : <CheckCircle className="w-8 h-8 text-success" />}
         </div>
         <h2 className="text-xl font-extrabold text-slate-900 mb-2">{title}</h2>
         <p className="text-[12px] text-slate-500 font-medium mb-6">

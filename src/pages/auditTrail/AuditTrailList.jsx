@@ -21,14 +21,14 @@ const filterLabelClassName =
   "text-[11px] font-medium text-slate-500 tracking-wider shrink-0";
 
 const filterSelectClassName =
-  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-500";
+  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 function ActionBadge({ action }) {
   const styles = {
-    Created: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Created: "bg-success-muted text-success border-[#b7d4c8]",
     Updated: "bg-sky-50 text-sky-700 border-sky-200",
     Deleted: "bg-rose-50 text-rose-700 border-rose-200",
-    Approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Approved: "bg-success-muted text-success border-[#b7d4c8]",
     Rejected: "bg-rose-50 text-rose-700 border-rose-200",
     "Status Change": "bg-amber-50 text-amber-800 border-amber-200",
     Exported: "bg-violet-50 text-violet-700 border-violet-200",

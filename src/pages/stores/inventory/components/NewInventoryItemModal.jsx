@@ -29,7 +29,7 @@ import StoreSelect from "./StoreSelect";
 import { sendDeliveryOtp } from "../../../../services/inventoryService";
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 const readOnlyClassName =
   "w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-600 cursor-not-allowed";
@@ -149,12 +149,12 @@ function CollapsibleSection({ title, description, open, onToggle, children }) {
         <ChevronDown
           size={14}
           className={cn(
-            "text-brand shrink-0 transition-transform duration-200",
+            "text-primary shrink-0 transition-transform duration-200",
             !open && "-rotate-90",
           )}
         />
         <span className="min-w-0">
-          <span className="block text-[10px] font-bold text-brand uppercase tracking-wider">
+          <span className="block text-[10px] font-bold text-primary uppercase tracking-wider">
             {title}
           </span>
           {description ? (
@@ -183,7 +183,7 @@ function SelectedItemCard({ item, onChange }) {
     .join(" · ");
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-brand/15 bg-brand-muted px-3 py-1.5">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
       <div className="flex min-w-0 items-center gap-2.5">
         <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
         <div className="min-w-0">
@@ -196,7 +196,7 @@ function SelectedItemCard({ item, onChange }) {
       <button
         type="button"
         onClick={onChange}
-        className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-brand hover:text-brand-hover"
+        className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-hover"
       >
         <Replace size={12} />
         Change

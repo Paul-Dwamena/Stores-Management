@@ -51,7 +51,7 @@ const filterLabelClassName =
   "text-[11px] font-medium text-slate-500 tracking-wider shrink-0";
 
 const filterSelectClassName =
-  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-500";
+  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 function statusBadgeClass(status) {
   switch (status) {
@@ -64,7 +64,7 @@ function statusBadgeClass(status) {
     case "ARRIVED":
       return "bg-indigo-50 text-indigo-700 border-indigo-200";
     case "COMPLETED":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      return "bg-success-muted text-success border-[#b7d4c8]";
     case "REJECTED":
       return "bg-rose-50 text-rose-700 border-rose-200";
     case "CANCELLED":

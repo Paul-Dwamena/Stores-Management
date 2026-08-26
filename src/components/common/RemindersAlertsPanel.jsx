@@ -42,7 +42,7 @@ const RemindersAlertsPanel = ({
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-lg">
+          <div className="p-2 bg-slate-100 border border-slate-200 text-primary rounded-lg">
             <Bell size={compact ? 15 : 16} />
           </div>
           <div>
@@ -96,8 +96,8 @@ const RemindersAlertsPanel = ({
                 className={cn(
                   "px-2.5 py-1 text-[9px] font-bold rounded-md border transition-colors",
                   filter === tab.id
-                    ? "bg-emerald-600 text-white border-emerald-600"
-                    : "bg-white text-slate-500 border-slate-200 hover:border-emerald-200 hover:text-emerald-700",
+                    ? "bg-slate-900 text-white border-primary"
+                    : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700",
                 )}
               >
                 {tab.label}
@@ -111,13 +111,13 @@ const RemindersAlertsPanel = ({
       {/* Alert list */}
       {loading ? (
         <div className={cn("flex items-center justify-center gap-2 text-[12px] text-slate-400", compact ? "py-6" : "py-10")}>
-          <Loader2 size={16} className="animate-spin text-emerald-500" />
+          <Loader2 size={16} className="animate-spin text-primary" />
           Loading alerts…
         </div>
       ) : filteredAlerts.length === 0 ? (
         <div className={cn("text-center", compact ? "py-6" : "py-10")}>
-          <div className="mx-auto w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-3">
-            <CheckCircle2 size={18} className="text-emerald-500" />
+          <div className="mx-auto w-10 h-10 rounded-full bg-success-muted border border-[#b7d4c8] flex items-center justify-center mb-3">
+            <CheckCircle2 size={18} className="text-success" />
           </div>
           <p className="text-[12px] font-bold text-slate-700">
             {filter === "all" ? "All clear" : "No alerts in this category"}

@@ -169,7 +169,7 @@ export default function InterStoreTransferDetailsModal({
           <ol className="space-y-3">
             {(transfer.history ?? []).map((event, index) => (
               <li key={`${event.action}-${event.at}-${index}`} className="flex gap-3">
-                <span className="mt-1.5 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="mt-1.5 h-2 w-2 rounded-full bg-slate-900 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-[13px] font-bold text-slate-800">
                     {formatInterStoreTransferHistoryAction(event.action)}

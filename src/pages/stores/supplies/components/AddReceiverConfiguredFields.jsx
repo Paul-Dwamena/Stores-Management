@@ -11,7 +11,7 @@ import { RECEIVER_ROLE_OPTIONS } from "../../../../mockdata/stores";
 const SYSTEM_KEYS = new Set(ADD_RECEIVER_FORM_FIELD_CATALOG.map((field) => field.key));
 
 const selectClass =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 text-slate-700";
 
 function sectionGridClass(section, fallback = 1) {
   const cols = Math.min(Math.max(section?.columns ?? fallback, 1), 4);

@@ -59,7 +59,7 @@ export default function TabbedPageHub({
 
       {active?.description ? (
         <div className="card p-4 border-slate-200 bg-slate-50/60 flex items-start gap-3">
-          <TabIcon size={18} className="text-brand shrink-0 mt-0.5" />
+          <TabIcon size={18} className="text-primary shrink-0 mt-0.5" />
           <p className="text-[11px] text-slate-600 leading-relaxed">{active.description}</p>
         </div>
       ) : null}

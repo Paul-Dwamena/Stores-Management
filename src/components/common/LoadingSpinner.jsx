@@ -22,10 +22,10 @@ export default function LoadingSpinner({
   const spinner = (
     <div className="flex flex-col items-center justify-center gap-3">
       <div className="relative">
-        <div className="absolute inset-0 bg-brand/20 rounded-full blur-md animate-pulse" />
+        <div className="absolute inset-0 bg-danger/20 rounded-full blur-md animate-pulse" />
         <div
           className={cn(
-            "rounded-full border-brand-muted border-t-brand animate-spin relative z-10",
+            "rounded-full border-slate-200 border-t-danger animate-spin relative z-10",
             ring,
           )}
         />
@@ -54,7 +54,7 @@ export default function LoadingSpinner({
 
   if (variant === "full") {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-emerald-950/20 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm">
         <div className="bg-white p-10 rounded-2xl shadow-2xl border border-slate-100">
           {spinner}
         </div>

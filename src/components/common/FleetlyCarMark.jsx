@@ -19,7 +19,7 @@ const CarSilhouette = ({
 }) => (
   <>
     {brandStyle && (
-      <ellipse cx="20" cy="27.8" rx="14.5" ry="1.6" fill="#022c22" opacity="0.22" />
+      <ellipse cx="20" cy="27.8" rx="14.5" ry="1.6" fill="#0a0a0a" opacity="0.22" />
     )}
 
     {/* Lower body / chassis */}
@@ -85,7 +85,7 @@ const CarSilhouette = ({
     {/* Front wheel */}
     <g style={frontWheelStyle ?? { transformBox: "fill-box", transformOrigin: "center" }}>
       <circle cx="11" cy="26.4" r="4.2" fill={wheelOuter} />
-      <circle cx="11" cy="26.4" r="3.1" fill="#0f3d2e" opacity={brandStyle ? 0.35 : 0.2} />
+      <circle cx="11" cy="26.4" r="3.1" fill="#0a0a0a" opacity={brandStyle ? 0.35 : 0.2} />
       <circle cx="11" cy="26.4" r="2.4" fill={wheelInner} />
       <circle cx="11" cy="26.4" r="1" fill={body} opacity={0.9} />
     </g>
@@ -93,7 +93,7 @@ const CarSilhouette = ({
     {/* Rear wheel */}
     <g style={rearWheelStyle ?? { transformBox: "fill-box", transformOrigin: "center" }}>
       <circle cx="29" cy="26.4" r="4.2" fill={wheelOuter} />
-      <circle cx="29" cy="26.4" r="3.1" fill="#0f3d2e" opacity={brandStyle ? 0.35 : 0.2} />
+      <circle cx="29" cy="26.4" r="3.1" fill="#0a0a0a" opacity={brandStyle ? 0.35 : 0.2} />
       <circle cx="29" cy="26.4" r="2.4" fill={wheelInner} />
       <circle cx="29" cy="26.4" r="1" fill={body} opacity={0.9} />
     </g>
@@ -146,11 +146,11 @@ const FleetlyCarMark = ({
         : "";
 
   const body = brandStyle ? "#ffffff" : "currentColor";
-  const glass = brandStyle ? "#ecfdf5" : "currentColor";
-  const glassDark = brandStyle ? "#d1fae5" : "currentColor";
-  const wheelOuter = brandStyle ? "#064e3b" : "currentColor";
-  const wheelInner = brandStyle ? "#34d399" : "currentColor";
-  const accent = brandStyle ? "#10b981" : "currentColor";
+  const glass = brandStyle ? "#fef2f2" : "currentColor";
+  const glassDark = brandStyle ? "#fecaca" : "currentColor";
+  const wheelOuter = brandStyle ? "#0a0a0a" : "currentColor";
+  const wheelInner = brandStyle ? "#737373" : "currentColor";
+  const accent = brandStyle ? "#b91c1c" : "currentColor";
 
   return (
     <svg

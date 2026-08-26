@@ -55,7 +55,7 @@ export default function IssueOtpSection({
       className={cn(
         "rounded-xl border p-4 space-y-4",
         otpVerified
-          ? "border-emerald-200 bg-emerald-50/40"
+          ? "border-slate-200 bg-slate-50"
           : otpSent
             ? "border-amber-200 bg-amber-50/30"
             : "border-slate-200 bg-slate-50/40",
@@ -126,7 +126,7 @@ export default function IssueOtpSection({
           </Button>
 
           {otpSent ? (
-            <p className="flex items-center gap-1.5 text-[12px] font-medium text-emerald-700">
+            <p className="flex items-center gap-1.5 text-[12px] font-medium text-success">
               <CheckCircle2 size={14} className="shrink-0" />
               OTP sent to {name}
               {phone ? ` on ${phone}` : ""}
@@ -138,7 +138,7 @@ export default function IssueOtpSection({
           )}
         </div>
       ) : (
-        <p className="flex items-center gap-1.5 text-[12px] font-medium text-emerald-700">
+        <p className="flex items-center gap-1.5 text-[12px] font-medium text-success">
           <CheckCircle2 size={14} className="shrink-0" />
           OTP confirmed for {name}
           {phone ? ` on ${phone}` : ""}

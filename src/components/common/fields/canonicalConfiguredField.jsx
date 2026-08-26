@@ -12,9 +12,9 @@ import {
 } from "../../../mockdata/setups";
 
 const selectClass =
-  "w-full appearance-none cursor-pointer px-3 py-2 pr-10 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 focus:bg-white transition-colors text-slate-700 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed";
+  "w-full appearance-none cursor-pointer px-3 py-2 pr-10 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 focus:bg-white transition-colors text-slate-700 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed";
 const textareaClass =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 focus:bg-white transition-colors text-slate-700 resize-y";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 focus:bg-white transition-colors text-slate-700 resize-y";
 
 function SelectControl({ className, children, ...props }) {
   return (
@@ -104,10 +104,10 @@ export function FileDropzone({ field, value, error, onChange }) {
         className={cn(
           "border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors",
           dragging
-            ? "border-emerald-500 bg-emerald-50"
+            ? "border-primary bg-slate-50"
             : error
               ? "border-red-300 bg-red-50/40"
-              : "border-slate-200 hover:border-emerald-400 hover:bg-slate-50",
+              : "border-slate-200 hover:border-primary hover:bg-slate-50",
         )}
       >
         <input
@@ -122,11 +122,11 @@ export function FileDropzone({ field, value, error, onChange }) {
         />
         <UploadCloud
           size={28}
-          className={cn(dragging ? "text-emerald-500" : "text-slate-300")}
+          className={cn(dragging ? "text-primary" : "text-slate-300")}
         />
         {fileName ? (
-          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 w-full max-w-sm">
-            <FileText size={14} className="text-emerald-600 shrink-0" />
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 w-full max-w-sm">
+            <FileText size={14} className="text-primary shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-bold text-slate-800 truncate">{fileName}</p>
               {value.size ? (
@@ -147,7 +147,7 @@ export function FileDropzone({ field, value, error, onChange }) {
         ) : (
           <>
             <p className="text-[12px] font-semibold text-slate-600">
-              Drag & drop or <span className="text-emerald-600">browse</span>
+              Drag & drop or <span className="text-primary">browse</span>
             </p>
             <p className="text-[10px] text-slate-400">{hint}</p>
           </>

@@ -44,7 +44,7 @@ export default function ViewRoleModal({
         <div className="flex items-start justify-between border-b border-slate-100 p-4 sm:p-6">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Shield size={18} className="shrink-0 text-emerald-600" />
+              <Shield size={18} className="shrink-0 text-primary" />
               <h2 className="truncate text-lg font-extrabold text-slate-900">
                 {role.label || role.name}
               </h2>

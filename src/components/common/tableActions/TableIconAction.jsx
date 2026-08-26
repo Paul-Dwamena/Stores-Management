@@ -2,9 +2,9 @@ import React from "react";
 import { cn } from "../../../utils/cn";
 
 const VARIANT_CLASSES = {
-  edit: "text-emerald-600 hover:bg-emerald-50",
-  approve: "text-emerald-600 hover:bg-emerald-50",
-  convert: "text-emerald-600 hover:bg-emerald-50",
+  edit: "text-primary hover:bg-slate-100",
+  approve: "text-success hover:bg-success-muted",
+  convert: "text-primary hover:bg-slate-100",
   resolve: "text-sky-600 hover:bg-sky-50",
   review: "text-sky-600 hover:bg-sky-50",
   info: "text-sky-600 hover:bg-sky-50",

@@ -31,7 +31,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-[210px] bg-brand-foreground flex flex-col h-full shrink-0 border-r border-black/20 transition-transform duration-300 ease-in-out",
+          "fixed inset-y-0 left-0 z-30 w-[210px] bg-slate-900 flex flex-col h-full shrink-0 border-r border-black/40 transition-transform duration-300 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           "lg:static lg:translate-x-0",
         )}
@@ -63,8 +63,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                   cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all duration-150",
                     navActive || (!item.exact && location.pathname.startsWith(item.path))
-                      ? "bg-brand-accent text-brand-foreground"
-                      : "text-white/70 hover:bg-[#16d595]/25 hover:text-white",
+                      ? "bg-brand text-white shadow-sm"
+                      : "text-white/70 hover:bg-white/10 hover:text-white",
                   )
                 }
               >

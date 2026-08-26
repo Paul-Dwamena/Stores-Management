@@ -12,7 +12,7 @@ export function StatusPill({ status }) {
     || raw === "Approved"
     || raw === "Paid"
     || raw === "Completed"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      ? "bg-success-muted text-success border-[#b7d4c8]"
       : ["PENDING", "PENDING_APPROVAL", "PENDING_DISPATCH"].includes(normalized) || raw === "Pending"
         ? "bg-amber-50 text-amber-700 border-amber-200"
         : normalized === "PENDING_SUPPLY_REQUEST" || raw === "Pending Supply Request" || raw === "Pending supply request"
@@ -22,7 +22,7 @@ export function StatusPill({ status }) {
         : normalized === "PENDING_ISSUANCE" || raw === "Pending Issuance" || raw === "Pending issuance"
           ? "bg-violet-50 text-violet-700 border-violet-200"
         : normalized === "SUPPLIED" || raw === "Supplied"
-          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+          ? "bg-success-muted text-success border-[#b7d4c8]"
         : normalized === "PARTIAL_SUPPLIED" || raw === "Partial Supplied" || raw === "Partial supplied"
           ? "bg-sky-50 text-sky-700 border-sky-200"
         : normalized === "IN_TRANSIT" || raw === "In transit"
@@ -80,7 +80,7 @@ export function AccordionSection({ title, open, onToggle, children }) {
 export function FileAttachmentRow({ label, fileName }) {
   return (
     <DetailRow label={label}>
-      <span className="inline-flex items-center gap-2 text-emerald-700">
+      <span className="inline-flex items-center gap-2 text-primary">
         <FileText size={14} />
         {fileName || "—"}
         <button

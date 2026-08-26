@@ -222,13 +222,13 @@ export function getStatusTone(status) {
 }
 
 export const STATUS_TONE_BADGE_CLASSES = {
-  success: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  success: "bg-brand-muted text-brand border-brand/20",
   pending: "bg-sky-50 text-sky-700 border-sky-200",
   failed: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
 export const STATUS_TONE_DOT_CLASSES = {
-  success: "bg-emerald-500",
+  success: "bg-brand",
   pending: "bg-sky-500",
   failed: "bg-rose-500",
 };

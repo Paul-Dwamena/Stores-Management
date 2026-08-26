@@ -49,7 +49,7 @@ const AlertListItem = ({ alert, onClick, compact = false }) => {
       </div>
       <ChevronRight
         size={14}
-        className="text-slate-300 group-hover:text-emerald-500 shrink-0 mt-1 transition-colors"
+        className="text-slate-300 group-hover:text-primary shrink-0 mt-1 transition-colors"
       />
     </div>
   );

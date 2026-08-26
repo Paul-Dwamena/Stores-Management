@@ -24,18 +24,13 @@ const STORES_SUB_TABS = [
 
 function NestedTabButtons({ tabs, activeId, onChange }) {
   return (
-    <div className="flex flex-wrap gap-1 min-w-0">
+    <div className="tab-track overflow-x-auto">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
-          className={cn(
-            "px-4 py-2.5 text-[11px] font-bold transition-all relative whitespace-nowrap",
-            activeId === tab.id
-              ? "text-brand after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-brand"
-              : "text-muted hover:text-text",
-          )}
+          className={cn("tab-pill", activeId === tab.id && "tab-pill-active")}
         >
           {tab.label}
         </button>
@@ -107,14 +102,14 @@ export default function StoresHub() {
         ))}
       </div>
 
-      <div className="space-y-4">
-        <div className="inline-flex flex-wrap gap-1 border-b border-border w-full">
-          <NestedTabButtons
-            tabs={STORES_SUB_TABS}
-            activeId={storesSub}
-            onChange={setStoresSub}
-          />
-        </div>
+        <div className="space-y-4">
+          <div className="pb-3 border-b border-slate-200">
+            <NestedTabButtons
+              tabs={STORES_SUB_TABS}
+              activeId={storesSub}
+              onChange={setStoresSub}
+            />
+          </div>
 
         {storesSub === "inventory" && (
           <InventoryList embedded />

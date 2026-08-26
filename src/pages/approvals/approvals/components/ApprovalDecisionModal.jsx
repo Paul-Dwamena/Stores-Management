@@ -16,7 +16,7 @@ export const APPROVAL_REJECTION_REASONS = [
 ];
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 /**
  * Decision step for Request Details — approve needs comments;
@@ -106,13 +106,13 @@ export default function ApprovalDecisionModal({
                   <div
                     className={cn(
                       "flex items-center justify-center h-12 w-12 rounded-full shrink-0",
-                      isReject ? "bg-red-50" : "bg-brand-muted",
+                      isReject ? "bg-red-50" : "bg-success-muted",
                     )}
                   >
                     {isReject ? (
                       <AlertTriangle className="w-6 h-6 text-red-600" />
                     ) : (
-                      <CheckCircle2 className="w-6 h-6 text-brand" />
+                      <CheckCircle2 className="w-6 h-6 text-success" />
                     )}
                   </div>
                   <div>

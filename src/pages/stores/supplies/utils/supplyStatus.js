@@ -14,7 +14,7 @@ export function supplyStatusBadgeClass(status) {
     case "PENDING_ISSUANCE":
       return "bg-violet-50 text-violet-700 border-violet-200";
     case "SUPPLIED":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      return "bg-success-muted text-success border-[#b7d4c8]";
     case "PARTIAL_SUPPLIED":
       return "bg-sky-50 text-sky-700 border-sky-200";
     case "REJECTED":

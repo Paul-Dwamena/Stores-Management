@@ -15,7 +15,7 @@ const FleetlyLogo = ({ size = "lg", className }) => {
     <div
       className={cn(
         box,
-        "bg-emerald-500 rounded-2xl shadow-xl flex items-center justify-center relative overflow-hidden border-white/20 text-white",
+        "bg-brand rounded-2xl shadow-xl flex items-center justify-center relative overflow-hidden border-white/20 text-white",
         border,
         size === "sm" && "rounded-lg shadow-md",
         className,

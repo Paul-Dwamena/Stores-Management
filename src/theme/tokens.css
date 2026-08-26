@@ -1,25 +1,32 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 :root {
-  --color-brand: #205848;
-  --color-brand-hover: #184338;
-  --color-brand-muted: #e8f2ee;
-  --color-brand-foreground: #205848;
-  --color-brand-accent: #16d595;
+  /* Accent red — logos, danger, selected accents (not primary buttons) */
+  --color-brand: #b91c1c;
+  --color-brand-hover: #991b1b;
+  --color-brand-muted: #fef2f2;
+  --color-brand-foreground: #b91c1c;
+  --color-brand-accent: #dc2626;
 
-  --color-app-bg: #f9fcfb;
+  /* Primary actions — black (with hex fallbacks for reliability) */
+  --color-primary: #0a0a0a;
+  --color-primary-hover: #262626;
+
+  --color-app-bg: #fafafa;
   --color-surface: #ffffff;
-  --color-border: #e2e8f0;
+  --color-border: #e5e5e5;
 
-  --color-text: #0f172a;
-  --color-text-muted: #475569;
-  --color-text-subtle: #94a3b8;
+  --color-text: #0a0a0a;
+  --color-text-muted: #404040;
+  --color-text-subtle: #a3a3a3;
 
-  --color-success: #059669;
-  --color-success-muted: #ecfdf5;
+  /* Active / success — previous green brand */
+  --color-success: #205848;
+  --color-success-muted: #e8f2ee;
+  --color-success-accent: #16d595;
   --color-warning: #d97706;
   --color-warning-muted: #fffbeb;
-  --color-danger: #dc2626;
+  --color-danger: #b91c1c;
   --color-danger-muted: #fef2f2;
   --color-info: #0284c7;
   --color-info-muted: #f0f9ff;

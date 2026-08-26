@@ -42,11 +42,11 @@ const filterLabelClassName =
   "text-[11px] font-medium text-slate-500 tracking-wider shrink-0";
 
 const filterSelectClassName =
-  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-500";
+  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 function statusBadgeClass(status) {
   const raw = (status ?? "").toString().toUpperCase();
-  if (raw === "IN_STOCK" || raw === "ACTIVE") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (raw === "IN_STOCK" || raw === "ACTIVE") return "bg-success-muted text-success border-[#b7d4c8]";
   if (raw === "INACTIVE") return "bg-slate-50 text-slate-600 border-slate-200";
   if (raw === "LOW_STOCK") return "bg-amber-50 text-amber-700 border-amber-200";
   if (raw === "OUT_OF_STOCK") return "bg-rose-50 text-rose-700 border-rose-200";

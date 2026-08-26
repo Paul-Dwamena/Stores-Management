@@ -5,7 +5,7 @@ import { getStoreLocationOptions } from "../../../../mockdata/stores";
 import StoreFormModal from "../../../setups/components/StoreFormModal";
 
 const defaultSelectClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 export default function StoreLocationField({
   id,
@@ -40,7 +40,7 @@ export default function StoreLocationField({
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover"
           >
             <Plus size={12} />
             Add store

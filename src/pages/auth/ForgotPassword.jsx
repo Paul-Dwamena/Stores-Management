@@ -92,9 +92,9 @@ const ForgotPassword = () => {
         <div className="bg-surface py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-border">
           {step === "done" ? (
             <div className="text-center space-y-3">
-              <CheckCircle2 className="mx-auto text-brand" size={32} />
+              <CheckCircle2 className="mx-auto text-success" size={32} />
               <p className="text-sm text-muted">{message}</p>
-              <Link to="/login" className="inline-flex items-center gap-1 text-sm font-medium text-brand">
+              <Link to="/login" className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                 <ArrowLeft size={14} /> Back to sign in
               </Link>
             </div>
@@ -153,7 +153,7 @@ const ForgotPassword = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 px-4 rounded-md text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50"
+                className="w-full py-2 px-4 rounded-md text-sm font-medium text-white bg-slate-900 hover:bg-black disabled:opacity-50"
               >
                 {loading ? "Resetting…" : "Reset password"}
               </button>
@@ -163,7 +163,7 @@ const ForgotPassword = () => {
                   setError("");
                   setStep("request");
                 }}
-                className="w-full text-sm font-medium text-muted"
+                className="w-full text-sm font-medium text-danger hover:text-[#991b1b]"
               >
                 Use a different phone number
               </button>
@@ -186,14 +186,14 @@ const ForgotPassword = () => {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="024 000 0000"
-                    className="block w-full border border-border rounded-lg py-2.5 pl-9 pr-3 placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-brand sm:text-sm"
+                    className="block w-full border border-border rounded-lg py-2.5 pl-9 pr-3 placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-slate-900/25 sm:text-sm"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 px-4 rounded-md text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50"
+                className="w-full py-2 px-4 rounded-md text-sm font-medium text-white bg-slate-900 hover:bg-black disabled:opacity-50"
               >
                 {loading ? "Sending…" : "Send reset OTP"}
               </button>

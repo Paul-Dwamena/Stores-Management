@@ -110,7 +110,7 @@ export default function AccountSettings() {
 
       <form onSubmit={requestProfileSave} className="card p-6 space-y-5">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-          <div className="h-12 w-12 rounded-lg bg-brand-muted text-brand flex items-center justify-center font-bold">
+          <div className="h-12 w-12 rounded-lg bg-slate-50 text-primary flex items-center justify-center font-bold">
             {(profile.firstName || "A").charAt(0).toUpperCase()}
           </div>
           <div>

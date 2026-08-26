@@ -110,7 +110,7 @@ export default function RejectRequisitionModal({
                     rows={4}
                     placeholder={copy.placeholder}
                     autoFocus
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 text-slate-700 resize-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 text-slate-700 resize-none"
                   />
                   {!reason.trim() ? (
                     <p className="text-[10px] text-slate-400">

@@ -30,7 +30,7 @@ const Header = ({ setSidebarOpen }) => {
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <div className="hidden md:flex items-center gap-2 mr-1 sm:mr-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand" />
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-900" />
           <span className="text-[10px] font-medium text-muted">System Live</span>
         </div>
 

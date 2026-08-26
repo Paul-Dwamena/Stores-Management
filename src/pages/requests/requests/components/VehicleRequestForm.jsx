@@ -18,7 +18,7 @@ import VehicleSearchSelect from "../../../vehicles/shared/components/VehicleSear
 const SYSTEM_KEYS = new Set(VEHICLE_REQUEST_FORM_FIELD_CATALOG.map((field) => field.key));
 
 const textareaClassName =
-  "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-emerald-500";
+  "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 function fieldSpanClass(field, sectionColumns = 1) {
   const parentColumns = Math.min(Math.max(field?.groupColumns ?? sectionColumns ?? 1, 1), 4);

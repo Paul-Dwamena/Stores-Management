@@ -8,13 +8,13 @@ const Button = React.forwardRef(
   ) => {
     const variants = {
       primary:
-        "bg-brand hover:bg-brand-hover text-white shadow-sm",
+        "bg-slate-900 hover:bg-black text-white shadow-sm",
       secondary: "bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold",
       outline:
         "border border-slate-200 hover:border-slate-300 text-slate-700 font-bold hover:bg-slate-50",
       ghost: "hover:bg-slate-100 text-slate-600",
       danger:
-        "bg-red-500 hover:bg-red-600 text-white shadow-sm shadow-red-200/50",
+        "bg-danger hover:bg-[#991b1b] text-white shadow-sm shadow-red-200/50",
       warning:
         "bg-amber-600 hover:bg-amber-700 text-white shadow-sm shadow-amber-300/50",
       info:

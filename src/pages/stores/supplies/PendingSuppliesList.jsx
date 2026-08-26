@@ -63,7 +63,7 @@ const filterLabelClassName =
   "text-[11px] font-medium text-slate-500 tracking-wider shrink-0";
 
 const filterSelectClassName =
-  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-500 shrink-0";
+  "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 shrink-0";
 
 const dateInputClassName =
   "min-w-0 w-[7.5rem] bg-transparent text-[12px] font-medium text-slate-700 outline-none cursor-pointer";
@@ -593,7 +593,7 @@ export default function PendingSuppliesList({ embedded = false }) {
                       checked={allPagedSelected}
                       onChange={toggleSelectAllPaged}
                       aria-label="Select all on page"
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      className="rounded border-slate-300 text-primary focus:ring-slate-900/25"
                     />
                   </th>
                 ) : null}
@@ -655,7 +655,7 @@ export default function PendingSuppliesList({ embedded = false }) {
                           checked={selectedIds.includes(row.listKey)}
                           onChange={() => toggleRowSelected(row.listKey)}
                           aria-label={`Select ${row.requestNumber || row.itemCode}`}
-                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                          className="rounded border-slate-300 text-primary focus:ring-slate-900/25"
                         />
                       </td>
                     ) : null}

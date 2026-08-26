@@ -26,7 +26,7 @@ function PermissionCheckbox({ checked, onChange, readOnly, label, disabled }) {
           className={cn(
             "inline-flex h-4 w-4 items-center justify-center rounded border",
             checked
-              ? "border-emerald-500 bg-emerald-500 text-white"
+              ? "border-slate-900 bg-slate-900 text-white"
               : "border-slate-200 bg-white",
           )}
           aria-label={label}
@@ -47,7 +47,7 @@ function PermissionCheckbox({ checked, onChange, readOnly, label, disabled }) {
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-slate-900/25"
         aria-label={label}
       />
     </label>

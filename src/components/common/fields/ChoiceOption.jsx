@@ -33,7 +33,7 @@ export default function ChoiceOption({
         <span
           className={cn(
             "mt-0.5 flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-full border transition-colors",
-            checked ? "border-brand bg-brand" : "border-slate-300 bg-white",
+            checked ? "border-slate-900 bg-slate-900" : "border-slate-300 bg-white",
           )}
         >
           <span className={cn("size-1.5 rounded-full", checked ? "bg-white" : "bg-transparent")} />
@@ -43,7 +43,7 @@ export default function ChoiceOption({
           className={cn(
             "mt-0.5 flex size-4 shrink-0 items-center justify-center overflow-hidden rounded border transition-colors",
             checked
-              ? "border-brand bg-brand text-white"
+              ? "border-slate-900 bg-slate-900 text-white"
               : "border-slate-300 bg-white text-transparent",
           )}
         >

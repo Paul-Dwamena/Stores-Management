@@ -31,7 +31,7 @@ const QUICK_TIPS = [
 ];
 
 const filterSelectClass =
-  "w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none focus:border-emerald-500";
+  "w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 export default function RequestsList() {
   const [requests, setRequests] = useState([]);
@@ -293,7 +293,7 @@ export default function RequestsList() {
             <ul className="mt-3 space-y-2.5">
               {QUICK_TIPS.map((tip) => (
                 <li key={tip} className="flex gap-2 text-[11px] leading-relaxed text-slate-600">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-900" />
                   <span>{tip}</span>
                 </li>
               ))}

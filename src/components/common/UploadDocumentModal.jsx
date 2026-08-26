@@ -146,7 +146,7 @@ const UploadDocumentModal = ({
           {uploaded ? (
             /* Success state */
             <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-              <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-200">
+              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-primary border border-slate-200">
                 <CheckCircle2 size={28} />
               </div>
               <div>
@@ -155,7 +155,7 @@ const UploadDocumentModal = ({
               </div>
               <button
                 onClick={handleClose}
-                className="mt-2 px-5 py-2 bg-emerald-600 text-white rounded-lg text-[12px] font-bold hover:bg-emerald-700 transition-colors"
+                className="mt-2 px-5 py-2 bg-slate-900 text-white rounded-lg text-[12px] font-bold hover:bg-black transition-colors"
               >
                 Done
               </button>
@@ -171,8 +171,8 @@ const UploadDocumentModal = ({
                 className={cn(
                   "border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors",
                   dragging
-                    ? "border-emerald-500 bg-emerald-50"
-                    : "border-slate-200 hover:border-emerald-400 hover:bg-slate-50"
+                    ? "border-primary bg-slate-50"
+                    : "border-slate-200 hover:border-primary hover:bg-slate-50"
                 )}
               >
                 <input
@@ -186,12 +186,12 @@ const UploadDocumentModal = ({
                   size={32}
                   className={cn(
                     "transition-colors",
-                    dragging ? "text-emerald-500" : "text-slate-300"
+                    dragging ? "text-primary" : "text-slate-300"
                   )}
                 />
                 {file ? (
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 w-full max-w-xs">
-                    <FileText size={14} className="text-emerald-600 shrink-0" />
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 w-full max-w-xs">
+                    <FileText size={14} className="text-primary shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-bold text-slate-800 truncate">{file.name}</p>
                       <p className="text-[10px] text-slate-500">{formatBytes(file.size)}</p>
@@ -206,7 +206,7 @@ const UploadDocumentModal = ({
                 ) : (
                   <>
                     <p className="text-[12px] font-semibold text-slate-600">
-                      Drag & drop or <span className="text-emerald-600">browse</span>
+                      Drag & drop or <span className="text-primary">browse</span>
                     </p>
                     <p className="text-[10px] text-slate-400">PDF, DOC, DOCX, JPG, PNG</p>
                   </>
@@ -224,7 +224,7 @@ const UploadDocumentModal = ({
                     value={docName}
                     onChange={(e) => setDocName(e.target.value)}
                     placeholder="e.g. Vehicle Registration — GR-4521-22"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors"
                   />
                 </div>
                 <div>
@@ -241,7 +241,7 @@ const UploadDocumentModal = ({
                       "w-full px-3 py-2 border border-slate-200 rounded-lg text-[12px] outline-none transition-colors",
                       lockLinkedTo
                         ? "bg-slate-100 text-slate-600 cursor-not-allowed"
-                        : "focus:border-emerald-500",
+                        : "focus:border-slate-900",
                     )}
                   />
                 </div>
@@ -253,7 +253,7 @@ const UploadDocumentModal = ({
                     type="date"
                     value={expiryDate}
                     onChange={(e) => setExpiryDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700"
                   />
                 </div>
               </div>
@@ -273,7 +273,7 @@ const UploadDocumentModal = ({
                     "flex-1 px-4 py-2 rounded-lg text-[12px] font-bold text-white flex items-center justify-center gap-2 transition-colors",
                     !file || !docName.trim()
                       ? "bg-slate-300 cursor-not-allowed"
-                      : "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-slate-900 hover:bg-black"
                   )}
                 >
                   {uploading ? (

@@ -16,7 +16,7 @@ import { ItemPhotoThumb } from "../../../stores/inventory/components/ItemPhotoFi
 import { isPositiveInt, toGeneralRequestWriteBody } from "../utils/requestHelpers";
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 function sameId(a, b) {
   if (a == null || b == null || a === "" || b === "") return false;
@@ -27,7 +27,7 @@ function SelectedItemCard({ item, onChange }) {
   const meta = [item.itemCode, item.brand].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-brand/15 bg-brand-muted px-3 py-1.5">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
       <div className="flex min-w-0 items-center gap-2.5">
         <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
         <div className="min-w-0">
@@ -40,7 +40,7 @@ function SelectedItemCard({ item, onChange }) {
       <button
         type="button"
         onClick={onChange}
-        className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-brand hover:text-brand-hover"
+        className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-hover"
       >
         <Replace size={12} />
         Change
@@ -470,7 +470,7 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                 className={cn(
                   "px-3 py-1.5 text-[11px] font-bold rounded-md transition-colors",
                   accessoryMode === "catalog"
-                    ? "bg-white text-emerald-700 shadow-sm"
+                    ? "bg-white text-primary shadow-sm"
                     : "text-slate-500 hover:text-slate-700",
                 )}
               >
@@ -482,7 +482,7 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                 className={cn(
                   "px-3 py-1.5 text-[11px] font-bold rounded-md transition-colors",
                   accessoryMode === "other"
-                    ? "bg-white text-emerald-700 shadow-sm"
+                    ? "bg-white text-primary shadow-sm"
                     : "text-slate-500 hover:text-slate-700",
                 )}
               >

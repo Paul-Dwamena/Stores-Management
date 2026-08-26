@@ -29,7 +29,7 @@ import RequisitionRequestSummary from "./RequisitionRequestSummary";
 import RejectRequisitionModal from "./RejectRequisitionModal";
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700 resize-none";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700 resize-none";
 
 export function getStockLocationsForRequisition(requisition) {
   if (!requisition?.itemId) return [];
@@ -397,13 +397,13 @@ export default function RaiseSupplyRequestModal({
         <div className="space-y-4">
           <RequisitionRequestSummary requisition={requisition} />
 
-          <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 px-3.5 py-3">
+          <div className="rounded-lg border border-[#b7d4c8] bg-success-muted px-3.5 py-3">
             <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-white text-emerald-600">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#b7d4c8] bg-white text-success">
                 <Boxes size={16} />
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-success">
                   Available stock
                 </p>
                 <p className="mt-0.5 text-[13px] font-semibold text-slate-900">
@@ -484,7 +484,7 @@ export default function RaiseSupplyRequestModal({
                       {requiredFieldLabel("Quantity from each store", true)}
                     </p>
                     <p className={`text-[10px] font-bold ${
-                      allocated > 0 ? "text-emerald-600" : "text-slate-500"
+                      allocated > 0 ? "text-success" : "text-slate-500"
                     }`}>
                       Total {allocated || 0}
                       {requested ? ` of ${requested} requested` : ""}

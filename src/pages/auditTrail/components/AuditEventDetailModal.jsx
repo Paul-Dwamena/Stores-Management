@@ -70,7 +70,7 @@ export default function AuditEventDetailModal({ isOpen, onClose, event }) {
                       <td
                         className={cn(
                           "px-3 py-2.5 text-[12px] font-medium",
-                          change.after === "Removed" ? "text-rose-600" : "text-emerald-700",
+                          change.after === "Removed" ? "text-rose-600" : "text-primary",
                         )}
                       >
                         {change.after}

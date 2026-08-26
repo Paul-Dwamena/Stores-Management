@@ -44,7 +44,7 @@ const LocationField = ({
           onChange={(event) => onChange?.(event.target.value)}
           placeholder={placeholder}
           className={cn(
-            "w-full pl-9 pr-3 py-2 bg-slate-50 border rounded-lg text-[12px] outline-none focus:border-brand focus:bg-surface transition-colors text-text",
+            "w-full pl-9 pr-3 py-2 bg-slate-50 border rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 focus:bg-surface transition-colors text-text",
             error ? "border-danger" : "border-border",
           )}
         />

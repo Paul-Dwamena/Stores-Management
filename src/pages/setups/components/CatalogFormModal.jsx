@@ -8,7 +8,7 @@ import SectionLoadState from "../../../components/common/SectionLoadState";
 import { cn } from "../../../utils/cn";
 
 const selectClass =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-brand transition-colors text-slate-700 appearance-none pr-9";
+  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700 appearance-none pr-9";
 
 export default function CatalogFormModal({
   isOpen,

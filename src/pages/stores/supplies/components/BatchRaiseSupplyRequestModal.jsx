@@ -8,7 +8,7 @@ import { cn } from "../../../../utils/cn";
 import { getLocationStock, getStockLocationsForRequisition, sumStoreQuantities } from "./RaiseSupplyRequestModal";
 
 const fieldClassName =
-  "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-emerald-500 transition-colors text-slate-700";
+  "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 function RemoveRowButton({ onClick, label }) {
   return (
@@ -284,7 +284,7 @@ export default function BatchRaiseSupplyRequestModal({
                             <div className="space-y-1.5">
                               <p className={`text-[10px] font-bold ${
                                 allocated === requested && requested > 0
-                                  ? "text-emerald-600"
+                                  ? "text-primary"
                                   : allocated > requested
                                     ? "text-rose-600"
                                     : "text-slate-500"

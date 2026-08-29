@@ -16,6 +16,8 @@ export default function TransferCommentModal({
   confirmText = "Confirm",
   isDanger = false,
   continueLabel = "Continue",
+  confirmLoading = false,
+  closeOnConfirm = true,
 }) {
   const [comment, setComment] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -37,6 +39,7 @@ export default function TransferCommentModal({
   if (!isOpen) return null;
 
   const close = () => {
+    if (confirmLoading) return;
     setComment("");
     setConfirmOpen(false);
     onClose();
@@ -44,10 +47,12 @@ export default function TransferCommentModal({
 
   const finalize = () => {
     const trimmed = comment.trim();
-    if (!trimmed) return;
+    if (!trimmed || confirmLoading) return;
     onConfirm(trimmed);
-    setComment("");
-    setConfirmOpen(false);
+    if (closeOnConfirm) {
+      setComment("");
+      setConfirmOpen(false);
+    }
   };
 
   const Icon = isDanger ? AlertTriangle : MessageSquare;
@@ -97,13 +102,13 @@ export default function TransferCommentModal({
                 </div>
 
                 <div className="flex justify-end gap-3">
-                  <Button onClick={close} variant="ghost" className="border border-slate-200">
+                  <Button onClick={close} variant="ghost" className="border border-slate-200" disabled={confirmLoading}>
                     Cancel
                   </Button>
                   <Button
                     onClick={() => comment.trim() && setConfirmOpen(true)}
                     variant={isDanger ? "danger" : "primary"}
-                    disabled={!comment.trim()}
+                    disabled={!comment.trim() || confirmLoading}
                   >
                     {continueLabel}
                   </Button>
@@ -116,7 +121,7 @@ export default function TransferCommentModal({
 
       <ConfirmationModal
         isOpen={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        onClose={() => !confirmLoading && setConfirmOpen(false)}
         onConfirm={finalize}
         isDanger={isDanger}
         className="!z-[10001]"
@@ -126,6 +131,8 @@ export default function TransferCommentModal({
           || (transferLabel ? `Continue with ${transferLabel}?` : "Continue with this transfer?")
         }
         confirmText={confirmText}
+        confirmLoading={confirmLoading}
+        closeOnConfirm={closeOnConfirm}
       />
     </>
   );

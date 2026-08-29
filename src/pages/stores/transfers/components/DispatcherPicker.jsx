@@ -1,7 +1,6 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import ConfiguredSearchSelectField from "../../../../components/common/fields/ConfiguredSearchSelectField";
-import { getReceivers } from "../../../../mockdata/stores";
 
 function personLabel(person) {
   return person.name || person.email || "";
@@ -19,31 +18,30 @@ function personOptions(people = []) {
   }));
 }
 
-export default function ReceiverPicker({
+export default function DispatcherPicker({
   value,
   onChange,
   error,
   onAddClick,
   required = true,
-  label = "Person to receive",
+  label = "Person dispatching",
   placeholder = "Search by name or phone…",
-  addButtonLabel = "Add receiver",
-  items,
-  id = "person-search",
+  addButtonLabel = "Add dispatcher",
+  items = [],
+  id = "dispatcher-search",
 }) {
-  const people = items ?? getReceivers();
-  const options = personOptions(people);
+  const options = personOptions(items);
 
   return (
     <ConfiguredSearchSelectField
       id={id}
       field={{
-        key: "person",
+        key: "dispatcher",
         title: label,
         placeholder,
         options,
       }}
-      values={{ person: value }}
+      values={{ dispatcher: value }}
       error={error}
       onChange={(_key, next) => onChange?.(next ?? "")}
       required={required}

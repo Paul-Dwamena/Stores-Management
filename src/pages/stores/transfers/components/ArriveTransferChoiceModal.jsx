@@ -10,6 +10,7 @@ export default function ArriveTransferChoiceModal({
   onHold,
   onAccept,
   transferLabel,
+  actionSaving = false,
 }) {
   const [holdConfirmOpen, setHoldConfirmOpen] = useState(false);
 
@@ -45,13 +46,13 @@ export default function ArriveTransferChoiceModal({
               Accept the items into store now, or hold them as arrived and receive later.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-3 w-full">
-              <Button onClick={onClose} variant="ghost" className="flex-1 border border-slate-200">
+              <Button onClick={onClose} variant="ghost" className="flex-1 border border-slate-200" disabled={actionSaving}>
                 Cancel
               </Button>
-              <Button onClick={() => setHoldConfirmOpen(true)} variant="info" className="flex-1">
+              <Button onClick={() => setHoldConfirmOpen(true)} variant="info" className="flex-1" disabled={actionSaving}>
                 Hold
               </Button>
-              <Button onClick={onAccept} className="flex-1">
+              <Button onClick={onAccept} className="flex-1" disabled={actionSaving}>
                 Accept to store
               </Button>
             </div>
@@ -62,10 +63,9 @@ export default function ArriveTransferChoiceModal({
 
       <ConfirmationModal
         isOpen={holdConfirmOpen}
-        onClose={() => setHoldConfirmOpen(false)}
+        onClose={() => !actionSaving && setHoldConfirmOpen(false)}
         onConfirm={() => {
           onHold();
-          setHoldConfirmOpen(false);
         }}
         className="!z-[10001]"
         title="Hold this transfer?"
@@ -75,6 +75,8 @@ export default function ArriveTransferChoiceModal({
             : "Keep these items as arrived and receive them into store later?"
         }
         confirmText="Hold"
+        confirmLoading={actionSaving}
+        closeOnConfirm={false}
       />
     </>
   );

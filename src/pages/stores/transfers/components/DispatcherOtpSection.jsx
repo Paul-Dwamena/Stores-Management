@@ -1,15 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import InputField from "../../../../components/common/fields/InputField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { verifyDeliveryOtp } from "../../../../services/inventoryService";
+import { verifyDispatcherConfirmationOtp } from "../../../../services/transfersService";
 
-export default function DeliveryPersonOtpSection({
-  deliveredByName,
-  deliveredByPhone,
-  deliveredByEmail,
+function resolveDispatcher(dispatcherId, dispatchers = []) {
+  const key = String(dispatcherId || "").trim();
+  if (!key) return null;
+  return (
+    dispatchers.find(
+      (person) =>
+        String(person.id) === key ||
+        person.name === key ||
+        [person.firstName, person.lastName].filter(Boolean).join(" ").trim() === key,
+    ) || null
+  );
+}
+
+export default function DispatcherOtpSection({
+  dispatcherId,
+  dispatchers = [],
   otpSent,
   otp,
   otpVerified,
@@ -18,28 +30,35 @@ export default function DeliveryPersonOtpSection({
   onVerifiedChange,
   sendDisabled = false,
   sendLoading = false,
+  itemCount,
   required = true,
 }) {
   const [otpError, setOtpError] = useState("");
   const [verifying, setVerifying] = useState(false);
-  const name = deliveredByName?.trim() || "the delivery person";
-  const phone = deliveredByPhone?.trim() || "";
-  const contact = phone || deliveredByEmail?.trim() || "";
+  const dispatcher = useMemo(
+    () => resolveDispatcher(dispatcherId, dispatchers),
+    [dispatcherId, dispatchers],
+  );
+  const name = dispatcher?.name || String(dispatcherId || "").trim() || "the selected dispatcher";
+  const phone = dispatcher?.phone?.trim() || "";
+  const itemLabel = Number.isFinite(itemCount)
+    ? ` for the ${itemCount} selected item${itemCount === 1 ? "" : "s"}`
+    : "";
 
   useEffect(() => {
     setOtpError("");
-  }, [otpSent, deliveredByName, deliveredByPhone, deliveredByEmail]);
+  }, [otpSent, dispatcherId]);
 
   const handleConfirmOtp = async () => {
     if (!/^\d{6}$/.test(otp.trim())) {
-      const message = "Enter the 6-digit OTP sent to the delivery person.";
+      const message = "Enter the 6-digit OTP sent to the dispatcher.";
       setOtpError(message);
       toast.warning(message);
       onVerifiedChange?.(false);
       return;
     }
     if (!phone) {
-      const message = "Delivery phone is required to verify the OTP.";
+      const message = "Dispatcher phone is required to verify the OTP.";
       setOtpError(message);
       toast.warning(message);
       onVerifiedChange?.(false);
@@ -47,12 +66,12 @@ export default function DeliveryPersonOtpSection({
     }
     setVerifying(true);
     try {
-      await verifyDeliveryOtp({ phone, otp: otp.trim() });
+      await verifyDispatcherConfirmationOtp({ phone, otp: otp.trim() });
       setOtpError("");
       onVerifiedChange?.(true);
       toast.success("OTP confirmed.");
     } catch (error) {
-      const message = error.message || "The OTP does not match the code sent to this contact.";
+      const message = error.message || "The OTP does not match the code sent to this number.";
       setOtpError(message);
       toast.error(message);
       onVerifiedChange?.(false);
@@ -74,47 +93,47 @@ export default function DeliveryPersonOtpSection({
     >
       <div>
         <p className="text-[12px] font-bold text-slate-800">
-          {otpVerified ? "OTP confirmed" : "Delivery person verification"}
+          {otpVerified ? "OTP confirmed" : "Dispatcher verification"}
         </p>
         <p className="text-[12px] text-slate-500 mt-1">
           {otpVerified ? (
             <>
               OTP confirmed for{" "}
               <span className="font-semibold text-slate-700">{name}</span>
-              {contact ? (
+              {phone ? (
                 <>
                   {" "}
                   on{" "}
-                  <span className="font-semibold text-slate-700">{contact}</span>
+                  <span className="font-semibold text-slate-700">{phone}</span>
                 </>
               ) : null}
-              . You can now receive stock.
+              {itemLabel}. You can now request approval.
             </>
           ) : otpSent ? (
             <>
               OTP sent to{" "}
               <span className="font-semibold text-slate-700">{name}</span>
-              {contact ? (
+              {phone ? (
                 <>
                   {" "}
                   on{" "}
-                  <span className="font-semibold text-slate-700">{contact}</span>
+                  <span className="font-semibold text-slate-700">{phone}</span>
                 </>
               ) : null}
-              . Enter the code they received to continue.
+              {itemLabel}. Enter the code they received to continue.
             </>
           ) : (
             <>
               An OTP will be sent to{" "}
               <span className="font-semibold text-slate-700">{name}</span>
-              {contact ? (
+              {phone ? (
                 <>
                   {" "}
                   on{" "}
-                  <span className="font-semibold text-slate-700">{contact}</span>
+                  <span className="font-semibold text-slate-700">{phone}</span>
                 </>
               ) : null}
-              . Confirm the code before receiving stock.
+              {itemLabel}. Confirm the code they receive before requesting approval.
             </>
           )}
         </p>
@@ -136,7 +155,7 @@ export default function DeliveryPersonOtpSection({
             <p className="flex items-center gap-1.5 text-[12px] font-medium text-success">
               <CheckCircle2 size={14} className="shrink-0" />
               OTP sent to {name}
-              {contact ? ` on ${contact}` : ""}
+              {phone ? ` on ${phone}` : ""}
             </p>
           </div>
         ) : (
@@ -152,7 +171,7 @@ export default function DeliveryPersonOtpSection({
               {sendLoading ? "Sending…" : "Send OTP"}
             </Button>
             <p className="text-[11px] font-medium text-slate-400">
-              Send and confirm the OTP to enable Receive stock
+              Send and confirm the OTP to enable Request approval
             </p>
           </div>
         )
@@ -160,7 +179,7 @@ export default function DeliveryPersonOtpSection({
         <p className="flex items-center gap-1.5 text-[12px] font-medium text-success">
           <CheckCircle2 size={14} className="shrink-0" />
           OTP confirmed for {name}
-          {contact ? ` on ${contact}` : ""}
+          {phone ? ` on ${phone}` : ""}
         </p>
       )}
 
@@ -168,7 +187,7 @@ export default function DeliveryPersonOtpSection({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="max-w-xs flex-1">
             <InputField
-              id="receiveDeliveryOtp"
+              id="transferDispatcherOtp"
               label="Enter OTP"
               required={required}
               value={otp}

@@ -259,7 +259,7 @@ export default function RequestsList() {
             {filtered.map((request) => (
               <div
                 key={request.id}
-                className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 transition-colors hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
               >
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1 space-y-2">

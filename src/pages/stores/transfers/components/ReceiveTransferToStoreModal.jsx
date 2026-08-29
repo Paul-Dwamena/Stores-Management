@@ -7,14 +7,10 @@ import RequestDetailsModal, {
   AccordionSection,
   DetailRow,
 } from "../../../../components/common/details/RequestDetailsModal";
-import {
-  formatInterStoreItemType,
-  formatInterStoreTransferDate,
-  formatInterStoreTransferDateTime,
-} from "../../../../mockdata/stores";
+import { formatApiDate, formatApiDateTime } from "../../../../utils/apiResponseHelpers";
 
 function lineKey(line, index) {
-  return `${line.itemType || "item"}:${line.itemId || line.itemCode || index}`;
+  return `${line.itemId || line.itemCode || "item"}:${index}`;
 }
 
 function ReceiveLineDetailsModal({ isOpen, onClose, transfer, line }) {
@@ -46,12 +42,10 @@ function ReceiveLineDetailsModal({ isOpen, onClose, transfer, line }) {
         <DetailRow label="Item code">{line.itemCode || "—"}</DetailRow>
         <DetailRow label="Name">{line.itemName || "—"}</DetailRow>
         <DetailRow label="Description">{line.description || "—"}</DetailRow>
-        <DetailRow label="Item type">{formatInterStoreItemType(line.itemType)}</DetailRow>
         <DetailRow label="Qty requested">
           {line.quantityRequested ?? line.movingQuantity ?? "—"}
         </DetailRow>
         <DetailRow label="Qty approved">{line.quantityApproved ?? "—"}</DetailRow>
-        <DetailRow label="Supplier">{line.supplier || "—"}</DetailRow>
       </AccordionSection>
 
       <AccordionSection
@@ -62,10 +56,10 @@ function ReceiveLineDetailsModal({ isOpen, onClose, transfer, line }) {
         <DetailRow label="Supplying store">{transfer.fromStore || "—"}</DetailRow>
         <DetailRow label="Destination store">{line.toStore || transfer.toStore || "—"}</DetailRow>
         <DetailRow label="Date requested">
-          {formatInterStoreTransferDateTime(transfer.createdAt)}
+          {formatApiDateTime(line.requestedAt || transfer.createdAt)}
         </DetailRow>
         <DetailRow label="Date approved">
-          {formatInterStoreTransferDateTime(transfer.approvedAt)}
+          {formatApiDateTime(line.approvedAt || transfer.approvedAt)}
         </DetailRow>
       </AccordionSection>
 
@@ -75,7 +69,7 @@ function ReceiveLineDetailsModal({ isOpen, onClose, transfer, line }) {
         onToggle={() => toggle("people")}
       >
         <DetailRow label="Transfer person">{transfer.requestedBy || "—"}</DetailRow>
-        <DetailRow label="Approval person">{transfer.approvedBy || "—"}</DetailRow>
+        <DetailRow label="Dispatcher">{transfer.dispatcher || "—"}</DetailRow>
       </AccordionSection>
     </RequestDetailsModal>
   );
@@ -86,6 +80,7 @@ export default function ReceiveTransferToStoreModal({
   onClose,
   onConfirm,
   transfer,
+  saving = false,
 }) {
   const [detailLine, setDetailLine] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -115,7 +110,7 @@ export default function ReceiveTransferToStoreModal({
           <div
             className="absolute inset-0 bg-slate-900/60 animate-in fade-in duration-200"
             style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
-            onClick={onClose}
+            onClick={() => !saving && onClose()}
           />
           <div className="relative w-full max-w-6xl bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 m-0 sm:m-4 max-h-[90vh] flex flex-col min-h-0">
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100">
@@ -128,7 +123,8 @@ export default function ReceiveTransferToStoreModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors focus:outline-none"
+                disabled={saving}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors focus:outline-none disabled:opacity-50"
               >
                 <X size={20} />
               </button>
@@ -172,10 +168,10 @@ export default function ReceiveTransferToStoreModal({
                           {transfer.fromStore}
                         </td>
                         <td className="px-3 py-2.5 text-[12px] text-slate-600 whitespace-nowrap">
-                          {formatInterStoreTransferDate(transfer.createdAt)}
+                          {formatApiDate(line.requestedAt || transfer.createdAt)}
                         </td>
                         <td className="px-3 py-2.5 text-[12px] text-slate-600 whitespace-nowrap">
-                          {formatInterStoreTransferDate(transfer.approvedAt)}
+                          {formatApiDate(line.approvedAt || transfer.approvedAt)}
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <button
@@ -194,10 +190,10 @@ export default function ReceiveTransferToStoreModal({
             </div>
 
             <div className="flex justify-end gap-3 p-4 sm:p-6 border-t border-slate-100">
-              <Button variant="ghost" className="border border-slate-200" onClick={onClose}>
+              <Button variant="ghost" className="border border-slate-200" onClick={onClose} disabled={saving}>
                 Cancel
               </Button>
-              <Button onClick={() => setConfirmOpen(true)}>
+              <Button onClick={() => setConfirmOpen(true)} disabled={saving}>
                 Receive to store
               </Button>
             </div>
@@ -215,15 +211,14 @@ export default function ReceiveTransferToStoreModal({
 
       <ConfirmationModal
         isOpen={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          onConfirm();
-          setConfirmOpen(false);
-        }}
+        onClose={() => !saving && setConfirmOpen(false)}
+        onConfirm={onConfirm}
         className="!z-[10003]"
         title="Receive these items?"
         message={`Book ${transfer.transferNumber} into the destination store${lines.length > 1 ? "s" : ""}?`}
         confirmText="Receive to store"
+        confirmLoading={saving}
+        closeOnConfirm={false}
       />
     </>
   );

@@ -1,44 +1,40 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight,
-  Ban,
   CheckCircle2,
   Clock3,
-  MapPin,
-  PackageCheck,
   Plus,
-  Truck,
-  XCircle,
   AlertTriangle,
 } from "lucide-react";
-import { cn } from "../../../utils/cn";
 import Button from "../../../components/common/base/Button";
 import SummaryStatCard from "../../../components/common/SummaryStatCard";
 import ConfirmationModal from "../../../components/common/ConfirmationModal";
 import SearchInput from "../../../components/common/fields/SearchInput";
 import Pagination from "../../../components/common/Pagination";
+import SectionLoadState from "../../../components/common/SectionLoadState";
 import {
-  TableIconAction,
   TableRowActions,
   TableViewAction,
 } from "../../../components/common/tableActions";
 import { toast } from "../../../components/common/ToastNotification";
+import { formatApiDateTime, sortNewestFirst } from "../../../utils/apiResponseHelpers";
+import { getTransfersStats } from "../../../services/statsService";
 import {
-  INTER_STORE_TRANSFER_KIND_TABS,
-  INTER_STORE_TRANSFER_STATUS_OPTIONS,
-  applyInterStoreTransferApprovalDecision,
-  cancelInterStoreTransfer,
-  createInterStoreTransfer,
-  dispatchInterStoreTransfer,
-  formatInterStoreTransferDate,
-  formatInterStoreTransferStatus,
-  getInterStoreTransfers,
-  getInterStoreTransferById,
-  markInterStoreTransferArrived,
-  receiveInterStoreTransfer,
-  rejectInterStoreTransfer,
-} from "../../../mockdata/stores";
-import { saveRequest } from "../../../mockdata/requests";
+  listTransfers,
+  getTransfer,
+  createTransfer,
+  approveTransfer,
+  cancelTransfer,
+  rejectTransferDispatch,
+  dispatchTransfer,
+  holdTransfer,
+  acceptTransfer,
+} from "../../../services/transfersService";
+import { TransferStatusBadge } from "./utils/TransferStatusBadge";
+import {
+  TRANSFER_STATUS_OPTIONS,
+  transferStatusKey,
+} from "./utils/transferStatus";
 import ArriveTransferChoiceModal from "./components/ArriveTransferChoiceModal";
 import InterStoreTransferDetailsModal from "./components/InterStoreTransferDetailsModal";
 import NewInterStoreTransferModal from "./components/NewInterStoreTransferModal";
@@ -53,72 +49,74 @@ const filterLabelClassName =
 const filterSelectClassName =
   "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
-function statusBadgeClass(status) {
-  switch (status) {
-    case "PENDING_APPROVAL":
-      return "bg-violet-50 text-violet-700 border-violet-200";
-    case "PENDING":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    case "IN_TRANSIT":
-      return "bg-sky-50 text-sky-700 border-sky-200";
-    case "ARRIVED":
-      return "bg-indigo-50 text-indigo-700 border-indigo-200";
-    case "COMPLETED":
-      return "bg-success-muted text-success border-[#b7d4c8]";
-    case "REJECTED":
-      return "bg-rose-50 text-rose-700 border-rose-200";
-    case "CANCELLED":
-      return "bg-slate-50 text-slate-500 border-slate-200";
-    default:
-      return "bg-slate-50 text-slate-600 border-slate-200";
-  }
-}
-
-export default function InterStoresTransfersList({
-  embedded = false,
-  tabsSlot = null,
-  view = "accessories",
-}) {
-  const isVehicleParts = view === "vehicle_parts";
-  const [rows, setRows] = useState(() => getInterStoreTransfers());
+export default function InterStoresTransfersList({ embedded = false }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalTransfers: 0,
+    open: 0,
+    completed: 0,
+    rejected: 0,
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
   const [detailRow, setDetailRow] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailLoadError, setDetailLoadError] = useState(null);
+  const [actionSaving, setActionSaving] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [commentAction, setCommentAction] = useState(null);
   const [arriveRow, setArriveRow] = useState(null);
   const [receiveRow, setReceiveRow] = useState(null);
 
-  const refreshRows = () => setRows(getInterStoreTransfers());
+  const loadTransfers = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await listTransfers();
+      setRows(sortNewestFirst(data, "createdAt"));
+    } catch (err) {
+      setLoadError(err.message || "Unable to load transfers.");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const data = await getTransfersStats();
+      setStats(data);
+    } catch {
+      setStats({
+        totalTransfers: 0,
+        open: 0,
+        completed: 0,
+        rejected: 0,
+      });
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  const reloadAll = useCallback(async () => {
+    await Promise.all([loadTransfers(), loadStats()]);
+  }, [loadTransfers, loadStats]);
 
   useEffect(() => {
-    setPage(0);
-    setSearchQuery("");
-    setStatusFilter("ALL");
-    setCreateOpen(false);
-    setDetailRow(null);
-    setConfirmAction(null);
-    setCommentAction(null);
-    setArriveRow(null);
-    setReceiveRow(null);
-    refreshRows();
-  }, [view]);
-
-  const kindRows = useMemo(
-    () => rows.filter((row) => {
-      const tabKind = isVehicleParts ? "vehicle_parts" : "accessories";
-      if (row.kind === tabKind || row.kind === "mixed") return true;
-      return (row.lines || []).some((line) => line.itemType === tabKind);
-    }),
-    [rows, isVehicleParts],
-  );
+    reloadAll();
+  }, [reloadAll]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return kindRows.filter((row) => {
-      if (statusFilter !== "ALL" && row.status !== statusFilter) return false;
+    return rows.filter((row) => {
+      if (statusFilter !== "ALL" && transferStatusKey(row.status) !== statusFilter) return false;
       if (!q) return true;
       return [
         row.transferNumber,
@@ -129,14 +127,19 @@ export default function InterStoresTransfersList({
         row.toStoreLabel,
         row.requestedBy,
         row.notes,
-        ...(row.lines || []).flatMap((line) => [line.itemCode, line.itemName, line.description, line.toStore]),
+        ...(row.lines || []).flatMap((line) => [
+          line.itemCode,
+          line.itemName,
+          line.description,
+          line.toStore,
+        ]),
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [kindRows, searchQuery, statusFilter]);
+  }, [rows, searchQuery, statusFilter]);
 
   const totalElements = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalElements / PAGE_SIZE));
@@ -147,115 +150,137 @@ export default function InterStoresTransfersList({
     if (safePage !== page) setPage(safePage);
   }, [safePage, page]);
 
-  const stats = useMemo(() => {
-    const pending = kindRows.filter((row) =>
-      ["PENDING_APPROVAL", "PENDING", "IN_TRANSIT", "ARRIVED"].includes(row.status),
-    ).length;
-    const completed = kindRows.filter((row) => row.status === "COMPLETED").length;
-    const rejected = kindRows.filter((row) =>
-      ["REJECTED", "CANCELLED"].includes(row.status),
-    ).length;
-    return [
+  const statCards = useMemo(
+    () => [
       {
-        label: isVehicleParts ? "Vehicle part transfers" : "Accessory transfers",
-        value: String(kindRows.length),
+        label: "Inter-store transfers",
+        value: String(stats.totalTransfers),
         icon: ArrowLeftRight,
         tone: "teal",
       },
-      { label: "Open", value: String(pending), icon: Clock3, tone: "amber" },
-      { label: "Completed", value: String(completed), icon: CheckCircle2, tone: "sky" },
-      { label: "Closed without move", value: String(rejected), icon: AlertTriangle, tone: "rose" },
-    ];
-  }, [kindRows, isVehicleParts]);
+      { label: "Open", value: String(stats.open), icon: Clock3, tone: "amber" },
+      { label: "Completed", value: String(stats.completed), icon: CheckCircle2, tone: "sky" },
+      {
+        label: "Closed without move",
+        value: String(stats.rejected),
+        icon: AlertTriangle,
+        tone: "rose",
+      },
+    ],
+    [stats],
+  );
 
-  const liveDetailRow = detailRow
-    ? getInterStoreTransferById(detailRow.id) || rows.find((row) => row.id === detailRow.id) || detailRow
-    : null;
-
-  const handleCreate = (payload) => {
+  const openDetail = async (row) => {
+    setDetailRow(row);
+    setDetailLoading(true);
+    setDetailLoadError(null);
     try {
-      const created = createInterStoreTransfer(payload);
-      saveRequest({
-        requestType: "inter_store_transfer",
-        amount: 0,
-        costCenter: "Parts Store",
-        budgetLine: "Inter-store Transfer",
-        requestClass: "Operating",
-        expenseCategory: `${created.transferNumber} · ${created.itemCount} item${created.itemCount === 1 ? "" : "s"}`,
-        purpose: created.notes || `Transfer stock from ${created.fromStore}.`,
-        status: "PENDING",
-        storesDetails: {
-          transferId: created.id,
-          requestNumber: created.transferNumber,
-          kind: created.kind,
-          fromStore: created.fromStore,
-          itemName: created.itemName,
-          itemCode: created.itemCode,
-          quantity: created.quantity,
-          lines: created.lines,
-          justification: created.notes,
-        },
-      });
-      refreshRows();
-      setCreateOpen(false);
-      toast.success(`${created.transferNumber} sent for approval.`);
+      const detail = await getTransfer(row.id);
+      setDetailRow(detail);
     } catch (err) {
-      toast.error(err.message || "Could not create the transfer.");
+      setDetailLoadError(err.message || "Unable to load transfer details.");
+    } finally {
+      setDetailLoading(false);
     }
   };
 
-  const handleDispatch = (row) => {
+  const refreshDetail = async (row) => {
     try {
-      dispatchInterStoreTransfer(row.id, { dispatcher: row.dispatcher });
-      refreshRows();
+      const detail = await getTransfer(row.id);
+      setDetailRow(detail);
+      return detail;
+    } catch (err) {
+      toast.error(err.message || "Unable to refresh transfer.");
+      return row;
+    }
+  };
+
+  const handleCreate = async (payload) => {
+    setCreateSaving(true);
+    try {
+      await createTransfer(payload);
+      await reloadAll();
+      setCreateOpen(false);
+      toast.success("Transfer sent for approval.");
+    } catch (err) {
+      toast.error(err.message || "Could not create the transfer.");
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
+  const handleDispatch = async (row) => {
+    setActionSaving(true);
+    try {
+      await dispatchTransfer(row.id);
+      await reloadAll();
       setConfirmAction(null);
+      setDetailRow(null);
       toast.success(`${row.transferNumber} is now in transit.`);
     } catch (err) {
       toast.error(err.message || "Could not dispatch the transfer.");
+    } finally {
+      setActionSaving(false);
     }
   };
 
-  const handleReceive = (row) => {
+  const handleReceive = async (row) => {
+    setActionSaving(true);
     try {
-      receiveInterStoreTransfer(row.id);
-      refreshRows();
+      await acceptTransfer(row.id);
+      await reloadAll();
       setReceiveRow(null);
+      setDetailRow(null);
       toast.success(`${row.transferNumber} received into store.`);
     } catch (err) {
       toast.error(err.message || "Could not receive the transfer.");
+    } finally {
+      setActionSaving(false);
     }
   };
 
-  const handleCancel = (row) => {
+  const handleCancel = async (row) => {
+    setActionSaving(true);
     try {
-      cancelInterStoreTransfer(row.id);
-      refreshRows();
+      await cancelTransfer(row.id, { reason: "Cancelled before approval." });
+      await reloadAll();
       setConfirmAction(null);
+      setDetailRow(null);
       toast.success(`${row.transferNumber} cancelled.`);
     } catch (err) {
       toast.error(err.message || "Could not cancel the transfer.");
+    } finally {
+      setActionSaving(false);
     }
   };
 
-  const handleApprove = (row) => {
+  const handleApprove = async (row) => {
+    setActionSaving(true);
     try {
-      applyInterStoreTransferApprovalDecision(row.id, { approved: true });
-      refreshRows();
+      await approveTransfer(row.id);
+      await reloadAll();
+      setConfirmAction(null);
       setDetailRow(null);
       toast.success(`${row.transferNumber} approved.`);
     } catch (err) {
       toast.error(err.message || "Could not approve the transfer.");
+    } finally {
+      setActionSaving(false);
     }
   };
 
-  const handleReject = (row, reason) => {
+  const handleReject = async (row, reason) => {
+    setActionSaving(true);
     try {
-      rejectInterStoreTransfer(row.id, { reason });
-      refreshRows();
+      await rejectTransferDispatch(row.id, { reason });
+      await reloadAll();
       setCommentAction(null);
+      setDetailRow(null);
       toast.success(`${row.transferNumber} rejected.`);
     } catch (err) {
       toast.error(err.message || "Could not reject the transfer.");
+    } finally {
+      setActionSaving(false);
     }
   };
 
@@ -264,35 +289,45 @@ export default function InterStoresTransfersList({
     handleReject(commentAction.row, comment);
   };
 
-  const handleHoldArrived = () => {
+  const handleHoldArrived = async () => {
     if (!arriveRow) return;
+    setActionSaving(true);
     try {
-      markInterStoreTransferArrived(arriveRow.id, {
-        note: "Held at destination pending store receipt.",
-      });
-      refreshRows();
+      await holdTransfer(arriveRow.id);
+      await reloadAll();
       setArriveRow(null);
+      setDetailRow(null);
       toast.success(`${arriveRow.transferNumber} marked as arrived and held.`);
     } catch (err) {
       toast.error(err.message || "Could not mark the transfer as arrived.");
+    } finally {
+      setActionSaving(false);
     }
   };
 
-  const handleAcceptArrived = () => {
+  const handleAcceptArrived = async () => {
     if (!arriveRow) return;
+    setActionSaving(true);
     try {
-      const updated = markInterStoreTransferArrived(arriveRow.id, {
-        note: "Accepted to store.",
-      });
-      refreshRows();
+      await holdTransfer(arriveRow.id);
+      const updated = await refreshDetail(arriveRow);
       setArriveRow(null);
       setReceiveRow(updated);
     } catch (err) {
       toast.error(err.message || "Could not mark the transfer as arrived.");
+    } finally {
+      setActionSaving(false);
     }
   };
 
   const confirmCopy = {
+    approve: {
+      title: "Approve this transfer?",
+      message: (row) =>
+        `Approve ${row.transferNumber}? ${row.quantity} item${row.quantity === 1 ? "" : "s"} will move from ${row.fromStore} once dispatched.`,
+      confirmText: "Approve",
+      onConfirm: handleApprove,
+    },
     cancel: {
       title: "Cancel this transfer?",
       message: (row) =>
@@ -329,12 +364,12 @@ export default function InterStoresTransfersList({
   return (
     <div className={embedded ? "space-y-4" : "space-y-4 pb-8"}>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
+        {statCards.map((stat) => (
           <SummaryStatCard
-          variant={embedded ? "light" : "filled"}
+            variant={embedded ? "light" : "filled"}
             key={stat.label}
             title={stat.label}
-            value={stat.value}
+            value={statsLoading ? "…" : stat.value}
             icon={stat.icon}
             tone={stat.tone}
           />
@@ -344,9 +379,7 @@ export default function InterStoresTransfersList({
       <div className="card overflow-hidden">
         <div className="border-b border-slate-100">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-2 sm:px-4 bg-slate-50/30">
-            <div className="min-w-0 flex-1">
-              {tabsSlot}
-            </div>
+            <div className="min-w-0 flex-1" />
             <div className="flex flex-nowrap items-center gap-2 shrink-0 py-2 ml-auto">
               <Button size="sm" onClick={() => setCreateOpen(true)}>
                 <Plus size={16} />
@@ -357,11 +390,7 @@ export default function InterStoresTransfersList({
 
           <div className="p-4 bg-slate-50/30 flex flex-col xl:flex-row justify-between gap-4">
             <SearchInput
-              placeholder={
-                isVehicleParts
-                  ? "Search by transfer #, part, or store…"
-                  : "Search by transfer #, item, or store…"
-              }
+              placeholder="Search by transfer #, item, or store…"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -382,7 +411,7 @@ export default function InterStoresTransfersList({
                   }}
                   className={filterSelectClassName}
                 >
-                  {INTER_STORE_TRANSFER_STATUS_OPTIONS.map((option) => (
+                  {TRANSFER_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -400,9 +429,9 @@ export default function InterStoresTransfersList({
                 <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   Transfer #
                 </th>
-                  <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[320px]">
-                    Items
-                  </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[320px]">
+                  Items
+                </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   Qty
                 </th>
@@ -427,7 +456,19 @@ export default function InterStoresTransfersList({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {pagedRows.length === 0 ? (
+              {loading || loadError ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-2">
+                    <SectionLoadState
+                      loading={loading}
+                      error={loadError}
+                      onRetry={loadTransfers}
+                      loadingLabel="Loading transfers…"
+                      errorTitle="Couldn't load transfers"
+                    />
+                  </td>
+                </tr>
+              ) : pagedRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={9}
@@ -459,26 +500,19 @@ export default function InterStoresTransfersList({
                       {row.toStoreLabel || row.toStore}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-600 whitespace-nowrap">
-                      {formatInterStoreTransferDate(row.createdAt)}
+                      {formatApiDateTime(row.createdAt)}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
                       {row.requestedBy}
                     </td>
                     <td className="px-6 py-3.5 whitespace-nowrap">
-                      <span
-                        className={cn(
-                          "inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border",
-                          statusBadgeClass(row.status),
-                        )}
-                      >
-                        {formatInterStoreTransferStatus(row.status)}
-                      </span>
+                      <TransferStatusBadge status={row.status} />
                     </td>
                     <td className="px-6 py-3.5 text-right whitespace-nowrap">
                       <TableRowActions>
                         <TableViewAction
                           title="View transfer"
-                          onClick={() => setDetailRow(row)}
+                          onClick={() => openDetail(row)}
                         />
                       </TableRowActions>
                     </td>
@@ -502,25 +536,30 @@ export default function InterStoresTransfersList({
 
       <NewInterStoreTransferModal
         isOpen={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => !createSaving && setCreateOpen(false)}
         onSave={handleCreate}
+        saving={createSaving}
       />
 
       <InterStoreTransferDetailsModal
-        isOpen={Boolean(liveDetailRow)}
-        onClose={() => setDetailRow(null)}
-        transfer={liveDetailRow}
-        onApprove={() => liveDetailRow && handleApprove(liveDetailRow)}
-        onDispatch={() => liveDetailRow && setConfirmAction({ type: "dispatch", row: liveDetailRow })}
-        onReceive={() => liveDetailRow && setReceiveRow(liveDetailRow)}
-        onReject={() => liveDetailRow && setCommentAction({ type: "reject", row: liveDetailRow })}
-        onCancel={() => liveDetailRow && setConfirmAction({ type: "cancel", row: liveDetailRow })}
-        onMarkArrived={() => liveDetailRow && setArriveRow(liveDetailRow)}
+        isOpen={Boolean(detailRow)}
+        onClose={() => !actionSaving && setDetailRow(null)}
+        transfer={detailRow}
+        loading={detailLoading}
+        loadError={detailLoadError}
+        onRetry={() => detailRow && openDetail(detailRow)}
+        actionSaving={actionSaving}
+        onApprove={() => detailRow && setConfirmAction({ type: "approve", row: detailRow })}
+        onDispatch={() => detailRow && setConfirmAction({ type: "dispatch", row: detailRow })}
+        onReceive={() => detailRow && setReceiveRow(detailRow)}
+        onReject={() => detailRow && setCommentAction({ type: "reject", row: detailRow })}
+        onCancel={() => detailRow && setConfirmAction({ type: "cancel", row: detailRow })}
+        onMarkArrived={() => detailRow && setArriveRow(detailRow)}
       />
 
       <TransferCommentModal
         isOpen={Boolean(commentAction?.row)}
-        onClose={() => setCommentAction(null)}
+        onClose={() => !actionSaving && setCommentAction(null)}
         onConfirm={handleCommentConfirm}
         transferLabel={commentAction?.row?.transferNumber}
         title={commentCopy[commentAction?.type]?.title}
@@ -533,32 +572,38 @@ export default function InterStoresTransfersList({
         }
         confirmText={commentCopy[commentAction?.type]?.confirmText}
         isDanger={Boolean(commentCopy[commentAction?.type]?.isDanger)}
+        confirmLoading={actionSaving}
+        closeOnConfirm={false}
       />
 
       <ArriveTransferChoiceModal
         isOpen={Boolean(arriveRow)}
-        onClose={() => setArriveRow(null)}
+        onClose={() => !actionSaving && setArriveRow(null)}
         onHold={handleHoldArrived}
         onAccept={handleAcceptArrived}
         transferLabel={arriveRow?.transferNumber}
+        actionSaving={actionSaving}
       />
 
       <ReceiveTransferToStoreModal
         isOpen={Boolean(receiveRow)}
-        onClose={() => setReceiveRow(null)}
+        onClose={() => !actionSaving && setReceiveRow(null)}
         onConfirm={() => receiveRow && handleReceive(receiveRow)}
         transfer={receiveRow}
+        saving={actionSaving}
       />
 
       <ConfirmationModal
         isOpen={Boolean(activeConfirm && confirmAction?.row)}
-        onClose={() => setConfirmAction(null)}
+        onClose={() => !actionSaving && setConfirmAction(null)}
         onConfirm={() => activeConfirm?.onConfirm(confirmAction.row)}
         isDanger={Boolean(activeConfirm?.isDanger)}
         className="!z-[10001]"
         title={activeConfirm?.title}
         message={confirmAction?.row ? activeConfirm?.message(confirmAction.row) : ""}
         confirmText={activeConfirm?.confirmText}
+        confirmLoading={actionSaving}
+        closeOnConfirm={false}
       />
     </div>
   );

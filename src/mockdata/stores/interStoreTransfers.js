@@ -8,7 +8,7 @@ import { getStoreLocationOptions } from "../org/stores";
 export const INTER_STORE_TRANSFER_STATUS_OPTIONS = [
   { value: "ALL", label: "All" },
   { value: "PENDING_APPROVAL", label: "Pending approval" },
-  { value: "PENDING", label: "Pending dispatch" },
+  { value: "PENDING_DISPATCH", label: "Pending dispatch" },
   { value: "IN_TRANSIT", label: "In transit" },
   { value: "ARRIVED", label: "Arrived" },
   { value: "COMPLETED", label: "Completed" },
@@ -154,7 +154,7 @@ const SEED_TRANSFERS = [
     requestedBy: "Kwesi Mensah",
     approvedBy: "Kojo Asante",
     dispatcher: "Selorm Gbeho",
-    status: "PENDING",
+    status: "PENDING_DISPATCH",
     createdAt: "2026-08-10T09:20:00.000Z",
     approvedAt: "2026-08-11T08:05:00.000Z",
     notes: "Move surplus mats to Tema for courier van fit-out.",
@@ -463,7 +463,7 @@ const SEED_TRANSFERS = [
     requestedBy: "Michael Addo",
     approvedBy: "Nii Quaye",
     dispatcher: "Efua Darko",
-    status: "PENDING",
+    status: "PENDING_DISPATCH",
     createdAt: "2026-08-12T08:40:00.000Z",
     approvedAt: "2026-08-12T15:20:00.000Z",
     notes: "Support Urvan shuttle service bay in Tema.",
@@ -1008,7 +1008,7 @@ export function applyInterStoreTransferApprovalDecision(transferId, {
         {
           ...row,
           lines: approvedLines,
-          status: "PENDING",
+          status: "PENDING_DISPATCH",
           approvedAt: now,
           approvedBy: actor,
         },
@@ -1038,7 +1038,7 @@ export function applyInterStoreTransferApprovalDecision(transferId, {
 export function dispatchInterStoreTransfer(id, payload = {}) {
   const row = sessionTransfers.find((item) => item.id === id);
   if (!row) throw new Error("Transfer not found.");
-  if (row.status !== "PENDING") {
+  if (row.status !== "PENDING_DISPATCH") {
     throw new Error("Only approved transfers can be dispatched.");
   }
   const now = new Date().toISOString();
@@ -1119,7 +1119,7 @@ export function receiveInterStoreTransfer(id, payload = {}) {
 export function rejectInterStoreTransfer(id, payload = {}) {
   const row = sessionTransfers.find((item) => item.id === id);
   if (!row) throw new Error("Transfer not found.");
-  if (row.status !== "PENDING") {
+  if (row.status !== "PENDING_DISPATCH") {
     throw new Error("Only pending transfers can be rejected.");
   }
   const reason = String(payload.reason || "").trim();

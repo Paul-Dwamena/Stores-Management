@@ -127,3 +127,20 @@ export const getRequestMenuStats = async () => {
     throw error;
   }
 };
+
+export const getTransfersStats = async () => {
+  try {
+    const { data } = await api.get("/stats/transfers-stats");
+    const transfers = data?.transfers || {};
+    return {
+      totalTransfers: Number(transfers.total_transfers) || 0,
+      open: Number(transfers.open) || 0,
+      completed: Number(transfers.completed) || 0,
+      rejected: Number(transfers.rejected) || 0,
+    };
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to load transfer stats."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};

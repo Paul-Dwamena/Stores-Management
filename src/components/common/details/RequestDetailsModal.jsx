@@ -105,6 +105,7 @@ export default function RequestDetailsModal({
   title,
   subtitle,
   status,
+  statusBadge,
   identifier,
   children,
   footerRight,
@@ -153,9 +154,9 @@ export default function RequestDetailsModal({
         </div>
 
         <div className="px-6 py-6 overflow-y-auto min-h-0 flex-1 space-y-3">
-          {status || identifier ? (
+          {status || statusBadge || identifier ? (
             <div className="flex flex-wrap items-center gap-2">
-              {status ? <StatusPill status={status} /> : null}
+              {statusBadge ?? (status ? <StatusPill status={status} /> : null)}
               {identifier ? (
                 <span className="text-[12px] text-slate-400 font-medium">{identifier}</span>
               ) : null}

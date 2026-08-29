@@ -138,33 +138,41 @@ export default function IssueOtpSection({
       </div>
 
       {!otpVerified ? (
-        <div className="space-y-2">
-          <Button
-            variant={otpSent ? "outline" : "primary"}
-            size="md"
-            onClick={onSendOtp}
-            disabled={sendDisabled || sendLoading}
-            className={cn(
-              "min-w-[140px]",
-              otpSent && "bg-white border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300",
-            )}
-          >
-            {otpSent ? <RefreshCw size={15} className={sendLoading ? "animate-spin" : undefined} /> : <KeyRound size={15} />}
-            {sendLoading ? "Sending…" : otpSent ? "Resend OTP" : "Send OTP"}
-          </Button>
-
-          {otpSent ? (
+        otpSent ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Button
+              variant="outline"
+              size="md"
+              onClick={onSendOtp}
+              disabled={sendDisabled || sendLoading}
+              className="min-w-[140px] shrink-0 bg-white border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300"
+            >
+              <RefreshCw size={15} className={sendLoading ? "animate-spin" : undefined} />
+              {sendLoading ? "Sending…" : "Resend OTP"}
+            </Button>
             <p className="flex items-center gap-1.5 text-[12px] font-medium text-success">
               <CheckCircle2 size={14} className="shrink-0" />
               OTP sent to {name}
               {phone ? ` on ${phone}` : ""}
             </p>
-          ) : (
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={onSendOtp}
+              disabled={sendDisabled || sendLoading}
+              className="min-w-[140px]"
+            >
+              <KeyRound size={15} />
+              {sendLoading ? "Sending…" : "Send OTP"}
+            </Button>
             <p className="text-[11px] font-medium text-slate-400">
               Send and confirm the OTP to enable Confirm issue
             </p>
-          )}
-        </div>
+          </div>
+        )
       ) : (
         <p className="flex items-center gap-1.5 text-[12px] font-medium text-success">
           <CheckCircle2 size={14} className="shrink-0" />

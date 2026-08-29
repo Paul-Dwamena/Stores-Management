@@ -511,17 +511,12 @@ export default function PendingSuppliesList({ embedded = false }) {
         setReceiverRoleId(receiverRole?.id ?? null);
         setReceiverOptions(
           users
-            .filter(
-              (user) =>
-                user.isActive !== false &&
-                receiverRole &&
-                Number(user.roleId) === Number(receiverRole.id),
-            )
+            .filter((user) => user.isActive !== false)
             .map((user) => ({
               id: user.id,
               name: user.name,
-              role: receiverRole?.label || "Receiver",
               phone: user.phone || "",
+              email: user.email || "",
               firstName: user.firstName,
               lastName: user.lastName,
             })),

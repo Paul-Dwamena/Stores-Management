@@ -26,6 +26,17 @@ export const isReceiverRoleName = (name) => {
 export const findReceiverRole = (roles = []) =>
   roles.find((role) => isReceiverRoleName(role?.name) || isReceiverRoleName(role?.label));
 
+/** Match backend role names like DISPATCHER / Dispatcher. */
+export const isDispatcherRoleName = (name) => {
+  const key = roleKey(name);
+  if (!key) return false;
+  if (key === "DISPATCHER" || key === "DISPATCHERS") return true;
+  return key.includes("DISPATCHER");
+};
+
+export const findDispatcherRole = (roles = []) =>
+  roles.find((role) => isDispatcherRoleName(role?.name) || isDispatcherRoleName(role?.label));
+
 const PROTECTED_ROLE_NAMES = new Set(["SUPER_ADMIN", "STAFF", "STORE_MANAGER"]);
 
 export const isProtectedRole = (role) => {

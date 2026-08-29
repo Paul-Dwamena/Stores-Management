@@ -42,7 +42,12 @@ const PROTECTED_ROLE_NAMES = new Set(["SUPER_ADMIN", "STAFF", "STORE_MANAGER"]);
 export const isProtectedRole = (role) => {
   const name = String(role?.name || "").toUpperCase();
   if (PROTECTED_ROLE_NAMES.has(name)) return true;
-  return isReceiverRoleName(role?.name) || isReceiverRoleName(role?.label);
+  return (
+    isReceiverRoleName(role?.name)
+    || isReceiverRoleName(role?.label)
+    || isDispatcherRoleName(role?.name)
+    || isDispatcherRoleName(role?.label)
+  );
 };
 
 const toPermission = (row) => ({

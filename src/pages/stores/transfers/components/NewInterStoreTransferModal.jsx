@@ -4,6 +4,7 @@ import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import SectionLoadState from "../../../../components/common/SectionLoadState";
 import { ConfiguredCustomFields } from "../../../../components/common/ConfiguredFormSections";
+import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
@@ -46,6 +47,7 @@ export default function NewInterStoreTransferModal({
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [fromStoreId, setFromStoreId] = useState("");
+  const [toStoreId, setToStoreId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [lines, setLines] = useState([]);
   const [notes, setNotes] = useState("");
@@ -126,6 +128,7 @@ export default function NewInterStoreTransferModal({
   useEffect(() => {
     if (!isOpen) return;
     setFromStoreId("");
+    setToStoreId("");
     setSearchQuery("");
     setLines([]);
     setNotes("");
@@ -194,6 +197,7 @@ export default function NewInterStoreTransferModal({
   );
 
   const fromStoreName = stores.find((store) => String(store.id) === String(fromStoreId))?.name || "";
+  const toStoreName = stores.find((store) => String(store.id) === String(toStoreId))?.name || "";
   const dispatcherName =
     dispatchers.find((person) => String(person.id) === String(dispatcherId))?.name || "";
   const selectedDispatcher = useMemo(
@@ -233,13 +237,27 @@ export default function NewInterStoreTransferModal({
 
   const handleFromStoreChange = (value) => {
     setFromStoreId(value);
+    if (String(toStoreId) === String(value)) {
+      setToStoreId("");
+    }
     setLines([]);
     setSearchQuery("");
     setErrors((prev) => {
-      if (!prev.fromStore && !prev.lines) return prev;
+      if (!prev.fromStore && !prev.toStore && !prev.lines) return prev;
       const next = { ...prev };
       delete next.fromStore;
+      delete next.toStore;
       delete next.lines;
+      return next;
+    });
+  };
+
+  const handleToStoreChange = (value) => {
+    setToStoreId(value);
+    setErrors((prev) => {
+      if (!prev.toStore) return prev;
+      const next = { ...prev };
+      delete next.toStore;
       return next;
     });
   };
@@ -259,7 +277,6 @@ export default function NewInterStoreTransferModal({
           photo: item.photo || "",
           stockQuantity: item.stockQuantity,
           movingQuantity: "1",
-          toStoreId: "",
         },
       ];
     });
@@ -286,6 +303,10 @@ export default function NewInterStoreTransferModal({
   const handleSave = () => {
     const nextErrors = {};
     if (!fromStoreId) nextErrors.fromStore = "Select the sending store first.";
+    if (!toStoreId) nextErrors.toStore = "Select the receiving store.";
+    else if (String(toStoreId) === String(fromStoreId)) {
+      nextErrors.toStore = "Must differ from the sending store.";
+    }
     if (!lines.length) nextErrors.lines = "Select at least one item from this store.";
     if (!dispatcherId) nextErrors.dispatcher = "Select the person dispatching.";
     else if (!otpVerified) nextErrors.dispatcher = "Verify the OTP sent to the dispatcher first.";
@@ -294,10 +315,6 @@ export default function NewInterStoreTransferModal({
       const key = lineKey(line);
       const moving = Number(line.movingQuantity);
       const rowErrors = {};
-      if (!line.toStoreId) rowErrors.toStore = "Select a store.";
-      if (line.toStoreId && String(line.toStoreId) === String(fromStoreId)) {
-        rowErrors.toStore = "Must differ from the sending store.";
-      }
       if (!line.movingQuantity || Number.isNaN(moving) || moving <= 0) {
         rowErrors.movingQuantity = "Enter a quantity.";
       } else if (moving > Number(line.stockQuantity)) {
@@ -314,11 +331,12 @@ export default function NewInterStoreTransferModal({
 
     setPendingPayload({
       fromStoreId: Number(fromStoreId),
+      toStoreId: Number(toStoreId),
       dispatcherId: Number(dispatcherId),
       notes: notes.trim(),
       lines: lines.map((line) => ({
         ...line,
-        toStoreId: Number(line.toStoreId),
+        toStoreId: Number(toStoreId),
         movingQuantity: Number(line.movingQuantity),
       })),
     });
@@ -341,7 +359,7 @@ export default function NewInterStoreTransferModal({
         onClose={onClose}
         onSave={handleSave}
         title="New inter-store transfer"
-        subtitle="Choose the sending store, select items, confirm the dispatcher with OTP, then request approval."
+        subtitle="Choose the sending and receiving stores, select items, confirm the dispatcher with OTP, then request approval."
         dialogClassName="max-w-5xl"
         saveLabel="Request approval"
         saveDisabled={loading || saving || Boolean(loadError) || !otpVerified}
@@ -354,36 +372,69 @@ export default function NewInterStoreTransferModal({
           errorTitle="Couldn't load transfer form data"
         >
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label htmlFor="transferFromStore" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                From store
-              </label>
-              <select
-                id="transferFromStore"
-                value={fromStoreId}
-                onChange={(e) => handleFromStoreChange(e.target.value)}
-                className={cn(fieldClassName, errors.fromStore && "border-rose-400 bg-rose-50")}
-              >
-                <option value="">Select sending store</option>
-                {fromStoreOptions.map((store) => (
-                  <option key={store.id} value={store.id}>
-                    {store.name}
-                  </option>
-                ))}
-              </select>
-              {errors.fromStore ? (
-                <p className="text-[10px] text-rose-600">{errors.fromStore}</p>
-              ) : (
-                <p className="text-[11px] text-slate-400">
-                  Only stores with on-hand stock are listed.
-                </p>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="transferFromStore" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  {requiredFieldLabel("From store", true)}
+                </label>
+                <select
+                  id="transferFromStore"
+                  value={fromStoreId}
+                  onChange={(e) => handleFromStoreChange(e.target.value)}
+                  className={cn(fieldClassName, errors.fromStore && "border-rose-400 bg-rose-50")}
+                >
+                  <option value="">Select sending store</option>
+                  {fromStoreOptions.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.fromStore ? (
+                  <p className="text-[10px] text-rose-600">{errors.fromStore}</p>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    Only stores with on-hand stock are listed.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="transferToStore" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  {requiredFieldLabel("To store", true)}
+                </label>
+                <select
+                  id="transferToStore"
+                  value={toStoreId}
+                  onChange={(e) => handleToStoreChange(e.target.value)}
+                  disabled={!fromStoreId}
+                  className={cn(
+                    fieldClassName,
+                    errors.toStore && "border-rose-400 bg-rose-50",
+                    !fromStoreId && "opacity-60 cursor-not-allowed",
+                  )}
+                >
+                  <option value="">Select receiving store</option>
+                  {destinationOptions.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.toStore ? (
+                  <p className="text-[10px] text-rose-600">{errors.toStore}</p>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    {fromStoreId ? "All lines will go to this store." : "Select a sending store first."}
+                  </p>
+                )}
+              </div>
             </div>
 
             {fromStoreId ? (
               <div className="space-y-1.5">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Items in this store
+                  {requiredFieldLabel("Items in this store", true)}
                 </p>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -448,25 +499,24 @@ export default function NewInterStoreTransferModal({
 
             <div className="space-y-1.5">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Transfer lines
+                {requiredFieldLabel("Transfer lines", true)}
               </p>
               <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="w-full text-left min-w-[920px]">
+                <table className="w-full text-left min-w-[680px]">
                   <thead>
                     <tr className="bg-slate-50/80 border-b border-slate-100">
                       <th className={thClass}>Photo</th>
                       <th className={thClass}>Item code</th>
                       <th className={thClass}>Name</th>
                       <th className={thClass}>Stock qty</th>
-                      <th className={thClass}>Moving qty</th>
-                      <th className={thClass}>Select store</th>
+                      <th className={thClass}>{requiredFieldLabel("Moving qty", true)}</th>
                       <th className={cn(thClass, "text-right w-10")} />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {lines.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-3 py-8 text-center text-[12px] text-slate-400">
+                        <td colSpan={6} className="px-3 py-8 text-center text-[12px] text-slate-400">
                           {fromStoreId
                             ? "Select items above to add them here."
                             : "Select a sending store to start."}
@@ -509,27 +559,6 @@ export default function NewInterStoreTransferModal({
                               />
                               {rowErrors.movingQuantity ? (
                                 <p className="text-[10px] text-rose-600 mt-1">{rowErrors.movingQuantity}</p>
-                              ) : null}
-                            </td>
-                            <td className="px-3 py-2.5 min-w-[220px]">
-                              <select
-                                value={line.toStoreId}
-                                onChange={(e) => updateLine(key, { toStoreId: e.target.value })}
-                                className={cn(
-                                  fieldClassName,
-                                  "bg-white py-1.5",
-                                  rowErrors.toStore && "border-rose-400 bg-rose-50",
-                                )}
-                              >
-                                <option value="">Select store</option>
-                                {destinationOptions.map((store) => (
-                                  <option key={store.id} value={store.id}>
-                                    {store.name}
-                                  </option>
-                                ))}
-                              </select>
-                              {rowErrors.toStore ? (
-                                <p className="text-[10px] text-rose-600 mt-1">{rowErrors.toStore}</p>
                               ) : null}
                             </td>
                             <td className="px-3 py-2.5 text-right">
@@ -659,7 +688,7 @@ export default function NewInterStoreTransferModal({
         title="Send for approval?"
         message={
           pendingPayload
-            ? `Request transfer of ${pendingPayload.lines.length} item${pendingPayload.lines.length === 1 ? "" : "s"} from ${fromStoreName}${dispatcherName ? ` (dispatcher: ${dispatcherName})` : ""}? This goes to the approval queue first.`
+            ? `Request transfer of ${pendingPayload.lines.length} item${pendingPayload.lines.length === 1 ? "" : "s"} from ${fromStoreName}${toStoreName ? ` to ${toStoreName}` : ""}${dispatcherName ? ` (dispatcher: ${dispatcherName})` : ""}? This goes to the approval queue first.`
             : "Request this inter-store transfer?"
         }
         confirmText="Request approval"

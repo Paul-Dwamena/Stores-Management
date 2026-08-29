@@ -43,7 +43,8 @@ import {
   RequisitionDetailModal,
 } from "./components";
 import { getRequisitionStoreAllocations, getRequisitionStoreIssueLines, getStoreIssueRemaining, getStoresWithRemainingQty } from "./components/RaiseSupplyRequestModal";
-import { supplyStatusBadgeClass, supplyStatusKey } from "./utils/supplyStatus";
+import { supplyStatusKey } from "./utils/supplyStatus";
+import { SupplyStatusBadge } from "./utils/SupplyStatusBadge";
 
 const PAGE_SIZE = 10;
 
@@ -862,14 +863,7 @@ export default function RequisitionsList({
                         </>
                       )}
                       <td className="px-6 py-3.5 whitespace-nowrap">
-                        <span
-                          className={cn(
-                            "inline-flex px-2 py-0.5 rounded text-[9px] font-bold border whitespace-nowrap",
-                            supplyStatusBadgeClass(row.status),
-                          )}
-                        >
-                          {formatRequisitionStatus(row.status)}
-                        </span>
+                        <SupplyStatusBadge status={row.status} />
                       </td>
                       {showActionsColumn && (
                         <td className="px-6 py-3.5 text-right whitespace-nowrap">

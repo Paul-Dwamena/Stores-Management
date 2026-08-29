@@ -2,20 +2,22 @@ import React from "react";
 import { cn } from "../../../../utils/cn";
 import {
   formatTransferStatus,
-  transferStatusBadgeClass,
   transferStatusKey,
 } from "./transferStatus";
+import {
+  STATUS_BADGE_CLASS,
+  workflowStatusBadgeClass,
+} from "../../../../utils/workflowStatusBadge";
 
-export const TRANSFER_STATUS_BADGE_CLASS =
-  "inline-flex px-2 py-0.5 rounded text-[9px] font-bold border whitespace-nowrap";
+export { STATUS_BADGE_CLASS as TRANSFER_STATUS_BADGE_CLASS };
 
 export function TransferStatusBadge({ status, className }) {
   const key = transferStatusKey(status);
   return (
     <span
       className={cn(
-        TRANSFER_STATUS_BADGE_CLASS,
-        transferStatusBadgeClass(key),
+        STATUS_BADGE_CLASS,
+        workflowStatusBadgeClass(key),
         className,
       )}
     >

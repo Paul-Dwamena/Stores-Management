@@ -1,9 +1,51 @@
 import api from "./api";
 import { extractApiErrorDetail } from "../utils/apiResponseHelpers";
-import { transferStatusKey } from "../pages/stores/transfers/utils/transferStatus";
+import {
+  TRANSFER_STATUS,
+  transferStatusKey,
+} from "../pages/stores/transfers/utils/transferStatus";
 
 const personName = (person) =>
   [person?.first_name, person?.last_name].filter(Boolean).join(" ").trim();
+
+const toStatusHistory = (row) => {
+  const rawChangedBy = row.changed_by;
+  const nestedUser =
+    row.changed_by_user
+    || row.changer
+    || (rawChangedBy && typeof rawChangedBy === "object" ? rawChangedBy : null);
+
+  return {
+    id: row.id,
+    fromStatus: row.from_status ? transferStatusKey(row.from_status) : null,
+    toStatus: transferStatusKey(row.to_status),
+    changedBy:
+      nestedUser?.id
+      ?? (typeof rawChangedBy === "number" || typeof rawChangedBy === "string"
+        ? rawChangedBy
+        : null),
+    changedByName:
+      (nestedUser ? personName(nestedUser) || nestedUser.email : "")
+      || row.changed_by_name
+      || "",
+    comment: row.comment || "",
+    createdAt: row.created_at,
+  };
+};
+
+const sortStatusHistory = (entries = []) =>
+  [...entries].sort(
+    (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime(),
+  );
+
+const latestHistoryComment = (entries = [], status) => {
+  const match = [...entries]
+    .filter((entry) => entry.toStatus === status && entry.comment)
+    .sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    );
+  return match[0]?.comment || "";
+};
 
 const toTransferLine = (row, fromStore = "") => ({
   id: row.id,
@@ -59,6 +101,7 @@ export const toTransfer = (row) => {
   const fromStore = row.from_store?.name || "";
   const lines = (row.items || []).map((item) => toTransferLine(item, fromStore));
   const summary = summarizeLines(lines);
+  const statusHistory = sortStatusHistory((row.status_history || []).map(toStatusHistory));
 
   return {
     id: row.id,
@@ -75,8 +118,15 @@ export const toTransfer = (row) => {
     dispatcherPhone: row.dispatcher?.phone || "",
     receiver: personName(row.receiver),
     receiverId: row.receiver?.id,
+    receiverEmail: row.receiver?.email || "",
+    receiverPhone: row.receiver?.phone || "",
+    canceller: personName(row.canceller),
+    cancellerId: row.canceller?.id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    statusHistory,
+    rejectionReason: latestHistoryComment(statusHistory, TRANSFER_STATUS.REJECTED),
+    cancelReason: latestHistoryComment(statusHistory, TRANSFER_STATUS.CANCELLED),
     lines,
     ...summary,
   };

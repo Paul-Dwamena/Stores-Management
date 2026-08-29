@@ -6,6 +6,7 @@ import RequestDetailsModal, {
   DetailRow,
 } from "../../../../components/common/details/RequestDetailsModal";
 import { formatApiDateTime } from "../../../../utils/apiResponseHelpers";
+import { listUsers } from "../../../../services/usersService";
 import { TRANSFER_STATUS, transferStatusKey } from "../utils/transferStatus";
 import { TransferStatusBadge } from "../utils/TransferStatusBadge";
 
@@ -25,10 +26,26 @@ export default function InterStoreTransferDetailsModal({
   onMarkArrived,
 }) {
   const [openSection, setOpenSection] = useState("summary");
+  const [users, setUsers] = useState([]);
 
   useEffect(() => {
     if (isOpen) setOpenSection("summary");
   }, [isOpen, transfer?.id]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let cancelled = false;
+    listUsers()
+      .then((rows) => {
+        if (!cancelled) setUsers(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setUsers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   if (!transfer) return null;
 
@@ -37,8 +54,15 @@ export default function InterStoreTransferDetailsModal({
   const dispatcherPhone = transfer.dispatcherPhone || "—";
   const status = transferStatusKey(transfer.status);
   const lines = transfer.lines || [];
+  const statusHistory = transfer.statusHistory || [];
   const toggle = (id) => setOpenSection((current) => (current === id ? "" : id));
   const disabled = loading || actionSaving;
+
+  const resolveChangedByName = (entry) => {
+    if (entry?.changedByName) return entry.changedByName;
+    const match = users.find((user) => Number(user.id) === Number(entry?.changedBy));
+    return match?.name || "—";
+  };
 
   const footerRight = (
     <div className="flex flex-wrap justify-end gap-2">
@@ -156,6 +180,44 @@ export default function InterStoreTransferDetailsModal({
                   </tbody>
                 </table>
               </div>
+            )}
+          </AccordionSection>
+
+          <AccordionSection
+            title={`Timeline${statusHistory.length ? ` (${statusHistory.length})` : ""}`}
+            open={openSection === "history"}
+            onToggle={() => toggle("history")}
+          >
+            {statusHistory.length === 0 ? (
+              <p className="text-[13px] text-slate-400">No timeline events recorded for this transfer yet.</p>
+            ) : (
+              <ul className="space-y-4">
+                {statusHistory.map((entry) => (
+                  <li key={entry.id} className="flex gap-3">
+                    <span
+                      className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-slate-900"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {entry.fromStatus ? (
+                          <>
+                            <TransferStatusBadge status={entry.fromStatus} />
+                            <span className="text-[11px] text-slate-400">→</span>
+                          </>
+                        ) : null}
+                        <TransferStatusBadge status={entry.toStatus} />
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        {formatApiDateTime(entry.createdAt)} · {resolveChangedByName(entry)}
+                      </p>
+                      {entry.comment ? (
+                        <p className="text-[12px] text-slate-600 leading-relaxed">{entry.comment}</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </AccordionSection>
         </>

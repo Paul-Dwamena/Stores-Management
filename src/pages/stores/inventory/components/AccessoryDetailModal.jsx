@@ -11,6 +11,7 @@ import {
   formatInventoryStatus,
 } from "../../../../services/inventoryService";
 import { displayValue, EMPTY_DISPLAY, formatApiDateTime } from "../../../../utils/apiResponseHelpers";
+import { STATUS_BADGE_CLASS, workflowStatusBadgeClass } from "../../../../utils/workflowStatusBadge";
 import { SupplyStatusBadge } from "../../supplies/utils/SupplyStatusBadge";
 import ReceiveIntoStoreModal from "./ReceiveIntoStoreModal";
 import EditInventoryItemModal from "./EditInventoryItemModal";
@@ -18,20 +19,13 @@ import ItemStoreStockModal from "./ItemStoreStockModal";
 import { ItemPhotoThumb } from "./ItemPhotoField";
 
 function StatusPill({ status }) {
-  const raw = (status ?? "").toString().toUpperCase();
-  const tone =
-    raw === "IN_STOCK" || raw === "ACTIVE"
-      ? "bg-success-muted text-success border-[#b7d4c8]"
-      : raw === "LOW_STOCK"
-        ? "bg-amber-50 text-amber-700 border-amber-200"
-        : raw === "OUT_OF_STOCK"
-          ? "bg-rose-50 text-rose-700 border-rose-200"
-          : raw === "INACTIVE"
-            ? "bg-slate-50 text-slate-600 border-slate-200"
-            : "bg-slate-50 text-slate-500 border-slate-200";
-
   return (
-    <span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border", tone)}>
+    <span
+      className={cn(
+        STATUS_BADGE_CLASS,
+        workflowStatusBadgeClass(status),
+      )}
+    >
       {formatInventoryStatus(status)}
     </span>
   );

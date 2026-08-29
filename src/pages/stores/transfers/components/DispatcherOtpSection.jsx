@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import InputField from "../../../../components/common/fields/InputField";
+import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { verifyDispatcherConfirmationOtp } from "../../../../services/transfersService";
@@ -93,7 +94,9 @@ export default function DispatcherOtpSection({
     >
       <div>
         <p className="text-[12px] font-bold text-slate-800">
-          {otpVerified ? "OTP confirmed" : "Dispatcher verification"}
+          {otpVerified
+            ? "OTP confirmed"
+            : requiredFieldLabel("Dispatcher verification", true)}
         </p>
         <p className="text-[12px] text-slate-500 mt-1">
           {otpVerified ? (

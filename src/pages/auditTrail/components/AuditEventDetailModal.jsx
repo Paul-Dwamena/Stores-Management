@@ -3,10 +3,11 @@ import AddModal from "../../../components/common/AddModal";
 import { cn } from "../../../utils/cn";
 import { EMPTY_DISPLAY } from "../../../utils/apiResponseHelpers";
 import { formatAuditWhen } from "../../../services/auditService";
+import { AuditActionBadge } from "../utils/auditActionBadge";
 
-function MetaItem({ label, value }) {
+function MetaItem({ label, value, className }) {
   return (
-    <div className="space-y-1">
+    <div className={cn("space-y-1", className)}>
       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
       <p className="text-[13px] font-medium text-slate-800 break-words">{value || EMPTY_DISPLAY}</p>
     </div>
@@ -16,16 +17,16 @@ function MetaItem({ label, value }) {
 export default function AuditEventDetailModal({ isOpen, onClose, event }) {
   if (!event) return null;
 
-  const actorLabel = event.actorEmail
-    ? `${event.actor} (${event.actorEmail})`
-    : event.actor;
+  const userLabel = event.user?.email
+    ? `${event.user.name} (${event.user.email})`
+    : event.user?.name || "System";
 
   return (
     <AddModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Audit Event"
-      subtitle={event.target}
+      title="Audit event"
+      subtitle={event.resourceTarget}
       dialogClassName="max-w-xl"
       hideCancelButton
       saveLabel="Close"
@@ -33,24 +34,25 @@ export default function AuditEventDetailModal({ isOpen, onClose, event }) {
     >
       <div className="space-y-5">
         <p className="text-[13px] text-slate-600 leading-relaxed">
-          {event.summary || EMPTY_DISPLAY}
+          {event.description || EMPTY_DISPLAY}
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-slate-100 bg-slate-50/60 p-4">
-          <MetaItem label="When" value={formatAuditWhen(event.at)} />
-          <MetaItem label="Module" value={event.module} />
-          <MetaItem label="Action" value={event.action} />
-          <MetaItem label="Source" value={event.source} />
-          <MetaItem label="Actor" value={actorLabel} />
-          <MetaItem label="IP Address" value={event.ipAddress} />
+          <MetaItem label="Created at" value={formatAuditWhen(event.createdAt)} />
+          <MetaItem label="Resource" value={event.resourceLabel} />
+          <MetaItem label="Resource ID" value={event.resourceId ?? EMPTY_DISPLAY} />
+          <MetaItem label="Action" value={<AuditActionBadge action={event.action} actionLabel={event.actionLabel} />} />
+          <MetaItem label="User" value={userLabel} />
+          <MetaItem label="IP address" value={event.ipAddress} />
+          <MetaItem label="User agent" value={event.userAgent} className="sm:col-span-2" />
         </div>
 
         <div>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Details
+            Audit metadata
           </p>
           {(event.changes ?? []).length === 0 ? (
-            <p className="text-[12px] text-slate-400">No extra metadata recorded.</p>
+            <p className="text-[12px] text-slate-400">No audit metadata recorded.</p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-slate-200">
               <table className="w-full text-left">

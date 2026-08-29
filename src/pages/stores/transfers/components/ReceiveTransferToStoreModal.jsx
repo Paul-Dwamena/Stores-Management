@@ -7,7 +7,7 @@ import RequestDetailsModal, {
   AccordionSection,
   DetailRow,
 } from "../../../../components/common/details/RequestDetailsModal";
-import { formatApiDate, formatApiDateTime } from "../../../../utils/apiResponseHelpers";
+import { formatApiDateTime } from "../../../../utils/apiResponseHelpers";
 
 function lineKey(line, index) {
   return `${line.itemId || line.itemCode || "item"}:${index}`;
@@ -132,17 +132,15 @@ export default function ReceiveTransferToStoreModal({
 
             <div className="flex-1 overflow-auto p-4 sm:p-6">
               <div className="overflow-x-auto rounded-lg border border-slate-100">
-                <table className="w-full text-left min-w-[1100px]">
+                <table className="w-full text-left min-w-[720px]">
                   <thead>
                     <tr className="bg-slate-50/80 border-b border-slate-100">
                       <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Item code</th>
                       <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Name</th>
-                      <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Description</th>
                       <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Qty requested</th>
                       <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Qty approved</th>
+                      <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Receiving store</th>
                       <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Supplying store</th>
-                      <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Date requested</th>
-                      <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Date approved</th>
                       <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 text-right">More</th>
                     </tr>
                   </thead>
@@ -155,9 +153,6 @@ export default function ReceiveTransferToStoreModal({
                         <td className="px-3 py-2.5 text-[12px] font-semibold text-slate-800">
                           {line.itemName}
                         </td>
-                        <td className="px-3 py-2.5 text-[12px] text-slate-700">
-                          {line.description || "—"}
-                        </td>
                         <td className="px-3 py-2.5 text-[12px] font-semibold text-slate-800 whitespace-nowrap">
                           {line.quantityRequested ?? line.movingQuantity ?? "—"}
                         </td>
@@ -165,13 +160,10 @@ export default function ReceiveTransferToStoreModal({
                           {line.quantityApproved ?? "—"}
                         </td>
                         <td className="px-3 py-2.5 text-[12px] text-slate-700">
+                          {line.toStore || transfer.toStore || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-[12px] text-slate-700">
                           {transfer.fromStore}
-                        </td>
-                        <td className="px-3 py-2.5 text-[12px] text-slate-600 whitespace-nowrap">
-                          {formatApiDate(line.requestedAt || transfer.createdAt)}
-                        </td>
-                        <td className="px-3 py-2.5 text-[12px] text-slate-600 whitespace-nowrap">
-                          {formatApiDate(line.approvedAt || transfer.approvedAt)}
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <button

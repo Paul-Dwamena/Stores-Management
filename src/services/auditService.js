@@ -8,10 +8,21 @@ import {
 
 export const AUDIT_PAGE_SIZE = 10;
 
-const actorName = (user) => {
+const userDisplayName = (user) => {
   if (!user) return "System";
   const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
   return name || user.email || "Unknown user";
+};
+
+const toAuditUser = (user) => {
+  if (!user) return null;
+  return {
+    id: user.id,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    email: user.email,
+    name: userDisplayName(user),
+  };
 };
 
 const formatResourceLabel = (resource) => {
@@ -53,42 +64,31 @@ const toChanges = (metadata) => {
             : String(value),
     }));
   }
-  return [{ field: "Metadata", before: EMPTY_DISPLAY, after: String(metadata) }];
-};
-
-const sourceFromUserAgent = (userAgent) => {
-  const ua = String(userAgent || "").toLowerCase();
-  if (!ua) return EMPTY_DISPLAY;
-  if (/mobile|android|iphone|ipad/.test(ua)) return "Mobile";
-  if (/mozilla|chrome|safari|firefox|edge/.test(ua)) return "Web";
-  return "API";
+  return [{ field: "audit_metadata", before: EMPTY_DISPLAY, after: String(metadata) }];
 };
 
 export const toAuditEvent = (row = {}) => {
   const resource = row.resource || "";
-  const resourceId = row.resource_id;
-  const target =
-    resourceId != null && resourceId !== ""
-      ? `${formatResourceLabel(resource)} #${resourceId}`
-      : formatResourceLabel(resource);
+  const resourceId = row.resource_id ?? null;
 
   return {
     id: row.id,
-    at: row.created_at || null,
-    actor: actorName(row.user),
-    actorEmail: row.user?.email || "",
-    action: formatActionLabel(row.action),
-    actionRaw: row.action || "",
-    module: formatResourceLabel(resource),
-    moduleRaw: resource,
-    target,
-    summary: row.description || "",
+    createdAt: row.created_at || null,
+    user: toAuditUser(row.user),
+    action: row.action || "",
+    actionLabel: formatActionLabel(row.action),
+    description: row.description || "",
+    resource,
+    resourceLabel: formatResourceLabel(resource),
+    resourceId,
+    auditMetadata: row.audit_metadata ?? null,
     ipAddress: row.ip_address || EMPTY_DISPLAY,
-    userAgent: row.user_agent || "",
-    source: sourceFromUserAgent(row.user_agent),
-    resourceId: resourceId ?? null,
-    metadata: row.audit_metadata ?? null,
+    userAgent: row.user_agent || EMPTY_DISPLAY,
     changes: toChanges(row.audit_metadata),
+    resourceTarget:
+      resourceId != null && resourceId !== ""
+        ? `${formatResourceLabel(resource)} #${resourceId}`
+        : formatResourceLabel(resource),
   };
 };
 

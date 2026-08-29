@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Plus, Warehouse, X } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import AddModal from "../../../../components/common/AddModal";
 import SectionLoadState from "../../../../components/common/SectionLoadState";
@@ -10,10 +10,11 @@ import {
   formatInventoryMoney,
   formatInventoryStatus,
 } from "../../../../services/inventoryService";
-import { formatApiDateTime } from "../../../../utils/apiResponseHelpers";
+import { displayValue, EMPTY_DISPLAY, formatApiDateTime } from "../../../../utils/apiResponseHelpers";
 import { SupplyStatusBadge } from "../../supplies/utils/SupplyStatusBadge";
 import ReceiveIntoStoreModal from "./ReceiveIntoStoreModal";
 import EditInventoryItemModal from "./EditInventoryItemModal";
+import ItemStoreStockModal from "./ItemStoreStockModal";
 import { ItemPhotoThumb } from "./ItemPhotoField";
 
 function StatusPill({ status }) {
@@ -46,7 +47,7 @@ function DetailRow({ label, children }) {
 }
 
 function formatCondition(value) {
-  if (!value) return "—";
+  if (!value) return EMPTY_DISPLAY;
   return value
     .toString()
     .toLowerCase()
@@ -55,8 +56,7 @@ function formatCondition(value) {
 }
 
 function cellValue(value) {
-  if (value == null || value === "") return "—";
-  return value;
+  return displayValue(value);
 }
 
 function AccordionSection({ title, open, onToggle, action, children }) {
@@ -92,8 +92,8 @@ function MiniTable({
   loading = false,
   error = null,
   onRetry,
-  loadingLabel = "Loading…",
-  errorTitle = "Couldn’t load this table",
+  loadingLabel = "Loading...",
+  errorTitle = "Couldn't load this table",
 }) {
   const tableMinWidth = Math.max(
     960,
@@ -185,7 +185,7 @@ const RECEIPT_COLUMNS = [
     minWidth: 180,
     wrap: true,
     render: (row) => {
-      if (!row.supplierName) return "—";
+      if (!row.supplierName) return EMPTY_DISPLAY;
       return (
         <div>
           <div className="font-medium text-slate-800">{row.supplierName}</div>
@@ -202,7 +202,7 @@ const RECEIPT_COLUMNS = [
     minWidth: 160,
     wrap: true,
     render: (row) => {
-      if (!row.storeName && !row.storeCode) return "—";
+      if (!row.storeName && !row.storeCode) return EMPTY_DISPLAY;
       if (row.storeName && row.storeCode) {
         return `${row.storeName} (${row.storeCode})`;
       }
@@ -215,10 +215,10 @@ const RECEIPT_COLUMNS = [
     minWidth: 150,
     wrap: true,
     render: (row) => {
-      if (!row.deliveredByName && !row.deliveredByPhone) return "—";
+      if (!row.deliveredByName && !row.deliveredByPhone) return EMPTY_DISPLAY;
       return (
         <div>
-          <div>{row.deliveredByName || "—"}</div>
+          <div>{row.deliveredByName || EMPTY_DISPLAY}</div>
           {row.deliveredByPhone ? (
             <div className="mt-0.5 text-[11px] text-slate-500">{row.deliveredByPhone}</div>
           ) : null}
@@ -243,7 +243,7 @@ const RECEIPT_COLUMNS = [
     label: "Unit price",
     minWidth: 120,
     render: (row) =>
-      row.unitPrice == null ? "—" : formatInventoryMoney(row.unitPrice),
+      row.unitPrice == null ? EMPTY_DISPLAY : formatInventoryMoney(row.unitPrice),
   },
   {
     key: "receivedAt",
@@ -254,11 +254,25 @@ const RECEIPT_COLUMNS = [
 ];
 
 const SUPPLY_COLUMNS = [
-  { key: "itemCode", label: "Item code", minWidth: 130 },
-  { key: "name", label: "Name", minWidth: 180 },
-  { key: "brand", label: "Brand", minWidth: 120 },
-  { key: "description", label: "Description", minWidth: 220, wrap: true },
-  { key: "quantity", label: "Quantity", minWidth: 100 },
+  {
+    key: "location",
+    label: "Store",
+    minWidth: 160,
+    wrap: true,
+    render: (row) => cellValue(row.location),
+  },
+  {
+    key: "quantityRequested",
+    label: "Qty requested",
+    minWidth: 110,
+    render: (row) => cellValue(row.quantityRequested),
+  },
+  {
+    key: "quantitySupplied",
+    label: "Qty supplied",
+    minWidth: 110,
+    render: (row) => cellValue(row.quantitySupplied ?? row.quantity),
+  },
   {
     key: "status",
     label: "Status",
@@ -277,8 +291,20 @@ const SUPPLY_COLUMNS = [
     minWidth: 130,
     render: (row) => formatApiDateTime(row.dateSupplied),
   },
-  { key: "location", label: "Location", minWidth: 160 },
-  { key: "requestedBy", label: "Requested by", minWidth: 150 },
+  {
+    key: "receivedBy",
+    label: "Received by",
+    minWidth: 150,
+    wrap: true,
+    render: (row) => cellValue(row.receivedBy || row.requestedBy),
+  },
+  {
+    key: "suppliedBy",
+    label: "Supplied by",
+    minWidth: 150,
+    wrap: true,
+    render: (row) => cellValue(row.suppliedBy),
+  },
 ];
 
 
@@ -324,7 +350,7 @@ function formatDetailLabel(key) {
 }
 
 function formatDetailValue(key, value) {
-  if (value == null || value === "") return "—";
+  if (value == null || value === "") return EMPTY_DISPLAY;
   if (key === "supplierId") return String(value);
   if (key === "condition") return formatCondition(value);
   if (["unitCost", "unitPrice", "averageUnitCost", "totalPurchaseCost"].includes(key)) {
@@ -349,6 +375,8 @@ function scalarEntries(record) {
     "receiptsLoading",
     "receiptsError",
     "receipts",
+    "suppliesLoading",
+    "suppliesError",
     "supplies",
     "stores",
   ]);
@@ -421,6 +449,7 @@ export default function AccessoryDetailModal({
   onUpdateDetails,
   onRetryDetail,
   onRetryReceipts,
+  onRetrySupplies,
 }) {
   const [openSections, setOpenSections] = useState({
     information: true,
@@ -428,6 +457,7 @@ export default function AccessoryDetailModal({
     supplies: true,
   });
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [storeStockOpen, setStoreStockOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState(null);
 
@@ -437,17 +467,21 @@ export default function AccessoryDetailModal({
   const detailError = item?.detailError || null;
   const receiptsLoading = Boolean(item?.receiptsLoading);
   const receiptsError = item?.receiptsError || null;
+  const suppliesLoading = Boolean(item?.suppliesLoading);
+  const suppliesError = item?.suppliesError || null;
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
       setOpenSections({ information: true, collectives: true, supplies: true });
       setReceiveOpen(false);
+      setStoreStockOpen(false);
       setEditOpen(false);
       setSelectedMovement(null);
     } else {
       document.body.style.overflow = "";
       setReceiveOpen(false);
+      setStoreStockOpen(false);
       setEditOpen(false);
       setSelectedMovement(null);
     }
@@ -462,7 +496,7 @@ export default function AccessoryDetailModal({
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const receipts = Array.isArray(item.receipts) ? item.receipts : [];
-  const supplies = item.supplies || [];
+  const supplies = Array.isArray(item.supplies) ? item.supplies : [];
   const averageUnitCost = detailReady && receipts.length
     ? receipts.reduce((sum, row) => sum + Number(row.unitPrice || 0), 0) / receipts.length
     : 0;
@@ -471,6 +505,7 @@ export default function AccessoryDetailModal({
       id: store.id,
       location: store.name,
       quantity: store.quantity,
+      shelfPosition: store.shelfPosition || store.shelf || "",
     }))
     : [];
   const estimatedStockValue = detailReady
@@ -485,6 +520,9 @@ export default function AccessoryDetailModal({
   const receiptsTitle = receiptsLoading || receiptsError
     ? "Receipts"
     : `Receipts (${receipts.length})`;
+  const suppliesTitle = suppliesLoading || suppliesError
+    ? "Supplies"
+    : `Supplies (${supplies.length})`;
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
@@ -526,53 +564,68 @@ export default function AccessoryDetailModal({
             open={openSections.information}
             onToggle={() => toggle("information")}
             action={
-              <Button
-                type="button"
-                size="sm"
-                variant="primary"
-                disabled={!detailReady}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setReceiveOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 shrink-0"
-              >
-                <Plus size={14} />
-                Receive stock
-              </Button>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={!detailReady}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setStoreStockOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 border border-slate-200"
+                >
+                  <Warehouse size={14} />
+                  Store stock
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="primary"
+                  disabled={!detailReady}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setReceiveOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  Receive stock
+                </Button>
+              </div>
             }
           >
             <SectionLoadState
               loading={detailLoading}
               error={detailError}
               onRetry={onRetryDetail}
-              loadingLabel="Loading item details…"
+              loadingLabel="Loading item details..."
             >
               {detailReady ? (
                 <>
                   <DetailRow label="Photo">
                     <ItemPhotoThumb src={item.photo} name={item.name} className="h-16 w-16" />
                   </DetailRow>
-                  <DetailRow label="Item Code">{item.itemCode}</DetailRow>
+                  <DetailRow label="Item Code">{displayValue(item.itemCode)}</DetailRow>
                   {isVehiclePart ? (
                     <>
-                      <DetailRow label="Make">{item.make}</DetailRow>
-                      <DetailRow label="Model">{item.model}</DetailRow>
-                      <DetailRow label="Year">{item.year ?? "—"}</DetailRow>
-                      <DetailRow label="Chassis Number">{item.chassisNumber}</DetailRow>
-                      <DetailRow label="Name">{item.name}</DetailRow>
-                      <DetailRow label="Component path">{item.componentPath || "—"}</DetailRow>
-                      <DetailRow label="Brand">{item.brand || "—"}</DetailRow>
+                      <DetailRow label="Make">{displayValue(item.make)}</DetailRow>
+                      <DetailRow label="Model">{displayValue(item.model)}</DetailRow>
+                      <DetailRow label="Year">{displayValue(item.year)}</DetailRow>
+                      <DetailRow label="Chassis Number">{displayValue(item.chassisNumber)}</DetailRow>
+                      <DetailRow label="Name">{displayValue(item.name)}</DetailRow>
+                      <DetailRow label="Component path">{displayValue(item.componentPath)}</DetailRow>
+                      <DetailRow label="Brand">{displayValue(item.brand)}</DetailRow>
                     </>
                   ) : (
                     <>
-                      <DetailRow label="Name">{item.name}</DetailRow>
-                      <DetailRow label="Brand">{item.brand}</DetailRow>
+                      <DetailRow label="Name">{displayValue(item.name)}</DetailRow>
+                      <DetailRow label="Brand">{displayValue(item.brand)}</DetailRow>
                     </>
                   )}
-                  <DetailRow label="Unit">{item.unit || "—"}</DetailRow>
-                  <DetailRow label="Description">{item.description || "—"}</DetailRow>
-                  <DetailRow label="Shelf location">{item.shelfPosition || "—"}</DetailRow>
+                  <DetailRow label="Unit">{displayValue(item.unit)}</DetailRow>
+                  <DetailRow label="Description">{displayValue(item.description)}</DetailRow>
                   <DetailRow label="Total quantity">{item.quantity}</DetailRow>
                   <DetailRow label="Average unit cost">
                     {formatInventoryMoney(averageUnitCost)}
@@ -582,7 +635,7 @@ export default function AccessoryDetailModal({
                   </DetailRow>
                   <DetailRow label="Locations">
                     {stockByLocation.length === 0 ? (
-                      "—"
+                      EMPTY_DISPLAY
                     ) : (
                       <ul className="space-y-1.5">
                         {stockByLocation.map((row) => (
@@ -590,7 +643,14 @@ export default function AccessoryDetailModal({
                             key={row.id ?? row.location}
                             className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5"
                           >
-                            <span>{row.location}</span>
+                            <span>
+                              {row.location}
+                              {row.shelfPosition ? (
+                                <span className="ml-1.5 text-[11px] font-normal text-slate-400">
+                                  ({row.shelfPosition})
+                                </span>
+                              ) : null}
+                            </span>
                             <span className="tabular-nums text-slate-500">
                               {row.quantity} on hand
                             </span>
@@ -620,13 +680,13 @@ export default function AccessoryDetailModal({
               loading={receiptsLoading}
               error={receiptsError}
               onRetry={onRetryReceipts}
-              loadingLabel="Loading receipts…"
-              errorTitle="Couldn’t load receipts"
+              loadingLabel="Loading receipts..."
+              errorTitle="Couldn't load receipts"
             />
           </AccordionSection>
 
           <AccordionSection
-            title={`Supplies (${supplies.length})`}
+            title={suppliesTitle}
             open={openSections.supplies}
             onToggle={() => toggle("supplies")}
           >
@@ -635,6 +695,11 @@ export default function AccessoryDetailModal({
               rows={supplies}
               emptyLabel="No supplies recorded for this item."
               onView={(row) => setSelectedMovement({ row, type: "Supply" })}
+              loading={suppliesLoading}
+              error={suppliesError}
+              onRetry={onRetrySupplies}
+              loadingLabel="Loading supplies..."
+              errorTitle="Couldn't load supplies"
             />
           </AccordionSection>
         </div>
@@ -658,14 +723,17 @@ export default function AccessoryDetailModal({
         onSave={handleReceiveSave}
       />
 
+      <ItemStoreStockModal
+        isOpen={storeStockOpen}
+        onClose={() => setStoreStockOpen(false)}
+        item={item}
+      />
+
       <EditInventoryItemModal
         isOpen={editOpen}
         onClose={() => setEditOpen(false)}
         item={item}
-        onSave={async (payload) => {
-          await onUpdateDetails?.(payload);
-          setEditOpen(false);
-        }}
+        onSave={onUpdateDetails}
       />
 
       <AddModal

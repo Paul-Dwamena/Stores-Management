@@ -46,10 +46,6 @@ export default function AccountSettings() {
       toast.warning("Enter your last name.");
       return;
     }
-    if (!profile.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
-      toast.warning("Enter a valid email address.");
-      return;
-    }
     setConfirmProfileOpen(true);
   };
 
@@ -59,11 +55,10 @@ export default function AccountSettings() {
       const saved = await updateProfile({
         first_name: profile.firstName.trim(),
         last_name: profile.lastName.trim(),
-        email: profile.email.trim(),
-        phone: profile.phone?.trim() || null,
       });
       applyProfile?.(saved);
       toast.success("Profile updated.");
+      setConfirmProfileOpen(false);
     } catch (err) {
       toast.error(err.message || "Unable to update profile.");
     } finally {
@@ -94,6 +89,7 @@ export default function AccountSettings() {
       const data = await changePassword(security.currentPassword, security.newPassword);
       setSecurity({ currentPassword: "", newPassword: "", confirmPassword: "" });
       toast.success(data?.message || "Password updated.");
+      setConfirmPasswordOpen(false);
     } catch (err) {
       toast.error(err.message || "Unable to change password.");
     } finally {
@@ -144,17 +140,16 @@ export default function AccountSettings() {
             id="settingsEmail"
             label="Email"
             type="email"
-            required
-            placeholder="you@example.com"
             value={profile.email}
-            onChange={(e) => setProfile((current) => ({ ...current, email: e.target.value }))}
+            readOnly
+            disabled
           />
           <InputField
             id="settingsPhone"
             label="Phone"
-            placeholder="024 000 0000"
             value={profile.phone}
-            onChange={(e) => setProfile((current) => ({ ...current, phone: e.target.value }))}
+            readOnly
+            disabled
           />
         </div>
         <div className="flex justify-end">
@@ -209,21 +204,31 @@ export default function AccountSettings() {
 
       <ConfirmationModal
         isOpen={confirmProfileOpen}
-        onClose={() => setConfirmProfileOpen(false)}
+        onClose={() => {
+          if (savingProfile) return;
+          setConfirmProfileOpen(false);
+        }}
         onConfirm={saveProfile}
+        closeOnConfirm={false}
+        confirmLoading={savingProfile}
         title="Save profile?"
         message="Your account profile details will be updated."
-        confirmText="Save profile"
+        confirmText={savingProfile ? "Saving…" : "Save profile"}
         cancelText="Cancel"
       />
 
       <ConfirmationModal
         isOpen={confirmPasswordOpen}
-        onClose={() => setConfirmPasswordOpen(false)}
+        onClose={() => {
+          if (savingPassword) return;
+          setConfirmPasswordOpen(false);
+        }}
         onConfirm={savePassword}
+        closeOnConfirm={false}
+        confirmLoading={savingPassword}
         title="Update password?"
         message="You will use this new password the next time you sign in."
-        confirmText="Update password"
+        confirmText={savingPassword ? "Updating…" : "Update password"}
         cancelText="Cancel"
       />
     </div>

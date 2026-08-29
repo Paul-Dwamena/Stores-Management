@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Package,
   ClipboardList,
@@ -9,9 +9,7 @@ import { useSearchParams } from "react-router-dom";
 import { cn } from "../../utils/cn";
 import PageHeader from "../../components/common/PageHeader";
 import SummaryStatCard from "../../components/common/SummaryStatCard";
-import { getInterStoreTransfers } from "../../mockdata/stores";
-import { listPendingSupplyLines } from "../../services/supplyRequestsService";
-import { listInventoryItems } from "../../services/inventoryService";
+import { getStoresGeneralStats } from "../../services/statsService";
 import { InventoryList } from "./inventory";
 import { PendingSuppliesList } from "./supplies";
 import { InterStoresTransfersList } from "./transfers";
@@ -47,40 +45,35 @@ export default function StoresHub() {
     setSearchParams({ sub: subId });
   };
 
-  const [openSupplies, setOpenSupplies] = useState(0);
-  const [inventoryItems, setInventoryItems] = useState([]);
+  const [hubAnalytics, setHubAnalytics] = useState([
+    { label: "Accessory SKUs", value: 0, icon: Package, tone: "teal" },
+    { label: "Low / out of stock", value: 0, icon: AlertTriangle, tone: "amber" },
+    { label: "Open supplies", value: 0, icon: ClipboardList, tone: "rose" },
+    { label: "Open transfers", value: 0, icon: Truck, tone: "sky" },
+  ]);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      listPendingSupplyLines().catch(() => []),
-      listInventoryItems().catch(() => []),
-    ]).then(([supplies, items]) => {
-      if (cancelled) return;
-      setOpenSupplies(supplies.length);
-      setInventoryItems(items);
-    });
+    getStoresGeneralStats()
+      .then((general) => {
+        if (cancelled) return;
+        setHubAnalytics([
+          { label: "Accessory SKUs", value: general.numberOfItems, icon: Package, tone: "teal" },
+          { label: "Low / out of stock", value: general.lowOutOfStock, icon: AlertTriangle, tone: "amber" },
+          { label: "Open supplies", value: general.openSupplies, icon: ClipboardList, tone: "rose" },
+          { label: "Open transfers", value: general.openTransfers, icon: Truck, tone: "sky" },
+        ]);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHubAnalytics((current) =>
+          current.map((card) => ({ ...card, value: 0 })),
+        );
+      });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  const hubAnalytics = useMemo(() => {
-    const outOfStock = inventoryItems.filter(
-      (item) => item.status === "OUT_OF_STOCK",
-    ).length;
-    const openTransfers = getInterStoreTransfers().filter((row) => {
-      const status = (row.status ?? "").toString().toUpperCase();
-      return status !== "COMPLETED" && status !== "REJECTED" && status !== "CANCELLED";
-    }).length;
-
-    return [
-      { label: "Accessory SKUs", value: inventoryItems.length, icon: Package, tone: "teal" },
-      { label: "Low / out of stock", value: outOfStock, icon: AlertTriangle, tone: "amber" },
-      { label: "Open supplies", value: openSupplies, icon: ClipboardList, tone: "rose" },
-      { label: "Open transfers", value: openTransfers, icon: Truck, tone: "sky" },
-    ];
-  }, [openSupplies, inventoryItems]);
 
   return (
     <div className="space-y-4 pb-8">
@@ -102,14 +95,14 @@ export default function StoresHub() {
         ))}
       </div>
 
-        <div className="space-y-4">
-          <div className="pb-3 border-b border-slate-200">
-            <NestedTabButtons
-              tabs={STORES_SUB_TABS}
-              activeId={storesSub}
-              onChange={setStoresSub}
-            />
-          </div>
+      <div className="space-y-4">
+        <div className="pb-3 border-b border-slate-200">
+          <NestedTabButtons
+            tabs={STORES_SUB_TABS}
+            activeId={storesSub}
+            onChange={setStoresSub}
+          />
+        </div>
 
         {storesSub === "inventory" && (
           <InventoryList embedded />
@@ -118,7 +111,7 @@ export default function StoresHub() {
           <PendingSuppliesList embedded />
         )}
         {storesSub === "transfers" && (
-          <InterStoresTransfersList embedded view="accessories" />
+          <InterStoresTransfersList embedded />
         )}
       </div>
     </div>

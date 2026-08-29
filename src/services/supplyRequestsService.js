@@ -17,6 +17,9 @@ const PENDING_QUEUE_STATUSES = new Set([
   PENDING_ISSUANCE_STATUS,
 ]);
 
+const sumQuantityIssued = (items = []) =>
+  items.reduce((sum, item) => sum + (Number(item.quantityIssued) || 0), 0);
+
 export const toPendingSupplyLine = (row) => ({
   id: row.general_request_item_id,
   generalRequestId: row.general_request_id,
@@ -40,6 +43,7 @@ export const toPendingSupplyLine = (row) => ({
 
 const toSupplyItem = (row) => ({
   id: row.id,
+  supplyRequestItemId: row.id,
   generalRequestItemId: row.general_request_item_id,
   itemId: row.item?.id,
   itemName: row.item?.name || "",
@@ -48,31 +52,52 @@ const toSupplyItem = (row) => ({
   description: row.item?.description || "",
   storeId: row.store?.id,
   storeName: row.store?.name || row.store?.code || "",
+  storeCode: row.store?.code || "",
   quantityRequested: row.quantity_requested,
+  quantityIssued: Number(row.quantity_issued) || 0,
+  status: statusKey(row.status),
 });
 
-export const toSupplyRequest = (row) => ({
-  id: row.id,
-  generalRequestId: row.general_request_id,
-  totalQuantityRequested: row.total_quantity_requested,
-  requesterName: requesterName(row.requester) || "",
-  requestedBy: row.requester?.id,
-  status: statusKey(row.status),
-  comment: row.comment,
-  approvalComment: row.approval_comment,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  items: (row.items || []).map(toSupplyItem),
-  queue: PENDING_QUEUE_STATUSES.has(statusKey(row.status)) ? "pending" : "history",
-});
+export const toSupplyRequest = (row) => {
+  const items = (row.items || []).map(toSupplyItem);
+  const totalQuantityRequested = row.total_quantity_requested;
+  const quantitySupplied = sumQuantityIssued(items);
+
+  return {
+    id: row.id,
+    generalRequestId: row.general_request_id,
+    totalQuantityRequested,
+    requesterName: requesterName(row.requester) || "",
+    requestedBy: row.requester?.id,
+    status: statusKey(row.status),
+    comment: row.comment,
+    approvalComment: row.approval_comment,
+    rejectionReason: row.rejection_reason || null,
+    approvedAt: row.approved_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    items,
+    quantitySupplied,
+    quantityRemaining: Math.max(0, Number(totalQuantityRequested) - quantitySupplied),
+    queue: PENDING_QUEUE_STATUSES.has(statusKey(row.status)) ? "pending" : "history",
+  };
+};
 
 export const toRequisitionFromSupplyRequest = (request) => {
   if (!request) return null;
   const items = request.items || [];
   const first = items[0] || {};
+  const totalRequested = request.totalQuantityRequested ?? request.quantityRequested;
+  const quantitySupplied =
+    request.quantitySupplied != null ? request.quantitySupplied : sumQuantityIssued(items);
+  const quantityRemaining =
+    request.quantityRemaining != null
+      ? request.quantityRemaining
+      : Math.max(0, Number(totalRequested) - quantitySupplied);
+
   return {
     ...request,
-    requestNumber: `Supply #${request.id}`,
+    requestNumber: request.requestNumber || `Supply #${request.id}`,
     itemId: first.itemId,
     itemCode: first.itemCode,
     itemName:
@@ -80,13 +105,19 @@ export const toRequisitionFromSupplyRequest = (request) => {
         ? items.map((item) => item.itemName).filter(Boolean).join(", ")
         : first.itemName,
     description: first.description,
-    quantity: request.totalQuantityRequested,
-    quantityRequested: request.totalQuantityRequested,
+    quantity: totalRequested,
+    quantityRequested: totalRequested,
+    quantitySupplied,
+    quantityRemaining,
     requestedBy: request.requesterName,
+    rejectionComment: request.rejectionReason || request.rejectionComment || null,
+    approvalDate: request.approvedAt || request.approvalDate || null,
     storeAllocations: items.map((item) => ({
       location: item.storeName || "—",
+      storeId: item.storeId,
+      supplyRequestItemId: item.supplyRequestItemId ?? item.id,
       quantity: item.quantityRequested,
-      quantityIssued: 0,
+      quantityIssued: Number(item.quantityIssued) || 0,
     })),
   };
 };
@@ -144,9 +175,94 @@ export const approveSupplyRequest = async (supplyRequestId, approvalComment) => 
     const { data } = await api.post(`/supply-requests/${supplyRequestId}/approve`, {
       approval_comment: approvalComment,
     });
-    return toSupplyRequest(data);
+    if (data && data.id != null) return toSupplyRequest(data);
+    return getSupplyRequest(supplyRequestId);
   } catch (err) {
     const error = new Error(extractApiErrorDetail(err, "Unable to approve supply request."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+export const rejectSupplyRequest = async (supplyRequestId, reason) => {
+  try {
+    const { data } = await api.post(
+      `/supply-requests/${supplyRequestId}/reject`,
+      null,
+      { params: { reason: String(reason || "").trim() || "Rejected" } },
+    );
+    if (data && data.id != null) return toSupplyRequest(data);
+    return getSupplyRequest(supplyRequestId);
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to reject supply request."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+export const rejectPendingIssuance = async (supplyRequestId, reason) => {
+  try {
+    const { data } = await api.post(
+      `/supply-requests/${supplyRequestId}/reject-pending-issuance`,
+      null,
+      { params: { reason: String(reason || "").trim() || "Rejected" } },
+    );
+    if (data && data.id != null) return toSupplyRequest(data);
+    return getSupplyRequest(supplyRequestId);
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to reject pending issuance."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+export const registerItemForRequest = async (generalRequestItemId, payload) => {
+  try {
+    const { data } = await api.post(
+      `/supply-requests/items/${generalRequestItemId}/register`,
+      {
+        name: String(payload.name || "").trim(),
+        description: payload.description?.trim() || null,
+        brand: payload.brand?.trim() || null,
+        unit: payload.unit?.trim() || null,
+      },
+    );
+    return {
+      message: data.message,
+      itemId: data.item_id,
+      generalRequestItemId: data.general_request_item_id,
+    };
+  } catch (err) {
+    const error = new Error(
+      extractApiErrorDetail(err, "Unable to register item for this request."),
+    );
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+export const sendSupplyConfirmationOtp = async (phone) => {
+  try {
+    const { data } = await api.post("/supply-requests/confirmation/send-otp", {
+      phone: String(phone || "").trim(),
+    });
+    return data;
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to send confirmation OTP."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+export const verifySupplyConfirmationOtp = async ({ phone, otp }) => {
+  try {
+    const { data } = await api.post("/supply-requests/confirmation/verify-otp", {
+      phone: String(phone || "").trim(),
+      otp: String(otp || "").trim(),
+    });
+    return data;
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to verify confirmation OTP."));
     error.status = err?.response?.status;
     throw error;
   }

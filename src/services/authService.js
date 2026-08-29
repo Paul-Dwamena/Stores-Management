@@ -91,18 +91,11 @@ export const confirmPasswordReset = async ({ email, otp, new_password }) => {
   }
 };
 
-export const updateProfile = async ({
-  first_name,
-  last_name,
-  email,
-  phone,
-}) => {
+export const updateProfile = async ({ first_name, last_name }) => {
   try {
     const { data } = await api.put("/auth/profile", {
       first_name,
       last_name,
-      email,
-      phone,
     });
     return {
       id: data.id,

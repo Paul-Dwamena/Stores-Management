@@ -4,7 +4,7 @@ import PageHeader from "../../../components/common/PageHeader";
 import SearchInput from "../../../components/common/fields/SearchInput";
 import Pagination from "../../../components/common/Pagination";
 import { TableRowActions, TableViewAction } from "../../../components/common/tableActions";
-import LoadingSpinner from "../../../components/common/LoadingSpinner";
+import SectionLoadState from "../../../components/common/SectionLoadState";
 import { toast } from "../../../components/common/ToastNotification";
 import { cn } from "../../../utils/cn";
 import { formatApiDateTime, sortNewestFirst } from "../../../utils/apiResponseHelpers";
@@ -17,16 +17,20 @@ export default function ApprovalsList() {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tableError, setTableError] = useState(null);
   const [tab, setTab] = useState("pending");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
 
   const reload = async () => {
     setLoading(true);
+    setTableError(null);
     try {
       setRows(sortNewestFirst(await listSupplyRequests(), "createdAt"));
     } catch (err) {
-      toast.error(err.message || "Unable to load supply requests.");
+      const message = err.message || "Unable to load supply requests.";
+      setTableError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -73,6 +77,8 @@ export default function ApprovalsList() {
     navigate(`/stores?sub=requisition&supplyId=${row.id}`);
   };
 
+  const showBodyState = loading || Boolean(tableError);
+
   return (
     <div className="space-y-4 pb-8">
       <div className="space-y-3">
@@ -100,8 +106,7 @@ export default function ApprovalsList() {
         </div>
       </div>
 
-      <div className="card overflow-hidden relative min-h-[200px]">
-        {loading ? <LoadingSpinner variant="overlay" size="sm" /> : null}
+      <div className="card overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50/30">
           <SearchInput
             placeholder="Search by supply id, requester, or item…"
@@ -128,7 +133,19 @@ export default function ApprovalsList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {pagedRows.length === 0 ? (
+              {showBodyState ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-2">
+                    <SectionLoadState
+                      loading={loading}
+                      error={tableError}
+                      onRetry={reload}
+                      loadingLabel="Loading…"
+                      errorTitle="Couldn't load approvals"
+                    />
+                  </td>
+                </tr>
+              ) : pagedRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-[13px] text-slate-400">
                     {tab === "pending" ? "No pending supply approvals" : "No approval history"}
@@ -167,15 +184,17 @@ export default function ApprovalsList() {
           </table>
         </div>
 
-        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100">
-          <Pagination
-            page={safePage}
-            size={PAGE_SIZE}
-            totalElements={filtered.length}
-            onPageChange={setPage}
-            showWhenEmpty={false}
-          />
-        </div>
+        {!showBodyState ? (
+          <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+            <Pagination
+              page={safePage}
+              size={PAGE_SIZE}
+              totalElements={filtered.length}
+              onPageChange={setPage}
+              showWhenEmpty={false}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

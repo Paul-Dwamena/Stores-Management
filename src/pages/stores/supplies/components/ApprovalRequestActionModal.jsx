@@ -39,10 +39,11 @@ export default function ApprovalRequestActionModal({
   onSubmit,
   onReject,
   loading = false,
+  saving = false,
   error = null,
   onRetry,
 }) {
-  const busy = loading || Boolean(error);
+  const busy = loading || Boolean(error) || saving;
   const [approvalComment, setApprovalComment] = useState("");
   const [customValues, setCustomValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -57,7 +58,13 @@ export default function ApprovalRequestActionModal({
   const systemKeys = new Set(APPROVE_SUPPLY_REQUEST_FORM_FIELD_CATALOG.map((field) => field.key));
 
   useEffect(() => {
-    if (!isOpen || !requisition) return;
+    if (!isOpen) {
+      setConfirmOpen(false);
+      setPendingPayload(null);
+      setRejectOpen(false);
+      return;
+    }
+    if (!requisition) return;
     setApprovalComment("");
     setCustomValues({});
     setErrors({});
@@ -73,10 +80,8 @@ export default function ApprovalRequestActionModal({
   };
 
   const finalizeSubmit = () => {
-    if (!pendingPayload) return;
+    if (!pendingPayload || saving) return;
     onSubmit?.(pendingPayload);
-    setPendingPayload(null);
-    setConfirmOpen(false);
   };
 
   return (
@@ -153,10 +158,13 @@ export default function ApprovalRequestActionModal({
       <ConfirmationModal
         isOpen={confirmOpen}
         onClose={() => {
+          if (saving) return;
           setConfirmOpen(false);
           setPendingPayload(null);
         }}
         onConfirm={finalizeSubmit}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         className="!z-[10001]"
         title="Approve supply request?"
         message={
@@ -164,15 +172,15 @@ export default function ApprovalRequestActionModal({
             ? `Approve ${requisition.requestNumber}? This moves the request to pending issuance.`
             : "Approve this supply request? This moves it to pending issuance."
         }
-        confirmText="Approve"
+        confirmText={saving ? "Approving…" : "Approve"}
       />
 
       <RejectRequisitionModal
         isOpen={rejectOpen}
         onClose={() => setRejectOpen(false)}
         requestLabel={requisition?.requestNumber}
+        saving={saving}
         onConfirm={(reason, mode) => {
-          setRejectOpen(false);
           onReject?.(reason, mode);
         }}
       />

@@ -43,6 +43,7 @@ import {
   RequisitionDetailModal,
 } from "./components";
 import { getRequisitionStoreAllocations, getRequisitionStoreIssueLines, getStoreIssueRemaining, getStoresWithRemainingQty } from "./components/RaiseSupplyRequestModal";
+import { supplyStatusBadgeClass, supplyStatusKey } from "./utils/supplyStatus";
 
 const PAGE_SIZE = 10;
 
@@ -51,25 +52,6 @@ const filterLabelClassName =
 
 const filterSelectClassName =
   "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
-
-function statusBadgeClass(status) {
-  switch (status) {
-    case "PENDING_SUPPLY_REQUEST":
-      return "bg-gray-100 text-gray-700 border-gray-300";
-    case "PENDING_SUPPLY_APPROVAL":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    case "PENDING_ISSUANCE":
-      return "bg-violet-50 text-violet-700 border-violet-200";
-    case "SUPPLIED":
-      return "bg-success-muted text-success border-[#b7d4c8]";
-    case "PARTIAL_SUPPLIED":
-      return "bg-sky-50 text-sky-700 border-sky-200";
-    case "REJECTED":
-      return "bg-rose-50 text-rose-700 border-rose-200";
-    default:
-      return "bg-slate-50 text-slate-600 border-slate-200";
-  }
-}
 
 function getVehiclePartName(row) {
   return (
@@ -85,13 +67,14 @@ function getVehiclePartName(row) {
 }
 
 function getActionConfig(status, row) {
-  if (status === "PENDING_SUPPLY_REQUEST") {
+  const key = supplyStatusKey(status);
+  if (key === "PENDING_SUPPLY_REQUEST") {
     return { action: "raise_supply_request" };
   }
-  if (status === "PENDING_SUPPLY_APPROVAL") {
+  if (key === "PENDING_SUPPLY_APPROVAL") {
     return { action: "approval_request" };
   }
-  if (isRequisitionIssuable(row) || status === "PENDING_ISSUANCE" || status === "PARTIAL_SUPPLIED") {
+  if (isRequisitionIssuable(row) || key === "PENDING_ISSUANCE" || key === "PARTIALLY_SUPPLIED") {
     return { action: "issue_item" };
   }
   return { action: "view_details" };
@@ -202,7 +185,7 @@ export default function RequisitionsList({
     return kindRows.filter((row) => {
       if (statusFilter !== "ALL" && row.status !== statusFilter) return false;
       if (
-        (statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIAL_SUPPLIED")
+        (statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIALLY_SUPPLIED")
         && locationFilter !== "ALL"
         && !getStoresWithRemainingQty(row).includes(locationFilter)
       ) {
@@ -230,18 +213,18 @@ export default function RequisitionsList({
   }, [kindRows, searchQuery, statusFilter, locationFilter]);
 
   const showSuppliedMeta =
-    statusFilter === "SUPPLIED" || statusFilter === "PARTIAL_SUPPLIED";
+    statusFilter === "SUPPLIED" || statusFilter === "PARTIALLY_SUPPLIED";
 
-  const showPartialMeta = statusFilter === "PARTIAL_SUPPLIED";
+  const showPartialMeta = statusFilter === "PARTIALLY_SUPPLIED";
 
   const showActionsColumn = true;
 
   const showRaiseSelection = statusFilter === "PENDING_SUPPLY_REQUEST";
   const showApprovalSelection = statusFilter === "PENDING_SUPPLY_APPROVAL";
   const showIssueSelection =
-    statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIAL_SUPPLIED";
+    statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIALLY_SUPPLIED";
   const showIssuanceStore =
-    statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIAL_SUPPLIED";
+    statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIALLY_SUPPLIED";
   const showBulkSelection = showRaiseSelection || showApprovalSelection || showIssueSelection;
   const showReceiverColumn = false;
 
@@ -282,15 +265,15 @@ export default function RequisitionsList({
         "PENDING_SUPPLY_REQUEST",
         "PENDING_SUPPLY_APPROVAL",
         "PENDING_ISSUANCE",
-        "PARTIAL_SUPPLIED",
+        "PARTIALLY_SUPPLIED",
       ].includes(
-        row.status,
+        supplyStatusKey(row.status),
       ),
     ).length;
     const supplied = kindRows.filter((row) =>
-      ["SUPPLIED", "PARTIAL_SUPPLIED"].includes(row.status),
+      ["SUPPLIED", "PARTIALLY_SUPPLIED"].includes(supplyStatusKey(row.status)),
     ).length;
-    const rejected = kindRows.filter((row) => row.status === "REJECTED").length;
+    const rejected = kindRows.filter((row) => supplyStatusKey(row.status) === "REJECTED").length;
     return [
       {
         label: isVehicleParts ? "Vehicle part reqs" : "Accessory reqs",
@@ -345,7 +328,7 @@ export default function RequisitionsList({
       toast.success(
         type === "store_change"
           ? "Sent back for store change. Raise the supply request again."
-          : activeAction.row.status === "PARTIAL_SUPPLIED"
+          : supplyStatusKey(activeAction.row.status) === "PARTIALLY_SUPPLIED"
             ? "Remaining quantity rejected. Already supplied items stay recorded."
             : "Requisition rejected.",
       );
@@ -882,7 +865,7 @@ export default function RequisitionsList({
                         <span
                           className={cn(
                             "inline-flex px-2 py-0.5 rounded text-[9px] font-bold border whitespace-nowrap",
-                            statusBadgeClass(row.status),
+                            supplyStatusBadgeClass(row.status),
                           )}
                         >
                           {formatRequisitionStatus(row.status)}

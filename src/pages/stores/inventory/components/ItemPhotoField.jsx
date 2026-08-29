@@ -43,10 +43,18 @@ export default function ItemPhotoField({
   onChange,
   onFileChange,
   error,
+  /** When set, controls Remove visibility. Default: show only after a new image is chosen. */
+  showRemove,
 }) {
   const inputRef = useRef(null);
+  const [pendingFile, setPendingFile] = useState(false);
+
+  useEffect(() => {
+    setPendingFile(false);
+  }, [id]);
 
   const setPhoto = (next, file = null) => {
+    setPendingFile(Boolean(file));
     onChange?.(next || "");
     onFileChange?.(file);
   };
@@ -58,6 +66,9 @@ export default function ItemPhotoField({
     reader.onload = () => setPhoto(String(reader.result || ""), file);
     reader.readAsDataURL(file);
   };
+
+  const removeVisible =
+    showRemove !== undefined ? Boolean(showRemove) : pendingFile;
 
   return (
     <div className="space-y-1.5">
@@ -87,7 +98,7 @@ export default function ItemPhotoField({
               <ImagePlus size={14} />
               {value ? "Change photo" : "Upload photo"}
             </button>
-            {value ? (
+            {removeVisible ? (
               <button
                 type="button"
                 onClick={() => setPhoto("", null)}

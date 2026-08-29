@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Boxes } from "lucide-react";
+import { AlertCircle, Boxes, PackagePlus } from "lucide-react";
 import AddModal from "../../../../components/common/AddModal";
 import SectionLoadState from "../../../../components/common/SectionLoadState";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
@@ -8,6 +8,7 @@ import CheckboxMultiSelect from "../../../../components/common/fields/CheckboxMu
 import { ConfiguredCustomFields } from "../../../../components/common/ConfiguredFormSections";
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
+import { cn } from "../../../../utils/cn";
 import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
 import {
   RAISE_SUPPLY_REQUEST_FORM_FIELD_CATALOG,
@@ -97,12 +98,14 @@ export function getRequisitionStoreAllocations(requisition) {
       .filter((row) => row?.location)
       .map((row) => ({
         location: row.location,
+        storeId: row.storeId ?? null,
         quantity: row.quantity == null || row.quantity === "" ? null : Number(row.quantity),
         quantityIssued: Number(row.quantityIssued) || 0,
       }));
   }
   return getRequisitionIssuingStores(requisition).map((location) => ({
     location,
+    storeId: null,
     quantity: null,
     quantityIssued: 0,
   }));
@@ -134,6 +137,42 @@ export function getStoresWithRemainingQty(requisition) {
   return getRequisitionStoreIssueLines(requisition)
     .filter((row) => row.remaining > 0)
     .map((row) => row.location);
+}
+
+/** Request-stage store allocations for issuance (includes zero stock). */
+export function buildIssueStoreOptions(requisition, inventoryItem = null) {
+  const allocations = getRequisitionStoreAllocations(requisition);
+  if (!allocations.length) return [];
+
+  const stockByStoreId = new Map(
+    (inventoryItem?.stores || []).map((store) => [
+      Number(store.id),
+      Number(store.quantity) || 0,
+    ]),
+  );
+  const stockByName = new Map(
+    (inventoryItem?.stores || []).map((store) => [
+      store.name,
+      Number(store.quantity) || 0,
+    ]),
+  );
+
+  return allocations.map((allocation) => {
+    const storeId = allocation.storeId;
+    const name = allocation.location;
+    const quantity =
+      (storeId != null ? stockByStoreId.get(Number(storeId)) : undefined)
+      ?? stockByName.get(name)
+      ?? 0;
+
+    return {
+      id: storeId,
+      name,
+      quantity,
+      quantityRequested: allocation.quantity,
+      quantityIssued: allocation.quantityIssued ?? 0,
+    };
+  });
 }
 
 export function getStoreIssueRemaining(requisition, location) {
@@ -173,6 +212,14 @@ export function sumStoreQuantities(quantitiesByLocation, locations = []) {
   );
 }
 
+export function getFilledStoreLocations(quantitiesByLocation, locations = []) {
+  return locations.filter((location) => {
+    const raw = quantitiesByLocation?.[location];
+    const qty = Number(raw);
+    return raw !== "" && raw != null && !Number.isNaN(qty) && qty > 0;
+  });
+}
+
 export default function RaiseSupplyRequestModal({
   isOpen,
   onClose,
@@ -180,11 +227,17 @@ export default function RaiseSupplyRequestModal({
   onSubmit,
   onReject,
   storeOptions,
+  raiseBlockReason = null,
+  onReceiveStock,
+  onRegisterItem,
   loading = false,
+  saving = false,
   error = null,
   onRetry,
 }) {
-  const busy = loading || Boolean(error);
+  const busy = loading || Boolean(error) || saving;
+  const isBlocked =
+    raiseBlockReason === "unregistered" || raiseBlockReason === "out_of_stock";
   const [quantityRequested, setQuantityRequested] = useState("");
   const [selectedLocations, setSelectedLocations] = useState([]);
   const [quantitiesByLocation, setQuantitiesByLocation] = useState({});
@@ -234,7 +287,9 @@ export default function RaiseSupplyRequestModal({
   );
 
   const requested = Number(quantityRequested) || 0;
-  const allocated = sumStoreQuantities(quantitiesByLocation, selectedLocations);
+  const filledStoreLocations = getFilledStoreLocations(quantitiesByLocation, selectedLocations);
+  const allocated = sumStoreQuantities(quantitiesByLocation, filledStoreLocations);
+  const overSupplyTotal = requested > 0 && allocated > requested;
 
   const remaining = getRequisitionRemainingQuantity(requisition);
   const originalRequested = Number(
@@ -245,8 +300,16 @@ export default function RaiseSupplyRequestModal({
     remaining > 0 && originalRequested > 0 && remaining < originalRequested
   );
 
+  const quantityCap = isRemainingRaise ? remaining : originalRequested;
+
   useEffect(() => {
-    if (!isOpen || !requisition) return;
+    if (!isOpen) {
+      setConfirmOpen(false);
+      setPendingPayload(null);
+      setRejectOpen(false);
+      return;
+    }
+    if (!requisition) return;
     const remainingQty = getRequisitionRemainingQuantity(requisition);
     const originalQty = Number(
       requisition.quantityRequested ?? requisition.quantity ?? remainingQty ?? 0,
@@ -312,23 +375,29 @@ export default function RaiseSupplyRequestModal({
   const handleSubmit = () => {
     const nextErrors = {};
     if (quantityRequested === "" || Number.isNaN(requested) || requested <= 0) {
-      if (!isRemainingRaise) nextErrors.quantityRequested = "Enter a valid quantity requested.";
+      nextErrors.quantityRequested = isRemainingRaise
+        ? "Enter a valid quantity remaining."
+        : "Enter a valid quantity to supply.";
+    } else if (quantityCap > 0 && requested > quantityCap) {
+      nextErrors.quantityRequested = isRemainingRaise
+        ? `Cannot exceed remaining quantity (${quantityCap}).`
+        : `Cannot exceed quantity requested (${quantityCap}).`;
     }
     if (selectedLocations.length === 0) {
       nextErrors.storeLocations = "Select at least one store.";
     }
-    selectedLocations.forEach((location) => {
+    filledStoreLocations.forEach((location) => {
       const qty = Number(quantitiesByLocation[location]);
       const stockRow = stockLocations.find((row) => row.location === location);
       const stock = stockRow?.quantity;
-      if (quantitiesByLocation[location] === "" || Number.isNaN(qty) || qty <= 0) {
-        nextErrors[`qty-${location}`] = "Enter a quantity for this store.";
-      } else if (stock != null && qty > Number(stock)) {
+      if (stock != null && qty > Number(stock)) {
         nextErrors[`qty-${location}`] = `Cannot exceed stock (${stock}).`;
       }
     });
     if (selectedLocations.length > 0 && allocated <= 0) {
       nextErrors.storeQuantities = "Enter a quantity from at least one store.";
+    } else if (requested > 0 && allocated > requested) {
+      nextErrors.storeQuantities = `Total from stores cannot exceed quantity to supply (${requested}).`;
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
@@ -336,7 +405,7 @@ export default function RaiseSupplyRequestModal({
       return;
     }
 
-    const storeAllocations = selectedLocations.map((location) => {
+    const storeAllocations = filledStoreLocations.map((location) => {
       const stockRow = stockLocations.find((row) => row.location === location);
       return {
         location: stockRow?.name || location,
@@ -347,7 +416,7 @@ export default function RaiseSupplyRequestModal({
     const nextRequested = requested || allocated;
     setPendingPayload({
       quantityRequested: nextRequested,
-      storeLocations: selectedLocations,
+      storeLocations: filledStoreLocations,
       storeAllocations,
       actualQuantity: allocated,
       comment: comment.trim(),
@@ -356,10 +425,8 @@ export default function RaiseSupplyRequestModal({
   };
 
   const finalizeSubmit = () => {
-    if (!pendingPayload) return;
+    if (!pendingPayload || saving) return;
     onSubmit?.(pendingPayload);
-    setPendingPayload(null);
-    setConfirmOpen(false);
   };
 
   return (
@@ -367,23 +434,44 @@ export default function RaiseSupplyRequestModal({
       <AddModal
         isOpen={isOpen && !confirmOpen && !rejectOpen}
         onClose={onClose}
-        onSave={handleSubmit}
+        onSave={isBlocked ? undefined : handleSubmit}
         title="Raise supply request"
         subtitle={
-          isRemainingRaise
-            ? `Remaining to supply: ${remaining}. Stores and quantities are not locked — pick any stocked store.`
-            : "Choose stores and enter how many units come from each."
+          raiseBlockReason === "unregistered"
+            ? "This item must be registered before a supply request can be raised."
+            : raiseBlockReason === "out_of_stock"
+              ? "Receive stock into a store before raising a supply request."
+              : isRemainingRaise
+                ? `Remaining to supply: ${remaining}. Stores and quantities are not locked — pick any stocked store.`
+                : "Choose stores and enter how many units come from each."
         }
         dialogClassName="max-w-2xl"
         saveLabel="Submit supply request"
         saveDisabled={busy}
+        hideSaveButton={isBlocked || busy}
         hideCancelButton
         secondaryAction={{ label: "Cancel", onClick: onClose }}
         footerActions={
-          busy || !onReject ? null : (
-            <Button variant="danger" size="modal" onClick={() => setRejectOpen(true)}>
-              Reject
-            </Button>
+          busy ? null : (
+            <>
+              {onReject ? (
+                <Button variant="danger" size="modal" onClick={() => setRejectOpen(true)}>
+                  Reject
+                </Button>
+              ) : null}
+              {raiseBlockReason === "unregistered" ? (
+                <Button size="modal" onClick={() => onRegisterItem?.()}>
+                  <PackagePlus size={16} />
+                  Register item
+                </Button>
+              ) : null}
+              {raiseBlockReason === "out_of_stock" ? (
+                <Button size="modal" onClick={() => onReceiveStock?.()}>
+                  <Boxes size={16} />
+                  Receive stock
+                </Button>
+              ) : null}
+            </>
           )
         }
       >
@@ -397,6 +485,73 @@ export default function RaiseSupplyRequestModal({
         <div className="space-y-4">
           <RequisitionRequestSummary requisition={requisition} />
 
+          {!busy && raiseBlockReason === "unregistered" ? (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
+                <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-600" />
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold text-amber-900">
+                    Unregistered item
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-amber-800/90">
+                    This request line is not linked to a catalog item. Register the item
+                    before raising supply.
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <table className="w-full text-left">
+                  <tbody className="divide-y divide-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 w-36">
+                        Item name
+                      </th>
+                      <td className="px-3 py-2 text-[12px] font-semibold text-slate-900">
+                        {requisition?.itemName || "—"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                        Description
+                      </th>
+                      <td className="px-3 py-2 text-[12px] text-slate-700">
+                        {requisition?.description || "—"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                        Quantity requested
+                      </th>
+                      <td className="px-3 py-2 text-[12px] font-semibold text-slate-900 tabular-nums">
+                        {requisition?.quantityRequested ?? requisition?.quantity ?? "—"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {!busy && raiseBlockReason === "out_of_stock" ? (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
+              <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-600" />
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold text-amber-900">
+                  No stock available
+                </p>
+                <p className="mt-0.5 text-[11px] text-amber-800/90">
+                  {requisition?.itemName
+                    ? `“${requisition.itemName}” is registered but has no stock in any store.`
+                    : "This item is registered but has no stock in any store."}{" "}
+                  Receive stock before raising a supply request.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {!isBlocked && !busy ? (
+          <>
           <div className="rounded-lg border border-[#b7d4c8] bg-success-muted px-3.5 py-3">
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#b7d4c8] bg-white text-success">
@@ -421,7 +576,7 @@ export default function RaiseSupplyRequestModal({
               htmlFor="raiseQuantityRequested"
               className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
             >
-              {isRemainingRaise ? "Quantity remaining" : "Quantity requested"}
+              {isRemainingRaise ? "Quantity remaining" : "Quantity to Supply"}
             </label>
             {isRemainingRaise ? (
               <p className="text-[10px] text-slate-500">
@@ -433,6 +588,7 @@ export default function RaiseSupplyRequestModal({
               id="raiseQuantityRequested"
               type="number"
               min="1"
+              max={quantityCap > 0 ? quantityCap : undefined}
               value={quantityRequested}
               onChange={(e) => {
                 setQuantityRequested(e.target.value);
@@ -442,6 +598,11 @@ export default function RaiseSupplyRequestModal({
                 errors.quantityRequested ? "border-rose-400 bg-rose-50" : ""
               }`}
             />
+            {!errors.quantityRequested && quantityCap > 0 && !isRemainingRaise ? (
+              <p className="text-[10px] text-slate-400">
+                Maximum {quantityCap} (quantity requested).
+              </p>
+            ) : null}
             {errors.quantityRequested ? (
               <p className="text-[10px] text-rose-600">{errors.quantityRequested}</p>
             ) : null}
@@ -483,11 +644,16 @@ export default function RaiseSupplyRequestModal({
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       {requiredFieldLabel("Quantity from each store", true)}
                     </p>
-                    <p className={`text-[10px] font-bold ${
-                      allocated > 0 ? "text-success" : "text-slate-500"
-                    }`}>
+                    <p className={cn(
+                      "text-[10px] font-bold",
+                      overSupplyTotal || errors.storeQuantities
+                        ? "text-rose-600"
+                        : allocated > 0
+                          ? "text-success"
+                          : "text-slate-500",
+                    )}>
                       Total {allocated || 0}
-                      {requested ? ` of ${requested} requested` : ""}
+                      {requested ? ` of ${requested} to supply` : ""}
                     </p>
                   </div>
                   <div className="overflow-hidden rounded-lg border border-slate-200">
@@ -497,7 +663,7 @@ export default function RaiseSupplyRequestModal({
                           <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">Store</th>
                           <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Available</th>
                           <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                            {requiredFieldLabel("Qty from store", true)}
+                            Qty from store
                           </th>
                         </tr>
                       </thead>
@@ -505,6 +671,8 @@ export default function RaiseSupplyRequestModal({
                         {selectedLocations.map((location) => {
                           const stockRow = stockLocations.find((row) => row.location === location);
                           const stock = stockRow?.quantity;
+                          const storeQty = Number(quantitiesByLocation[location]);
+                          const storeMax = stock == null ? undefined : Number(stock);
                           return (
                             <tr key={location}>
                               <td className="px-3 py-2 text-[12px] text-slate-800">
@@ -517,10 +685,13 @@ export default function RaiseSupplyRequestModal({
                                 <input
                                   type="number"
                                   min="1"
+                                  max={storeMax > 0 ? storeMax : undefined}
                                   value={quantitiesByLocation[location] ?? ""}
                                   onChange={(e) => handleLocationQuantityChange(location, e.target.value)}
                                   className={`${fieldClassName} bg-white py-1.5 ${
-                                    errors[`qty-${location}`] ? "border-rose-400 bg-rose-50" : ""
+                                    errors[`qty-${location}`] || (overSupplyTotal && storeQty > 0)
+                                      ? "border-rose-400 bg-rose-50"
+                                      : ""
                                   }`}
                                 />
                                 {errors[`qty-${location}`] ? (
@@ -535,9 +706,13 @@ export default function RaiseSupplyRequestModal({
                   </div>
                   {errors.storeQuantities ? (
                     <p className="text-[10px] text-rose-600">{errors.storeQuantities}</p>
+                  ) : overSupplyTotal ? (
+                    <p className="text-[10px] text-rose-600">
+                      Total from stores cannot exceed quantity to supply ({requested}).
+                    </p>
                   ) : (
                     <p className="text-[10px] text-slate-400">
-                      Enter the quantity from each selected store. You can also change the requested quantity above.
+                      Enter the quantity from each selected store. Total cannot exceed quantity to supply.
                     </p>
                   )}
                 </div>
@@ -576,6 +751,8 @@ export default function RaiseSupplyRequestModal({
             }}
             idPrefix="rsq"
           />
+          </>
+          ) : null}
         </div>
         </SectionLoadState>
       </AddModal>
@@ -583,10 +760,13 @@ export default function RaiseSupplyRequestModal({
       <ConfirmationModal
         isOpen={confirmOpen}
         onClose={() => {
+          if (saving) return;
           setConfirmOpen(false);
           setPendingPayload(null);
         }}
         onConfirm={finalizeSubmit}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         className="!z-[10001]"
         title="Submit supply request?"
         message={
@@ -594,15 +774,15 @@ export default function RaiseSupplyRequestModal({
             ? `Submit ${requisition.requestNumber} for supply approval?`
             : "Submit this supply request for approval?"
         }
-        confirmText="Submit supply request"
+        confirmText={saving ? "Submitting…" : "Submit supply request"}
       />
 
       <RejectRequisitionModal
         isOpen={rejectOpen}
         onClose={() => setRejectOpen(false)}
         requestLabel={requisition?.requestNumber}
+        saving={saving}
         onConfirm={(reason) => {
-          setRejectOpen(false);
           onReject?.(reason);
         }}
       />

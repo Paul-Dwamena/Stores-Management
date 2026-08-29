@@ -886,6 +886,7 @@ export default function BulkInventoryReceiptModal({
   const [newLines, setNewLines] = useState([]);
   const [errors, setErrors] = useState({ shared: {}, lines: {} });
   const [pendingSave, setPendingSave] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [supplyOpen, setSupplyOpen] = useState(true);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [supplierTick, setSupplierTick] = useState(0);
@@ -1107,12 +1108,15 @@ export default function BulkInventoryReceiptModal({
   };
 
   const confirmSave = async () => {
-    if (!pendingSave) return;
+    if (!pendingSave || saving) return;
+    setSaving(true);
     try {
       await onSave?.(pendingSave);
       setPendingSave(null);
     } catch (error) {
       toast.error(error.message ?? "Could not receive inventory items.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1362,8 +1366,13 @@ export default function BulkInventoryReceiptModal({
 
       <ConfirmationModal
         isOpen={Boolean(pendingSave)}
-        onClose={() => setPendingSave(null)}
+        onClose={() => {
+          if (saving) return;
+          setPendingSave(null);
+        }}
         onConfirm={confirmSave}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         title={
           mode === "existing"
             ? "Receive stock?"
@@ -1374,7 +1383,7 @@ export default function BulkInventoryReceiptModal({
             ? `Receive ${pendingSave?.lines.length || 0} ${typeLabel} receipt${(pendingSave?.lines.length || 0) === 1 ? "" : "s"}?`
             : `Receive ${pendingSave?.lines.length || 0} ${typeLabel} with a total quantity of ${pendingSave?.lines.reduce((sum, line) => sum + line.quantity, 0) || 0}?`
         }
-        confirmText="Receive stock"
+        confirmText={saving ? "Receiving…" : "Receive stock"}
       />
     </>
   );

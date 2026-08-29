@@ -22,11 +22,18 @@ export default function UserFormModal({
   title,
   subtitle = "Assign a role. Phone is optional.",
   saveLabel,
+  presetRoleId = null,
+  lockRole = false,
+  defaultValues = null,
 }) {
   const [roles, setRoles] = useState([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [optionsError, setOptionsError] = useState(null);
   const isEdit = Boolean(editing);
+  const lockedRoleId =
+    lockRole && presetRoleId != null && presetRoleId !== ""
+      ? String(presetRoleId)
+      : null;
 
   const loadOptions = async () => {
     setOptionsLoading(true);
@@ -45,6 +52,16 @@ export default function UserFormModal({
     loadOptions();
   }, [isOpen]);
 
+  const roleOptions = useMemo(() => {
+    const mapped = roles.map((role) => ({
+      value: String(role.id),
+      label: role.label,
+    }));
+    if (!lockedRoleId) return mapped;
+    const locked = mapped.filter((role) => role.value === lockedRoleId);
+    return locked.length ? locked : mapped;
+  }, [roles, lockedRoleId]);
+
   const fields = useMemo(
     () => [
       { key: "firstName", label: "First name", required: true, placeholder: "Jane" },
@@ -60,10 +77,9 @@ export default function UserFormModal({
         type: "select",
         required: true,
         placeholder: "Select role",
-        options: roles.map((role) => ({
-          value: String(role.id),
-          label: role.label,
-        })),
+        options: roleOptions,
+        disabled: Boolean(lockedRoleId),
+        readOnly: Boolean(lockedRoleId),
       },
       ...(isEdit
         ? [{
@@ -77,7 +93,16 @@ export default function UserFormModal({
           }]
         : []),
     ],
-    [roles, isEdit],
+    [roleOptions, isEdit, lockedRoleId],
+  );
+
+  const createInitialValues = useMemo(
+    () => ({
+      ...EMPTY_USER_FORM,
+      ...(defaultValues || {}),
+      role_id: lockedRoleId || defaultValues?.role_id || "",
+    }),
+    [defaultValues, lockedRoleId],
   );
 
   const handleSave = async (form) => {
@@ -86,6 +111,8 @@ export default function UserFormModal({
       return;
     }
 
+    const roleId = lockedRoleId || form.role_id;
+
     if (isEdit) {
       try {
         const saved = await updateUser(editing.id, {
@@ -93,7 +120,7 @@ export default function UserFormModal({
           last_name: form.lastName.trim(),
           email: form.email.trim(),
           phone: (form.phone || "").trim() || null,
-          role_id: Number(form.role_id),
+          role_id: Number(roleId),
           is_active: form.is_active !== false,
         });
         toast.success("User updated.");
@@ -117,7 +144,7 @@ export default function UserFormModal({
         email: form.email.trim(),
         phone: (form.phone || "").trim() || null,
         password: form.password,
-        role_id: Number(form.role_id),
+        role_id: Number(roleId),
       });
       toast.success("User added.");
       onSaved?.(saved);
@@ -148,10 +175,10 @@ export default function UserFormModal({
               lastName: editing.lastName || "",
               email: editing.email || "",
               phone: editing.phone || "",
-              role_id: editing.roleId != null ? String(editing.roleId) : "",
+              role_id: lockedRoleId || (editing.roleId != null ? String(editing.roleId) : ""),
               is_active: editing.isActive !== false,
             }
-          : EMPTY_USER_FORM
+          : createInitialValues
       }
     />
   );

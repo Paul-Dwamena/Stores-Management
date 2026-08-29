@@ -23,6 +23,7 @@ export default function RolesPermissionsList() {
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
   const [tableError, setTableError] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
@@ -210,9 +211,13 @@ export default function RolesPermissionsList() {
 
       <ConfirmationModal
         isOpen={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
+        onClose={() => {
+          if (deleteLoading) return;
+          setDeleteTarget(null);
+        }}
         onConfirm={async () => {
-          if (!deleteTarget || isProtectedRole(deleteTarget)) return;
+          if (!deleteTarget || isProtectedRole(deleteTarget) || deleteLoading) return;
+          setDeleteLoading(true);
           try {
             await deleteRole(deleteTarget.id);
             toast.success("Role deleted.");
@@ -221,15 +226,19 @@ export default function RolesPermissionsList() {
             reload();
           } catch (error) {
             toast.error(error.message ?? "Could not delete role.");
+          } finally {
+            setDeleteLoading(false);
           }
         }}
+        closeOnConfirm={false}
+        confirmLoading={deleteLoading}
         title="Delete role?"
         message={
           deleteTarget
             ? `Remove "${deleteTarget.label || deleteTarget.name}"? Users assigned to this role may lose access.`
             : ""
         }
-        confirmText="Delete role"
+        confirmText={deleteLoading ? "Deleting…" : "Delete role"}
         isDanger
       />
     </>

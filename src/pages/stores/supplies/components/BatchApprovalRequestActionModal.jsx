@@ -125,7 +125,7 @@ export default function BatchApprovalRequestActionModal({
                   <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Request</th>
                   <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Item</th>
                   <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Qty requested</th>
-                  <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Stores & qty supplied</th>
+                  <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Stores & qty requested</th>
                   <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Request comment</th>
                   <th className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Approval comment</th>
                   <th className="w-12 px-4 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 text-right"> </th>

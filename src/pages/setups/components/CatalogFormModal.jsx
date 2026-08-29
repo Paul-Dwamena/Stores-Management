@@ -143,7 +143,12 @@ export default function CatalogFormModal({
                         id={field.key}
                         value={form[field.key] ?? ""}
                         onChange={(e) => setField(field.key, e.target.value)}
-                        className={cn(selectClass, errors[field.key] && "border-red-500 bg-red-50")}
+                        disabled={Boolean(field.disabled || field.readOnly)}
+                        className={cn(
+                          selectClass,
+                          errors[field.key] && "border-red-500 bg-red-50",
+                          (field.disabled || field.readOnly) && "bg-slate-100 text-slate-500 cursor-not-allowed",
+                        )}
                       >
                         <option value="">{field.placeholder || `Select ${field.label.toLowerCase()}`}</option>
                         {(field.options || []).map((option) => (

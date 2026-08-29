@@ -4,6 +4,10 @@ import Button from "../../../../components/common/base/Button";
 import InputField from "../../../../components/common/fields/InputField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
+import {
+  UNREGISTERED_ITEM_DESCRIPTION_HELPER,
+  UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER,
+} from "../../../requests/requests/utils/requestHelpers";
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { ItemPhotoThumb } from "../../inventory/components/ItemPhotoField";
 
@@ -259,7 +263,7 @@ export function MultiAccessoryRequisitionTable({
         </button>
 
         {findItemsOpen ? (
-          <div className="pt-4 space-y-4">
+          <div className="pt-3 space-y-3">
             <div className="inline-flex bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1">
               <button
                 type="button"
@@ -412,48 +416,56 @@ export function MultiAccessoryRequisitionTable({
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                  <div className="flex-1 min-w-0">
-                    <InputField
-                      label="Name"
-                      id="multiOtherName"
-                      value={otherName}
-                      onChange={(e) => {
-                        setOtherName(e.target.value);
-                        clearFormError("otherName");
-                      }}
-                      error={formErrors.otherName}
-                      placeholder="Item name"
-                      className="bg-white focus:bg-white"
-                    />
-                  </div>
-                  <div className="w-full sm:w-28 shrink-0">
-                    <InputField
-                      label="Quantity"
-                      id="multiOtherQty"
-                      type="number"
-                      value={otherQty}
-                      onChange={(e) => {
-                        setOtherQty(e.target.value);
-                        clearFormError("otherQty");
-                      }}
-                      error={formErrors.otherQty}
-                      className="bg-white focus:bg-white"
-                    />
-                  </div>
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <InputField
+                    label="Name"
+                    id="multiOtherName"
+                    required
+                    value={otherName}
+                    onChange={(e) => {
+                      setOtherName(e.target.value);
+                      clearFormError("otherName");
+                    }}
+                    error={formErrors.otherName}
+                    placeholder="Item name"
+                    className="bg-white focus:bg-white"
+                  />
+                  <InputField
+                    label="Quantity"
+                    id="multiOtherQty"
+                    type="number"
+                    required
+                    value={otherQty}
+                    onChange={(e) => {
+                      setOtherQty(e.target.value);
+                      clearFormError("otherQty");
+                    }}
+                    error={formErrors.otherQty}
+                    className="bg-white focus:bg-white"
+                  />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label
                     htmlFor="multiOtherDescription"
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                    className={cn(
+                      "text-[10px] font-bold uppercase tracking-wider",
+                      formErrors.otherDescription ? "text-red-500" : "text-slate-500",
+                    )}
                   >
                     Description
+                    <span className="normal-case !text-red-500" aria-hidden="true">
+                      {" "}
+                      *
+                    </span>
                   </label>
+                  <p className="text-[10px] font-medium normal-case tracking-normal text-slate-400 leading-snug">
+                    {UNREGISTERED_ITEM_DESCRIPTION_HELPER}
+                  </p>
                   <textarea
                     id="multiOtherDescription"
-                    rows={2}
+                    rows={3}
                     value={otherDescription}
                     onChange={(e) => {
                       setOtherDescription(e.target.value);
@@ -461,16 +473,20 @@ export function MultiAccessoryRequisitionTable({
                     }}
                     className={cn(
                       fieldClassName,
-                      "resize-none min-h-[64px]",
+                      "resize-none",
                       formErrors.otherDescription && "border-red-500 bg-red-50",
                     )}
-                    placeholder="Describe the item needed…"
+                    placeholder={UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER}
                   />
-                  {formErrors.otherDescription ? (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {formErrors.otherDescription}
-                    </p>
-                  ) : null}
+                  <p
+                    className={cn(
+                      "mt-1 min-h-[14px] text-[10px] font-medium leading-[14px]",
+                      formErrors.otherDescription ? "text-red-500" : "invisible",
+                    )}
+                    aria-live="polite"
+                  >
+                    {formErrors.otherDescription || "\u00A0"}
+                  </p>
                 </div>
 
                 <div className="flex justify-end">
@@ -780,7 +796,7 @@ export function MultiVehiclePartRequisitionTable({
         </button>
 
         {findItemsOpen ? (
-          <div className="pt-4 space-y-4">
+          <div className="pt-3 space-y-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">

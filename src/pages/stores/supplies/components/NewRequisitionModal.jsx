@@ -5,15 +5,11 @@ import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
 import ChoiceOption from "../../../../components/common/fields/ChoiceOption";
 import { toast } from "../../../../components/common/ToastNotification";
-import { ConfiguredCustomFields, ShowConfiguredField } from "../../../../components/common/ConfiguredFormSections";
 import { cn } from "../../../../utils/cn";
-import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
 import {
-  ACCESSORY_REQUISITION_FORM_FIELD_CATALOG,
-  ACCESSORY_REQUISITION_FORM_SETUP_CHANGED_EVENT,
-  getActiveAccessoryRequisitionFormSections,
-  getAccessoryRequisitionFormSetup,
-} from "../../../../mockdata/setups";
+  UNREGISTERED_ITEM_DESCRIPTION_HELPER,
+  UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER,
+} from "../../../requests/requests/utils/requestHelpers";
 import {
   getAccessories,
   getVehicleParts,
@@ -149,13 +145,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
 
   const [multiAccessoryLines, setMultiAccessoryLines] = useState([]);
   const [multiPartLines, setMultiPartLines] = useState([]);
-  const [customValues, setCustomValues] = useState({});
-  const { sections, visibleKeys } = useFormTreeSections(
-    ACCESSORY_REQUISITION_FORM_SETUP_CHANGED_EVENT,
-    getAccessoryRequisitionFormSetup,
-    getActiveAccessoryRequisitionFormSections,
-  );
-  const requisitionSystemKeys = new Set(ACCESSORY_REQUISITION_FORM_FIELD_CATALOG.map((field) => field.key));
   const [lineErrors, setLineErrors] = useState({});
 
   const accessories = useMemo(() => getAccessories(), []);
@@ -300,12 +289,9 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
     if (accessoryMode === "catalog") {
       if (!selectedAccessoryId) nextErrors.selectedAccessoryId = "Select an accessory.";
       if (
-        visibleKeys.has("quantity")
-        && (
         accessoryQty === ""
         || Number.isNaN(Number(accessoryQty))
         || Number(accessoryQty) <= 0
-        )
       ) {
         nextErrors.accessoryQty = "Enter a valid quantity.";
       }
@@ -358,7 +344,7 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
     if (partQty === "" || Number.isNaN(Number(partQty)) || Number(partQty) <= 0) {
       nextErrors.partQty = "Enter a valid quantity.";
     }
-    if (visibleKeys.has("justification") && !partJustification.trim()) {
+    if (!partJustification.trim()) {
       nextErrors.partJustification = "Enter a justification.";
     }
     setErrors(nextErrors);
@@ -591,7 +577,7 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                 ? "max-w-3xl"
                 : "max-w-lg"
         }
-        contentClassName="space-y-4"
+        contentClassName="space-y-3"
         secondaryAction={
           !isTypeStep
             ? {
@@ -603,7 +589,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
       >
         {isTypeStep && (
           <div className="grid grid-cols-1 gap-4">
-            <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="quantityMode">
               <div className="space-y-1.5">
                 <p
                   className={cn(
@@ -646,7 +631,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                   <p className="text-[10px] font-medium text-red-500">{errors.quantityMode}</p>
                 ) : null}
               </div>
-            </ShowConfiguredField>
           </div>
         )}
 
@@ -753,7 +737,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                     </div>
                   </>
                 )}
-                <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="quantity">
                 <InputField
                   label="Quantity"
                   id="reqAccQty"
@@ -765,39 +748,52 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                   }}
                   error={errors.accessoryQty}
                 />
-                </ShowConfiguredField>
               </>
             ) : (
-              <>
-                <InputField
-                  label="Name"
-                  id="reqOtherName"
-                  value={otherName}
-                  onChange={(e) => {
-                    setOtherName(e.target.value);
-                    clearError("otherName");
-                  }}
-                  error={errors.otherName}
-                  placeholder="Item name"
-                />
-                <InputField
-                  label="Quantity"
-                  id="reqOtherQty"
-                  type="number"
-                  value={otherQty}
-                  onChange={(e) => {
-                    setOtherQty(e.target.value);
-                    clearError("otherQty");
-                  }}
-                  error={errors.otherQty}
-                />
-                <div className="space-y-1.5">
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <InputField
+                    label="Name"
+                    id="reqOtherName"
+                    required
+                    value={otherName}
+                    onChange={(e) => {
+                      setOtherName(e.target.value);
+                      clearError("otherName");
+                    }}
+                    error={errors.otherName}
+                    placeholder="Item name"
+                  />
+                  <InputField
+                    label="Quantity"
+                    id="reqOtherQty"
+                    type="number"
+                    required
+                    value={otherQty}
+                    onChange={(e) => {
+                      setOtherQty(e.target.value);
+                      clearError("otherQty");
+                    }}
+                    error={errors.otherQty}
+                  />
+                </div>
+                <div className="space-y-1">
                   <label
                     htmlFor="reqOtherDescription"
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                    className={cn(
+                      "text-[10px] font-bold uppercase tracking-wider",
+                      errors.otherDescription ? "text-red-500" : "text-slate-500",
+                    )}
                   >
                     Description
+                    <span className="normal-case !text-red-500" aria-hidden="true">
+                      {" "}
+                      *
+                    </span>
                   </label>
+                  <p className="text-[10px] font-medium normal-case tracking-normal text-slate-400 leading-snug">
+                    {UNREGISTERED_ITEM_DESCRIPTION_HELPER}
+                  </p>
                   <textarea
                     id="reqOtherDescription"
                     rows={3}
@@ -811,15 +807,19 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                       "resize-none",
                       errors.otherDescription && "border-red-500 bg-red-50",
                     )}
-                    placeholder="Describe the item needed…"
+                    placeholder={UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER}
                   />
-                  {errors.otherDescription && (
-                    <p className="text-[10px] font-medium text-red-500">
-                      {errors.otherDescription}
-                    </p>
-                  )}
+                  <p
+                    className={cn(
+                      "mt-1 min-h-[14px] text-[10px] font-medium leading-[14px]",
+                      errors.otherDescription ? "text-red-500" : "invisible",
+                    )}
+                    aria-live="polite"
+                  >
+                    {errors.otherDescription || "\u00A0"}
+                  </p>
                 </div>
-              </>
+              </div>
             )}
           </>
         )}
@@ -1005,7 +1005,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
               </DetailBlock>
             )}
 
-            <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="quantity">
             <InputField
               label="Quantity"
               id="reqVpQty"
@@ -1017,8 +1016,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
               }}
               error={errors.partQty}
             />
-            </ShowConfiguredField>
-            <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="justification">
             <div className="space-y-1.5">
               <label
                 htmlFor="reqVpJustification"
@@ -1047,7 +1044,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
                 </p>
               )}
             </div>
-            </ShowConfiguredField>
           </>
         )}
 
@@ -1138,19 +1134,6 @@ export default function NewRequisitionModal({ isOpen, onClose, onSave }) {
             }
           />
         )}
-        {isFormStep ? (
-          <ConfiguredCustomFields
-            sections={sections}
-            systemKeys={requisitionSystemKeys}
-            form={customValues}
-            formErrors={errors}
-            handleChange={(key) => (event) => {
-              const value = event?.target ? event.target.value : event;
-              setCustomValues((current) => ({ ...current, [key]: value }));
-            }}
-            idPrefix="arq"
-          />
-        ) : null}
       </AddModal>
 
       <ConfirmationModal

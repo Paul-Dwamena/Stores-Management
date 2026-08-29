@@ -1,47 +1,61 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import AddModal from "../../../../components/common/AddModal";
+import InputField from "../../../../components/common/fields/InputField";
 import { toast } from "../../../../components/common/ToastNotification";
-import { collectCanonicalFieldErrors } from "../../../../components/common/fields/canonicalConfiguredField";
-import { useSetupTreeRevision } from "../../../../hooks/useSetupTreeRevision";
-import {
-  ADD_RECEIVER_FORM_SETUP_CHANGED_EVENT,
-  getActiveAddReceiverFormSections,
-  getAddReceiverFormSetup,
-  getInitialAddReceiverFormValues,
-} from "../../../../mockdata/setups";
-import { addReceiver } from "../../../../mockdata/stores";
-import AddReceiverConfiguredFields from "./AddReceiverConfiguredFields";
+import { createUser } from "../../../../services/usersService";
+
+const EMPTY_FORM = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+};
+
+function validateForm(form) {
+  const errors = {};
+  if (!String(form.firstName || "").trim()) {
+    errors.firstName = "Enter a first name.";
+  }
+  if (!String(form.lastName || "").trim()) {
+    errors.lastName = "Enter a last name.";
+  }
+  const email = String(form.email || "").trim();
+  if (!email) {
+    errors.email = "Enter an email address.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = "Enter a valid email address.";
+  }
+  if (!String(form.phone || "").trim()) {
+    errors.phone = "Enter a phone number.";
+  }
+  return errors;
+}
 
 export default function AddReceiverModal({
   isOpen,
   onClose,
   onCreated,
+  receiverRoleId = null,
+  onEnsureReceiverRole,
   title = "Add receiver",
   saveLabel = "Add receiver",
-  subtitle = "Create a receiver with name, email, phone, and role. They can collect issued items immediately.",
+  subtitle = "Add someone who can collect issued items.",
 }) {
-  const setupRevision = useSetupTreeRevision(ADD_RECEIVER_FORM_SETUP_CHANGED_EVENT);
-  const formSetup = useMemo(() => {
-    void setupRevision;
-    return getAddReceiverFormSetup();
-  }, [setupRevision]);
-  const configuredSections = useMemo(
-    () => getActiveAddReceiverFormSections(formSetup),
-    [formSetup],
-  );
-  const allConfiguredFields = useMemo(
-    () => configuredSections.flatMap((section) => section.fields || []),
-    [configuredSections],
-  );
-
-  const [form, setForm] = useState(() => getInitialAddReceiverFormValues());
+  const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    setForm(getInitialAddReceiverFormValues(formSetup));
+    setForm(EMPTY_FORM);
     setErrors({});
-  }, [isOpen, formSetup]);
+    setSaving(false);
+    try {
+      delete window.__FLEETLY_ADD_RECEIVER_FORM_TREE__;
+    } catch {
+      /* ignore */
+    }
+  }, [isOpen]);
 
   const handleChange = (field) => (event) => {
     const value = event?.target ? event.target.value : event;
@@ -54,24 +68,41 @@ export default function AddReceiverModal({
     });
   };
 
-  const handleSave = () => {
-    const nextErrors = collectCanonicalFieldErrors(allConfiguredFields, form);
-    const email = String(form.email || "").trim();
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      nextErrors.email = "Enter a valid email address.";
-    }
+  const handleSave = async () => {
+    const nextErrors = validateForm(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warning("Complete the receiver details.");
       return;
     }
+
+    setSaving(true);
     try {
-      const created = addReceiver(form);
+      let roleId = receiverRoleId;
+      if (roleId == null && onEnsureReceiverRole) {
+        roleId = await onEnsureReceiverRole();
+      }
+      if (roleId == null) {
+        toast.error(
+          "No Receiver role found. Create a role named Receiver in Setups first.",
+        );
+        return;
+      }
+
+      const created = await createUser({
+        first_name: String(form.firstName || "").trim(),
+        last_name: String(form.lastName || "").trim(),
+        email: String(form.email || "").trim(),
+        phone: String(form.phone || "").trim() || null,
+        role_id: Number(roleId),
+      });
       toast.success(`${created.name} added.`);
       onCreated?.(created);
       onClose?.();
     } catch (error) {
       toast.error(error.message ?? "Could not add receiver.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -83,15 +114,49 @@ export default function AddReceiverModal({
       title={title}
       subtitle={subtitle}
       saveLabel={saveLabel}
+      saveDisabled={saving}
       dialogClassName="max-w-lg"
       overlayClassName="!z-[10001]"
     >
-      <AddReceiverConfiguredFields
-        sections={configuredSections}
-        form={form}
-        formErrors={errors}
-        handleChange={handleChange}
-      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <InputField
+          id="add-receiver-first-name"
+          label="First name"
+          required
+          value={form.firstName}
+          onChange={handleChange("firstName")}
+          placeholder="Jane"
+          error={errors.firstName}
+        />
+        <InputField
+          id="add-receiver-last-name"
+          label="Last name"
+          required
+          value={form.lastName}
+          onChange={handleChange("lastName")}
+          placeholder="Mensah"
+          error={errors.lastName}
+        />
+        <InputField
+          id="add-receiver-email"
+          type="email"
+          label="Email"
+          required
+          value={form.email}
+          onChange={handleChange("email")}
+          placeholder="name@fleet.gh"
+          error={errors.email}
+        />
+        <InputField
+          id="add-receiver-phone"
+          label="Phone"
+          required
+          value={form.phone}
+          onChange={handleChange("phone")}
+          placeholder="024 000 0000"
+          error={errors.phone}
+        />
+      </div>
     </AddModal>
   );
 }

@@ -45,14 +45,16 @@ export const createUser = async ({
   role_id,
 }) => {
   try {
-    const { data } = await api.post("/users", {
+    const body = {
       first_name,
       last_name,
       email,
       phone,
-      password,
       role_id,
-    });
+    };
+    if (password) body.password = password;
+
+    const { data } = await api.post("/users", body);
     return toUser(data);
   } catch (err) {
     const error = new Error(extractApiErrorDetail(err, "Unable to create user."));

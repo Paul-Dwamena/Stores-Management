@@ -5,6 +5,9 @@ const toStoreStock = (store) => ({
   id: store.store_id,
   name: store.store_name,
   quantity: store.quantity,
+  shelfPosition: store.shelf_position || "",
+  shelf: store.shelf || "",
+  position: store.position || "",
 });
 
 const inventoryStatus = (row) => {
@@ -173,6 +176,113 @@ export const listItemReceipts = async (itemId) => {
     return parsePaginatedList(data).map(toStockReceipt);
   } catch (err) {
     const error = new Error(extractApiErrorDetail(err, "Unable to load receipts."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+const personName = (person) =>
+  [person?.first_name, person?.last_name].filter(Boolean).join(" ").trim();
+
+export const toItemSupply = (row = {}) => ({
+  id: [
+    row.item_id,
+    row.store_id,
+    row.date_supplied || row.date_requested || "",
+    row.quantity_supplied,
+    row.status,
+  ].join("-"),
+  itemId: row.item_id ?? null,
+  itemCode: row.item_code || "",
+  name: row.item_name || "",
+  brand: row.brand || "",
+  description: row.description || "",
+  quantity: row.quantity_supplied,
+  quantityRequested: row.quantity_requested,
+  quantitySupplied: row.quantity_supplied,
+  status: row.status || "",
+  dateRequested: row.date_requested || null,
+  dateSupplied: row.date_supplied || null,
+  approvedAt: row.approved_at || null,
+  storeId: row.store_id ?? null,
+  location: row.store_name || "",
+  shelfPosition: row.shelf_position || "",
+  receivedBy: personName(row.received_by) || "",
+  suppliedBy: personName(row.supplied_by) || "",
+  requestedBy: personName(row.received_by) || "",
+});
+
+export const listItemSupplies = async (itemId) => {
+  try {
+    const { data } = await api.get(`/inventory/items/${itemId}/supplies`);
+    return parsePaginatedList(data).map(toItemSupply);
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to load supplies."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+/** GET /items/items/{id}/stores — qty + shelf/position per store for one item. */
+export const getItemStoreStock = async (itemId) => {
+  try {
+    const { data } = await api.get(`/items/items/${itemId}/stores`);
+    return {
+      totalQuantity: data?.total_quantity ?? 0,
+      stores: (data?.stores || []).map((store) => ({
+        id: store.store_id,
+        name: store.store_name || "",
+        quantity: store.quantity ?? 0,
+        shelf: store.shelf || "",
+        position: store.position || "",
+        shelfPosition: [store.shelf, store.position].filter(Boolean).join(" / "),
+      })),
+    };
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to load store stock."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+/** GET /stores/{storeId}/items/{itemId}/location */
+export const getStoreItemLocation = async (storeId, itemId) => {
+  try {
+    const { data } = await api.get(`/stores/${storeId}/items/${itemId}/location`);
+    return {
+      id: data.id,
+      storeId: data.store_id,
+      itemId: data.item_id,
+      shelf: data.shelf || "",
+      position: data.position || "",
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to load item location."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+/** PUT /stores/{storeId}/items/{itemId}/location */
+export const updateStoreItemLocation = async (storeId, itemId, { shelf, position }) => {
+  try {
+    const { data } = await api.put(`/stores/${storeId}/items/${itemId}/location`, {
+      shelf: shelf?.trim() ? shelf.trim() : null,
+      position: position?.trim() ? position.trim() : null,
+    });
+    return {
+      id: data.id,
+      storeId: data.store_id,
+      itemId: data.item_id,
+      shelf: data.shelf || "",
+      position: data.position || "",
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to update item location."));
     error.status = err?.response?.status;
     throw error;
   }

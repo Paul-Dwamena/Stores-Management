@@ -157,7 +157,7 @@ export default function DeliveryPersonOtpSection({
       )}
 
       {otpSent && !otpVerified ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="max-w-xs flex-1">
             <InputField
               id="receiveDeliveryOtp"
@@ -180,7 +180,7 @@ export default function DeliveryPersonOtpSection({
             size="md"
             onClick={handleConfirmOtp}
             disabled={otp.length !== 6 || verifying}
-            className="min-w-[140px]"
+            className="min-w-[140px] sm:mt-[22px]"
           >
             <ShieldCheck size={15} />
             {verifying ? "Confirming…" : "Confirm OTP"}

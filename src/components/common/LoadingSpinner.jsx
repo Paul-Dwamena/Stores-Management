@@ -43,7 +43,7 @@ export default function LoadingSpinner({
     return (
       <div
         className={cn(
-          "absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-[2px]",
+          "absolute inset-0 z-10 flex items-center justify-center",
           className,
         )}
       >

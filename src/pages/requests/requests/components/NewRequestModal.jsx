@@ -13,7 +13,7 @@ import {
 } from "../../../../services/generalRequestsService";
 import { MultiAccessoryRequisitionTable } from "../../../stores/supplies/components/MultiRequisitionTables";
 import { ItemPhotoThumb } from "../../../stores/inventory/components/ItemPhotoField";
-import { isPositiveInt, toGeneralRequestWriteBody } from "../utils/requestHelpers";
+import { isPositiveInt, toGeneralRequestWriteBody, UNREGISTERED_ITEM_DESCRIPTION_HELPER, UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER } from "../utils/requestHelpers";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -389,8 +389,8 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
   return (
     <>
       <AddModal
-        isOpen={isOpen}
-        onClose={onClose}
+      isOpen={isOpen}
+      onClose={onClose}
         onSave={handlePrimaryAction}
         title={title}
         subtitle={subtitle}
@@ -406,7 +406,7 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
         saveDisabled={saving || (!isTypeStep && !catalogReady)}
         fillViewport={false}
         dialogClassName={isMultiStep ? "max-w-5xl" : isSingleStep ? "max-w-3xl" : "max-w-lg"}
-        contentClassName="space-y-4"
+        contentClassName="space-y-3"
         secondaryAction={
           !isTypeStep
             ? { label: "Back", onClick: handleBack, disabled: saving }
@@ -577,36 +577,50 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                 />
               </>
             ) : (
-              <>
-                <InputField
-                  label="Name"
-                  id="reqOtherName"
-                  value={otherName}
-                  onChange={(event) => {
-                    setOtherName(event.target.value);
-                    clearError("otherName");
-                  }}
-                  error={errors.otherName}
-                  placeholder="Item name"
-                />
-                <InputField
-                  label="Quantity"
-                  id="reqOtherQty"
-                  type="number"
-                  value={otherQty}
-                  onChange={(event) => {
-                    setOtherQty(event.target.value);
-                    clearError("otherQty");
-                  }}
-                  error={errors.otherQty}
-                />
-                <div className="space-y-1.5">
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <InputField
+                    label="Name"
+                    id="reqOtherName"
+                    required
+                    value={otherName}
+                    onChange={(event) => {
+                      setOtherName(event.target.value);
+                      clearError("otherName");
+                    }}
+                    error={errors.otherName}
+                    placeholder="Item name"
+                  />
+                  <InputField
+                    label="Quantity"
+                    id="reqOtherQty"
+                    type="number"
+                    required
+                    value={otherQty}
+                    onChange={(event) => {
+                      setOtherQty(event.target.value);
+                      clearError("otherQty");
+                    }}
+                    error={errors.otherQty}
+                  />
+                </div>
+                <div className="space-y-1">
                   <label
                     htmlFor="reqOtherDescription"
-                    className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
+                    className={cn(
+                      "text-[10px] font-bold uppercase tracking-wider",
+                      errors.otherDescription ? "text-red-500" : "text-slate-500",
+                    )}
                   >
                     Description
+                    <span className="normal-case !text-red-500" aria-hidden="true">
+                      {" "}
+                      *
+                    </span>
                   </label>
+                  <p className="text-[10px] font-medium normal-case tracking-normal text-slate-400 leading-snug">
+                    {UNREGISTERED_ITEM_DESCRIPTION_HELPER}
+                  </p>
                   <textarea
                     id="reqOtherDescription"
                     rows={3}
@@ -620,13 +634,19 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                       "resize-none",
                       errors.otherDescription && "border-red-500 bg-red-50",
                     )}
-                    placeholder="Describe the item needed…"
+                    placeholder={UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER}
                   />
-                  {errors.otherDescription ? (
-                    <p className="text-[10px] font-medium text-red-500">{errors.otherDescription}</p>
-                  ) : null}
+                  <p
+                    className={cn(
+                      "mt-1 min-h-[14px] text-[10px] font-medium leading-[14px]",
+                      errors.otherDescription ? "text-red-500" : "invisible",
+                    )}
+                    aria-live="polite"
+                  >
+                    {errors.otherDescription || "\u00A0"}
+                  </p>
                 </div>
-              </>
+              </div>
             )}
 
             <ReasonField value={reason} onChange={setReason} />
@@ -670,6 +690,8 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
           setPendingPayload(null);
         }}
         onConfirm={() => pendingPayload && persist(pendingPayload)}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         title="Submit request?"
         message={
           itemCount > 1

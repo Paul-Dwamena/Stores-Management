@@ -1,10 +1,21 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import InputField from "../../../../components/common/fields/InputField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { getReceiverByName, MOCK_ISSUE_OTP } from "../../../../mockdata/stores";
+import { verifySupplyConfirmationOtp } from "../../../../services/supplyRequestsService";
+
+function resolveReceiver(suppliedTo, receivers = []) {
+  const key = String(suppliedTo || "").trim();
+  if (!key) return null;
+  return receivers.find(
+    (person) =>
+      String(person.id) === key ||
+      person.name === key ||
+      [person.firstName, person.lastName].filter(Boolean).join(" ").trim() === key,
+  ) || null;
+}
 
 export default function IssueOtpSection({
   suppliedTo,
@@ -15,13 +26,19 @@ export default function IssueOtpSection({
   onOtpChange,
   onVerifiedChange,
   sendDisabled = false,
+  sendLoading = false,
   itemCount,
   required = true,
+  receivers = [],
 }) {
   const [otpError, setOtpError] = useState("");
-  const receiver = getReceiverByName(suppliedTo);
-  const name = suppliedTo.trim() || "the selected receiver";
-  const phone = receiver?.phone || "";
+  const [verifying, setVerifying] = useState(false);
+  const receiver = useMemo(
+    () => resolveReceiver(suppliedTo, receivers),
+    [suppliedTo, receivers],
+  );
+  const name = receiver?.name || String(suppliedTo || "").trim() || "the selected receiver";
+  const phone = receiver?.phone?.trim() || "";
   const itemLabel = Number.isFinite(itemCount)
     ? ` for the ${itemCount} ticked item(s)`
     : "";
@@ -30,7 +47,7 @@ export default function IssueOtpSection({
     setOtpError("");
   }, [otpSent, suppliedTo]);
 
-  const handleConfirmOtp = () => {
+  const handleConfirmOtp = async () => {
     if (!/^\d{6}$/.test(otp.trim())) {
       const message = "Enter the 6-digit OTP sent to the receiver.";
       setOtpError(message);
@@ -38,16 +55,27 @@ export default function IssueOtpSection({
       onVerifiedChange?.(false);
       return;
     }
-    if (otp.trim() !== MOCK_ISSUE_OTP) {
-      const message = "The OTP does not match the code sent to this number.";
+    if (!phone) {
+      const message = "Receiver phone is required to verify the OTP.";
       setOtpError(message);
-      toast.error(message);
+      toast.warning(message);
       onVerifiedChange?.(false);
       return;
     }
-    setOtpError("");
-    onVerifiedChange?.(true);
-    toast.success("OTP confirmed.");
+    setVerifying(true);
+    try {
+      await verifySupplyConfirmationOtp({ phone, otp: otp.trim() });
+      setOtpError("");
+      onVerifiedChange?.(true);
+      toast.success("OTP confirmed.");
+    } catch (error) {
+      const message = error.message || "The OTP does not match the code sent to this number.";
+      setOtpError(message);
+      toast.error(message);
+      onVerifiedChange?.(false);
+    } finally {
+      setVerifying(false);
+    }
   };
 
   return (
@@ -115,14 +143,14 @@ export default function IssueOtpSection({
             variant={otpSent ? "outline" : "primary"}
             size="md"
             onClick={onSendOtp}
-            disabled={sendDisabled}
+            disabled={sendDisabled || sendLoading}
             className={cn(
               "min-w-[140px]",
               otpSent && "bg-white border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300",
             )}
           >
-            {otpSent ? <RefreshCw size={15} /> : <KeyRound size={15} />}
-            {otpSent ? "Resend OTP" : "Send OTP"}
+            {otpSent ? <RefreshCw size={15} className={sendLoading ? "animate-spin" : undefined} /> : <KeyRound size={15} />}
+            {sendLoading ? "Sending…" : otpSent ? "Resend OTP" : "Send OTP"}
           </Button>
 
           {otpSent ? (
@@ -146,7 +174,7 @@ export default function IssueOtpSection({
       )}
 
       {otpSent && !otpVerified ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="max-w-xs flex-1">
             <InputField
               id="issueOtp"
@@ -168,11 +196,11 @@ export default function IssueOtpSection({
             variant="primary"
             size="md"
             onClick={handleConfirmOtp}
-            disabled={otp.length !== 6}
-            className="min-w-[140px]"
+            disabled={otp.length !== 6 || verifying}
+            className="min-w-[140px] sm:mt-[22px]"
           >
             <ShieldCheck size={15} />
-            Confirm OTP
+            {verifying ? "Confirming…" : "Confirm OTP"}
           </Button>
         </div>
       ) : null}

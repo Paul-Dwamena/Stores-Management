@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import Button from "./base/Button";
 import { cn } from "../../utils/cn";
 
@@ -16,6 +16,8 @@ const ConfirmationModal = ({
   isDanger,
   icon: Icon,
   className,
+  confirmLoading = false,
+  closeOnConfirm = true,
 }) => {
   React.useEffect(() => {
     if (isOpen) {
@@ -31,8 +33,15 @@ const ConfirmationModal = ({
   if (!isOpen) return null;
 
   const handleCancel = () => {
+    if (confirmLoading) return;
     if (onCancel) onCancel();
     else onClose();
+  };
+
+  const handleConfirm = () => {
+    if (confirmLoading) return;
+    onConfirm?.();
+    if (closeOnConfirm) onClose();
   };
 
   return ReactDOM.createPortal(
@@ -40,7 +49,7 @@ const ConfirmationModal = ({
       <div
         className="absolute inset-0 bg-slate-900/60 animate-in fade-in duration-200"
         style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
-        onClick={onClose}
+        onClick={handleCancel}
       />
 
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 m-4 flex flex-col p-6 text-center">
@@ -54,11 +63,28 @@ const ConfirmationModal = ({
         </p>
 
         <div className="flex justify-center gap-3 w-full">
-          <Button onClick={handleCancel} variant="ghost" className="flex-1 border border-slate-200">
+          <Button
+            onClick={handleCancel}
+            variant="ghost"
+            className="flex-1 border border-slate-200"
+            disabled={confirmLoading}
+          >
             {cancelText || "Cancel"}
           </Button>
-          <Button onClick={() => { onConfirm(); onClose(); }} variant={isDanger ? "danger" : "primary"} className="flex-1">
-            {confirmText || "Confirm"}
+          <Button
+            onClick={handleConfirm}
+            variant={isDanger ? "danger" : "primary"}
+            className="flex-1"
+            disabled={confirmLoading}
+          >
+            {confirmLoading ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                {confirmText || "Confirm"}
+              </>
+            ) : (
+              confirmText || "Confirm"
+            )}
           </Button>
         </div>
       </div>

@@ -12,23 +12,36 @@ export default function RequestDetailModal({
   isOpen,
   onClose,
   request,
+  issuances = [],
+  users = [],
   requesterName,
   loading = false,
-  onEdit,
   onDelete,
 }) {
   const [openSections, setOpenSections] = useState({
     information: true,
     details: true,
-    history: false,
+    issuances: true,
+    history: true,
   });
 
   useEffect(() => {
-    setOpenSections({ information: true, details: true, history: false });
+    setOpenSections({
+      information: true,
+      details: true,
+      issuances: true,
+      history: true,
+    });
   }, [request?.id]);
 
   const toggle = (key) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const resolveChangedByName = (entry) => {
+    if (entry?.changedByName) return entry.changedByName;
+    const match = users.find((user) => Number(user.id) === Number(entry?.changedBy));
+    return match?.name || "—";
+  };
 
   return (
     <RequestDetailsModal
@@ -44,9 +57,6 @@ export default function RequestDetailModal({
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="danger" size="modal" onClick={onDelete}>
               Delete
-            </Button>
-            <Button variant="secondary" size="modal" onClick={onEdit}>
-              Edit
             </Button>
           </div>
         )
@@ -136,12 +146,92 @@ export default function RequestDetailModal({
             )}
           </AccordionSection>
 
-          {(request?.statusHistory || []).length > 0 ? (
-            <AccordionSection
-              title="Status history"
-              open={openSections.history}
-              onToggle={() => toggle("history")}
-            >
+          <AccordionSection
+            title={`Issuance history${issuances.length ? ` (${issuances.length})` : ""}`}
+            open={openSections.issuances}
+            onToggle={() => toggle("issuances")}
+          >
+            {issuances.length === 0 ? (
+              <p className="text-[13px] text-slate-400">No issuances recorded for this request yet.</p>
+            ) : (
+              <div className="overflow-x-auto rounded border border-slate-200">
+                <table className="w-full min-w-[640px] text-left">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200">
+                      <th className="px-3 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                        Item
+                      </th>
+                      <th className="px-3 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                        Store
+                      </th>
+                      <th className="px-3 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                        Qty issued
+                      </th>
+                      <th className="px-3 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {issuances.flatMap((issuance) => {
+                      const items = (issuance.items || []).length
+                        ? issuance.items
+                        : [null];
+                      return items.map((item, index) => (
+                        <tr key={`${issuance.id}-${item?.id ?? index}`}>
+                          <td className="px-3 py-3 align-top text-[12px] text-slate-800 min-w-[220px]">
+                            <p>
+                              <span className="font-semibold text-slate-900">
+                                {item?.itemName || "—"}
+                              </span>
+                              {item?.itemCode ? (
+                                <span className="ml-1.5 font-mono text-[11px] text-slate-500">
+                                  {item.itemCode}
+                                </span>
+                              ) : null}
+                            </p>
+                            <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed">
+                              <span>
+                                <span className="font-semibold text-slate-600">Issued by</span>{" "}
+                                {issuance.issuerName || "—"}
+                              </span>
+                              <span className="mx-1.5 text-slate-300">·</span>
+                              <span>
+                                <span className="font-semibold text-slate-600">Received by</span>{" "}
+                                {issuance.receiverName || "—"}
+                              </span>
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                              <span className="font-semibold text-slate-600">Comment:</span>{" "}
+                              {issuance.comment?.trim() ? issuance.comment : "—"}
+                            </p>
+                          </td>
+                          <td className="px-3 py-3 align-top text-[12px] text-slate-700 whitespace-nowrap">
+                            {item?.storeName || "—"}
+                          </td>
+                          <td className="px-3 py-3 align-top text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                            {item?.quantityIssued ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 align-top text-[12px] text-slate-600 whitespace-nowrap">
+                            {formatApiDateTime(issuance.createdAt)}
+                          </td>
+                        </tr>
+                      ));
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AccordionSection>
+
+          <AccordionSection
+            title={`Status history${(request?.statusHistory || []).length ? ` (${request.statusHistory.length})` : ""}`}
+            open={openSections.history}
+            onToggle={() => toggle("history")}
+          >
+            {(request?.statusHistory || []).length === 0 ? (
+              <p className="text-[13px] text-slate-400">No status history recorded for this request yet.</p>
+            ) : (
               <div className="space-y-3">
                 {request.statusHistory.map((entry) => (
                   <div key={entry.id} className="rounded-lg border border-slate-100 px-3 py-2.5">
@@ -159,14 +249,21 @@ export default function RequestDetailModal({
                         {formatApiDateTime(entry.createdAt)}
                       </span>
                     </div>
+                    <p className="mt-1.5 text-[12px] text-slate-600">
+                      <span className="font-semibold text-slate-700">Changed by:</span>{" "}
+                      {resolveChangedByName(entry)}
+                    </p>
                     {entry.comment ? (
-                      <p className="mt-1.5 text-[12px] text-slate-600">{entry.comment}</p>
+                      <p className="mt-1.5 text-[12px] text-slate-600">
+                        <span className="font-semibold text-slate-700">Comment:</span>{" "}
+                        {entry.comment}
+                      </p>
                     ) : null}
                   </div>
                 ))}
               </div>
-            </AccordionSection>
-          ) : null}
+            )}
+          </AccordionSection>
         </>
       )}
     </RequestDetailsModal>

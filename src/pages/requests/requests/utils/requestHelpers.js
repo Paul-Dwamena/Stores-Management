@@ -14,13 +14,44 @@ export function formatRequestStatus(status) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export function isDraftRequest(status) {
-  const key = requestStatusKey(status);
-  return !key || key === "DRAFT";
-}
-
 export function isRejectedRequest(status) {
   return requestStatusKey(status) === "REJECTED";
+}
+
+export function isSuppliedRequest(status) {
+  const key = requestStatusKey(status);
+  return key === "SUPPLIED" || key === "PARTIALLY_SUPPLIED" || key === "PARTIAL_SUPPLIED";
+}
+
+export function isOpenRequest(status) {
+  const key = requestStatusKey(status);
+  if (!key || key === "DRAFT") return false;
+  return !isRejectedRequest(status) && !isSuppliedRequest(status);
+}
+
+/** Build ordered status chain from history, e.g. [pending…, pending…, rejected]. */
+export function buildStatusChangeChain(statusHistory = [], currentStatus = null) {
+  const history = [...(statusHistory || [])].sort((a, b) => {
+    const aTime = new Date(a.createdAt || 0).getTime();
+    const bTime = new Date(b.createdAt || 0).getTime();
+    return aTime - bTime;
+  });
+
+  const chain = [];
+  const pushUnique = (status) => {
+    const key = requestStatusKey(status);
+    if (!key) return;
+    if (chain.length && requestStatusKey(chain[chain.length - 1]) === key) return;
+    chain.push(status);
+  };
+
+  history.forEach((entry) => {
+    if (!chain.length) pushUnique(entry.fromStatus);
+    pushUnique(entry.toStatus || entry.status);
+  });
+
+  if (!chain.length && currentStatus) pushUnique(currentStatus);
+  return chain;
 }
 
 export function summarizeItems(items = []) {
@@ -47,3 +78,9 @@ export function toGeneralRequestWriteBody(reason, lines = []) {
     ),
   };
 }
+
+export const UNREGISTERED_ITEM_DESCRIPTION_HELPER =
+  "Give a thorough description so this item can be registered later. Include unit (e.g. carton, box), brand if known, size, model, specifications, and any other details that identify what is needed.";
+
+export const UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER =
+  "Unit (carton or box), brand if known, size, model, specifications, and intended use…";

@@ -18,7 +18,7 @@ export function AddSupplierButton({ onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover"
+      className="inline-flex items-center gap-1 text-[11px] font-bold text-danger hover:text-[#991b1b]"
     >
       <Plus size={12} />
       Add supplier

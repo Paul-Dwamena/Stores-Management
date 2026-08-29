@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, FileText, Clock3, Ban } from "lucide-react";
+import { Plus, Clock3, Ban, CheckCircle2 } from "lucide-react";
 import PageHeader from "../../../components/common/PageHeader";
 import Button from "../../../components/common/base/Button";
 import SummaryStatCard from "../../../components/common/SummaryStatCard";
@@ -15,11 +15,14 @@ import {
   getGeneralRequest,
   deleteGeneralRequest,
 } from "../../../services/generalRequestsService";
+import { listIssuancesByGeneralRequest } from "../../../services/issuancesService";
 import {
-  isDraftRequest,
+  isOpenRequest,
   isRejectedRequest,
+  isSuppliedRequest,
   requestStatusKey,
   summarizeItems,
+  buildStatusChangeChain,
 } from "./utils/requestHelpers";
 import NewRequestModal from "./components/NewRequestModal";
 import RequestDetailModal from "./components/RequestDetailModal";
@@ -33,6 +36,25 @@ const QUICK_TIPS = [
 const filterSelectClass =
   "w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
+function StatusChangeChain({ history, currentStatus }) {
+  const chain = buildStatusChangeChain(history, currentStatus);
+  if (!chain.length) return <SupplyStatusBadge status={currentStatus} />;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {chain.map((status, index) => (
+        <React.Fragment key={`${requestStatusKey(status)}-${index}`}>
+          {index > 0 ? (
+            <span className="text-[11px] text-slate-400" aria-hidden="true">
+              →
+            </span>
+          ) : null}
+          <SupplyStatusBadge status={status} />
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 export default function RequestsList() {
   const [requests, setRequests] = useState([]);
   const [users, setUsers] = useState([]);
@@ -43,8 +65,10 @@ export default function RequestsList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [viewIssuances, setViewIssuances] = useState([]);
   const [viewLoading, setViewLoading] = useState(false);
   const [confirm, setConfirm] = useState(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const requesterName = (request) =>
     request?.requesterName
@@ -101,9 +125,9 @@ export default function RequestsList() {
   }, [requests, dateFrom, dateTo, status]);
 
   const summary = useMemo(() => {
-    const draft = requests.filter((row) => isDraftRequest(row.status)).length;
+    const open = requests.filter((row) => isOpenRequest(row.status)).length;
     const rejected = requests.filter((row) => isRejectedRequest(row.status)).length;
-    const open = requests.length - draft - rejected;
+    const supplied = requests.filter((row) => isSuppliedRequest(row.status)).length;
     const byStatus = [];
     const counts = new Map();
     requests.forEach((row) => {
@@ -113,7 +137,7 @@ export default function RequestsList() {
     counts.forEach((count, key) => {
       byStatus.push({ key, label: formatStatusLabel(key), count });
     });
-    return { draft, open, rejected, total: requests.length, byStatus };
+    return { open, rejected, supplied, total: requests.length, byStatus };
   }, [requests]);
 
   const openAdd = () => {
@@ -123,23 +147,21 @@ export default function RequestsList() {
 
   const openView = async (row) => {
     setViewing(row);
+    setViewIssuances([]);
     setViewLoading(true);
     try {
-      setViewing(await getGeneralRequest(row.id));
+      const [request, issuances] = await Promise.all([
+        getGeneralRequest(row.id),
+        listIssuancesByGeneralRequest(row.id).catch(() => []),
+      ]);
+      setViewing(request);
+      setViewIssuances(issuances);
     } catch (err) {
       toast.error(err.message || "Unable to load request.");
       setViewing(null);
+      setViewIssuances([]);
     } finally {
       setViewLoading(false);
-    }
-  };
-
-  const openEdit = async (row) => {
-    try {
-      setEditing(await getGeneralRequest(row.id));
-      setModalOpen(true);
-    } catch (err) {
-      toast.error(err.message || "Unable to load request.");
     }
   };
 
@@ -148,13 +170,18 @@ export default function RequestsList() {
   };
 
   const runDelete = async (row) => {
+    setConfirmLoading(true);
     try {
       await deleteGeneralRequest(row.id);
       toast.success("Request deleted.");
       setViewing(null);
+      setViewIssuances([]);
+      setConfirm(null);
       reload();
     } catch (err) {
       toast.error(err.message || "Unable to delete request.");
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -166,9 +193,9 @@ export default function RequestsList() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SummaryStatCard title="Draft" value={summary.draft} icon={FileText} tone="orange" />
         <SummaryStatCard title="Open" value={summary.open} icon={Clock3} tone="sky" />
         <SummaryStatCard title="Rejected" value={summary.rejected} icon={Ban} tone="rose" />
+        <SummaryStatCard title="Supplied" value={summary.supplied} icon={CheckCircle2} tone="teal" />
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -240,7 +267,10 @@ export default function RequestsList() {
                       <span className="text-[13px] font-bold text-slate-900">
                         {request.requestNumber}
                       </span>
-                      <SupplyStatusBadge status={request.status} />
+                      <StatusChangeChain
+                        history={request.statusHistory}
+                        currentStatus={request.status}
+                      />
                     </div>
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-600">
                       <span>
@@ -314,11 +344,15 @@ export default function RequestsList() {
 
       <RequestDetailModal
         isOpen={Boolean(viewing) && !modalOpen && !confirm}
-        onClose={() => setViewing(null)}
+        onClose={() => {
+          setViewing(null);
+          setViewIssuances([]);
+        }}
         request={viewing}
+        issuances={viewIssuances}
+        users={users}
         requesterName={requesterName(viewing)}
         loading={viewLoading}
-        onEdit={() => openEdit(viewing)}
         onDelete={() =>
           setConfirm({
             title: "Delete request?",
@@ -332,11 +366,16 @@ export default function RequestsList() {
 
       <ConfirmationModal
         isOpen={Boolean(confirm)}
-        onClose={() => setConfirm(null)}
+        onClose={() => {
+          if (confirmLoading) return;
+          setConfirm(null);
+        }}
         onConfirm={() => confirm?.run?.()}
+        closeOnConfirm={false}
+        confirmLoading={confirmLoading}
         title={confirm?.title}
         message={confirm?.message}
-        confirmText={confirm?.confirmText}
+        confirmText={confirmLoading ? "Deleting…" : confirm?.confirmText}
         isDanger={confirm?.isDanger}
       />
     </div>

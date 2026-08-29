@@ -4,7 +4,11 @@ import ConfiguredSearchSelectField from "../../../../components/common/fields/Co
 import { getReceivers } from "../../../../mockdata/stores";
 
 function personLabel(person) {
-  return [person.name, person.role].filter(Boolean).join(" · ");
+  return person.name || "";
+}
+
+function personValue(person) {
+  return person.id != null ? String(person.id) : person.name;
 }
 
 export default function ReceiverPicker({
@@ -14,14 +18,14 @@ export default function ReceiverPicker({
   onAddClick,
   required = true,
   label = "Person to receive",
-  placeholder = "Search by name or role…",
+  placeholder = "Search by name…",
   addButtonLabel = "Add receiver",
   items,
   id = "person-search",
 }) {
   const people = items ?? getReceivers();
   const options = people.map((person) => ({
-    value: person.name,
+    value: personValue(person),
     label: personLabel(person),
   }));
 
@@ -43,7 +47,7 @@ export default function ReceiverPicker({
           <button
             type="button"
             onClick={onAddClick}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-danger hover:text-[#991b1b]"
           >
             <Plus size={12} />
             {addButtonLabel}

@@ -5,16 +5,16 @@ import PageHeader from "../../components/common/PageHeader";
 import Button from "../../components/common/base/Button";
 import SearchInput from "../../components/common/fields/SearchInput";
 import Pagination from "../../components/common/Pagination";
+import SectionLoadState from "../../components/common/SectionLoadState";
 import { TableRowActions, TableViewAction } from "../../components/common/tableActions";
 import { toast } from "../../components/common/ToastNotification";
 import { cn } from "../../utils/cn";
+import { EMPTY_DISPLAY, sortNewestFirst } from "../../utils/apiResponseHelpers";
 import {
-  AUDIT_ACTION_FILTERS,
-  AUDIT_MODULE_FILTERS,
   AUDIT_PAGE_SIZE,
   formatAuditWhen,
-  getAuditEvents,
-} from "../../mockdata/administration/auditTrail";
+  listAuditLogs,
+} from "../../services/auditService";
 import { AuditEventDetailModal } from "./components";
 
 const filterLabelClassName =
@@ -23,53 +23,137 @@ const filterLabelClassName =
 const filterSelectClassName =
   "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
-function ActionBadge({ action }) {
-  const styles = {
-    Created: "bg-success-muted text-success border-[#b7d4c8]",
-    Updated: "bg-sky-50 text-sky-700 border-sky-200",
-    Deleted: "bg-rose-50 text-rose-700 border-rose-200",
-    Approved: "bg-success-muted text-success border-[#b7d4c8]",
-    Rejected: "bg-rose-50 text-rose-700 border-rose-200",
-    "Status Change": "bg-amber-50 text-amber-800 border-amber-200",
-    Exported: "bg-violet-50 text-violet-700 border-violet-200",
-    Login: "bg-slate-100 text-slate-600 border-slate-200",
-  };
+function actionTone(action) {
+  const key = String(action || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
+  if (!key) return "bg-slate-50 text-slate-600 border-slate-200";
+  if (/(^|_)(create|created|add|added|insert)(_|$)/.test(key) || key.includes("create")) {
+    return "bg-success-muted text-success border-[#b7d4c8]";
+  }
+  if (/(^|_)(update|updated|edit|edited|modify|modified|patch)(_|$)/.test(key) || key.includes("update")) {
+    return "bg-sky-50 text-sky-700 border-sky-200";
+  }
+  if (/(^|_)(delete|deleted|remove|removed)(_|$)/.test(key) || key.includes("delete")) {
+    return "bg-rose-50 text-rose-700 border-rose-200";
+  }
+  if (/(^|_)(approve|approved)(_|$)/.test(key) || key.includes("approve")) {
+    return "bg-success-muted text-success border-[#b7d4c8]";
+  }
+  if (/(^|_)(reject|rejected)(_|$)/.test(key) || key.includes("reject")) {
+    return "bg-rose-50 text-rose-700 border-rose-200";
+  }
+  if (key.includes("status") || key.includes("change")) {
+    return "bg-amber-50 text-amber-800 border-amber-200";
+  }
+  if (key.includes("export")) {
+    return "bg-violet-50 text-violet-700 border-violet-200";
+  }
+  if (key.includes("login") || key.includes("auth")) {
+    return "bg-slate-100 text-slate-600 border-slate-200";
+  }
+  if (key.includes("issue") || key.includes("supply") || key.includes("stock")) {
+    return "bg-indigo-50 text-indigo-700 border-indigo-200";
+  }
+  return "bg-slate-50 text-slate-600 border-slate-200";
+}
+
+function ActionBadge({ action, actionRaw }) {
   return (
     <span
       className={cn(
-        "inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap",
-        styles[action] ?? "bg-slate-50 text-slate-600 border-slate-200",
+        "inline-flex px-2 py-0.5 rounded text-[9px] font-bold border whitespace-nowrap",
+        actionTone(actionRaw || action),
       )}
     >
-      {action}
+      {action || EMPTY_DISPLAY}
     </span>
   );
 }
 
 export default function AuditTrailList() {
-  const [events] = useState(() => getAuditEvents());
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("ALL");
   const [actionFilter, setActionFilter] = useState("ALL");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState(null);
 
+  const reload = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setEvents(sortNewestFirst(await listAuditLogs(), "at"));
+    } catch (err) {
+      const message = err.message || "Unable to load audit trail.";
+      setEvents([]);
+      setLoadError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const moduleFilters = useMemo(() => {
+    const seen = new Map();
+    events.forEach((row) => {
+      const value = row.moduleRaw || row.module;
+      if (!value || seen.has(value)) return;
+      seen.set(value, row.module || value);
+    });
+    return [
+      { value: "ALL", label: "All modules" },
+      ...[...seen.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label })),
+    ];
+  }, [events]);
+
+  const actionFilters = useMemo(() => {
+    const seen = new Map();
+    events.forEach((row) => {
+      const value = row.actionRaw || row.action;
+      if (!value || seen.has(value)) return;
+      seen.set(value, row.action || value);
+    });
+    return [
+      { value: "ALL", label: "All actions" },
+      ...[...seen.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label })),
+    ];
+  }, [events]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return events.filter((row) => {
-      if (moduleFilter !== "ALL" && row.module !== moduleFilter) return false;
-      if (actionFilter !== "ALL" && row.action !== actionFilter) return false;
+      if (moduleFilter !== "ALL" && (row.moduleRaw || row.module) !== moduleFilter) {
+        return false;
+      }
+      if (actionFilter !== "ALL" && (row.actionRaw || row.action) !== actionFilter) {
+        return false;
+      }
       if (!q) return true;
-      return (
-        row.actor.toLowerCase().includes(q) ||
-        row.actorEmail.toLowerCase().includes(q) ||
-        row.action.toLowerCase().includes(q) ||
-        row.module.toLowerCase().includes(q) ||
-        row.target.toLowerCase().includes(q) ||
-        row.summary.toLowerCase().includes(q) ||
-        row.ipAddress.toLowerCase().includes(q)
-      );
+      return [
+        row.actor,
+        row.actorEmail,
+        row.action,
+        row.module,
+        row.target,
+        row.summary,
+        row.ipAddress,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
     });
   }, [events, search, moduleFilter, actionFilter]);
 
@@ -98,7 +182,7 @@ export default function AuditTrailList() {
       >
         <Button
           variant="secondary"
-          onClick={() => toast.success("Audit trail exported successfully.")}
+          onClick={() => toast.warning("Not available")}
         >
           <FiDownload size={16} /> Export Audit Trail
         </Button>
@@ -121,8 +205,9 @@ export default function AuditTrailList() {
                 value={moduleFilter}
                 onChange={(e) => setModuleFilter(e.target.value)}
                 className={filterSelectClassName}
+                disabled={loading}
               >
-                {AUDIT_MODULE_FILTERS.map((option) => (
+                {moduleFilters.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -138,8 +223,9 @@ export default function AuditTrailList() {
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
                 className={filterSelectClassName}
+                disabled={loading}
               >
-                {AUDIT_ACTION_FILTERS.map((option) => (
+                {actionFilters.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -165,10 +251,24 @@ export default function AuditTrailList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {pagedRows.length === 0 ? (
+              {loading || loadError ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4">
+                    <SectionLoadState
+                      loading={loading}
+                      error={loadError}
+                      onRetry={reload}
+                      loadingLabel="Loading audit trail…"
+                      errorTitle="Couldn’t load audit trail"
+                    />
+                  </td>
+                </tr>
+              ) : pagedRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-[13px] text-slate-400">
-                    No audit events match your filters.
+                    {events.length === 0
+                      ? "No audit events yet."
+                      : "No audit events match your filters."}
                   </td>
                 </tr>
               ) : (
@@ -183,10 +283,10 @@ export default function AuditTrailList() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-[13px] font-semibold text-slate-900">{row.actor}</p>
-                      <p className="text-[11px] text-slate-400">{row.actorEmail}</p>
+                      <p className="text-[11px] text-slate-400">{row.actorEmail || EMPTY_DISPLAY}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <ActionBadge action={row.action} />
+                      <ActionBadge action={row.action} actionRaw={row.actionRaw} />
                     </td>
                     <td className="px-4 py-3 text-[12px] font-medium text-slate-700">{row.module}</td>
                     <td className="max-w-[260px] px-4 py-3">
@@ -214,15 +314,17 @@ export default function AuditTrailList() {
           </table>
         </div>
 
-        <div className="flex justify-start border-t border-slate-100 bg-slate-50/50 px-6 py-4">
-          <Pagination
-            page={safePage}
-            size={AUDIT_PAGE_SIZE}
-            totalElements={totalElements}
-            onPageChange={setPage}
-            showWhenEmpty={false}
-          />
-        </div>
+        {!loading && !loadError ? (
+          <div className="flex justify-start border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+            <Pagination
+              page={safePage}
+              size={AUDIT_PAGE_SIZE}
+              totalElements={totalElements}
+              onPageChange={setPage}
+              showWhenEmpty={false}
+            />
+          </div>
+        ) : null}
       </div>
 
       <AuditEventDetailModal

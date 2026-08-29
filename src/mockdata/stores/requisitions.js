@@ -2,6 +2,7 @@
 
 import { generateAccessoryItemCode, getAccessories } from "./accessories";
 import { getStoreLocationOptions } from "../org/stores";
+import { supplyStatusKey } from "../../pages/stores/supplies/utils/supplyStatus";
 
 export { getStoreLocationOptions };
 
@@ -11,7 +12,7 @@ export const REQUISITION_STATUS_OPTIONS = [
   { value: "PENDING_SUPPLY_APPROVAL", label: "Pending supply approval" },
   { value: "PENDING_ISSUANCE", label: "Pending issuance" },
   { value: "SUPPLIED", label: "Supplied" },
-  { value: "PARTIAL_SUPPLIED", label: "Partial supplied" },
+  { value: "PARTIALLY_SUPPLIED", label: "Partially supplied" },
   { value: "REJECTED", label: "Rejected" },
 ];
 
@@ -49,10 +50,17 @@ export const RECEIVER_OPTIONS = [
 ];
 
 export function formatRequisitionStatus(status) {
-  return (
-    REQUISITION_STATUS_OPTIONS.find((option) => option.value === status)?.label
-    ?? (status ?? "—").toString().replace(/_/g, " ")
-  );
+  const key = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  const lookupKey = key === "PARTIAL_SUPPLIED" ? "PARTIALLY_SUPPLIED" : key;
+  const label = REQUISITION_STATUS_OPTIONS.find((option) => option.value === lookupKey)?.label;
+  if (label) return label;
+  return lookupKey
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function formatRequisitionDate(value) {
@@ -130,9 +138,11 @@ export function getStoresWithRemaining(row) {
 
 export function isRequisitionIssuable(row) {
   if (!row) return false;
-  const status = row.status === "PENDING_BATCH_ISSUANCE" ? "PENDING_ISSUANCE" : row.status;
+  const status = supplyStatusKey(
+    row.status === "PENDING_BATCH_ISSUANCE" ? "PENDING_ISSUANCE" : row.status,
+  );
   if (status === "PENDING_ISSUANCE") return true;
-  return status === "PARTIAL_SUPPLIED" && getRequisitionRemainingQuantity(row) > 0;
+  return status === "PARTIALLY_SUPPLIED" && getRequisitionRemainingQuantity(row) > 0;
 }
 
 let issuanceBatchSeq = 1;
@@ -518,7 +528,7 @@ const SEED_REQUISITIONS = [
     quantity: 10,
     isOther: false,
     requestedBy: "Ruth Ofori",
-    status: "PARTIAL_SUPPLIED",
+    status: "PARTIALLY_SUPPLIED",
     createdAt: "2026-07-12T08:30:00.000Z",
     approvedBy: "Ama Serwaa",
     approvalDate: "2026-07-13T11:40:00.000Z",
@@ -992,7 +1002,7 @@ const SEED_REQUISITIONS = [
     quantity: 5,
     isOther: false,
     requestedBy: "Selorm Gbeho",
-    status: "PARTIAL_SUPPLIED",
+    status: "PARTIALLY_SUPPLIED",
     createdAt: "2026-07-18T15:05:00.000Z",
     approvedBy: "Nii Quaye",
     approvalDate: "2026-07-19T10:10:00.000Z",
@@ -1331,7 +1341,7 @@ export function advanceRequisition(id, action, payload = {}) {
   }
 
   const remaining = getRequisitionRemainingQuantity(current);
-  const canIssueFromOtherStore = current.status === "PARTIAL_SUPPLIED" && remaining > 0;
+  const canIssueFromOtherStore = supplyStatusKey(current.status) === "PARTIALLY_SUPPLIED" && remaining > 0;
   if (
     ["send_issue_otp", "issue_item"].includes(action)
     && payload.storeLocation
@@ -1368,7 +1378,7 @@ export function advanceRequisition(id, action, payload = {}) {
         throw new Error("Select the store you are issuing from.");
       }
       const storeRemaining = getStoreRemainingQuantity(current, issueStore);
-      const canUseOtherStore = current.status === "PARTIAL_SUPPLIED" && remaining > 0;
+      const canUseOtherStore = supplyStatusKey(current.status) === "PARTIALLY_SUPPLIED" && remaining > 0;
       if (storeRemaining <= 0 && !canUseOtherStore) {
         throw new Error(`Nothing remaining to issue from ${issueStore}.`);
       }
@@ -1475,7 +1485,7 @@ export function advanceRequisition(id, action, payload = {}) {
         : row.storeAllocations;
       updated = {
         ...row,
-        status: newRemaining > 0 ? "PARTIAL_SUPPLIED" : "SUPPLIED",
+        status: newRemaining > 0 ? "PARTIALLY_SUPPLIED" : "SUPPLIED",
         approvedBy: row.approvedBy || "Current Approver",
         approvalDate: row.approvalDate || now,
         storeAllocations: nextAllocations,
@@ -1517,7 +1527,7 @@ export function rejectRequisition(id, rejectionComment, options = {}) {
     if (row.id !== id) return row;
     const remaining = getRequisitionRemainingQuantity(row);
     const canRejectPending = PENDING_REQUISITION_STATUSES.includes(row.status);
-    const canRejectRemaining = row.status === "PARTIAL_SUPPLIED" && remaining > 0;
+    const canRejectRemaining = supplyStatusKey(row.status) === "PARTIALLY_SUPPLIED" && remaining > 0;
     if (!canRejectPending && !canRejectRemaining) {
       return row;
     }
@@ -1533,12 +1543,12 @@ export function rejectRequisition(id, rejectionComment, options = {}) {
         storeLocation: null,
         storeLocations: [],
         storeAllocations: [],
-        approvedBy: row.status === "PARTIAL_SUPPLIED" ? row.approvedBy : null,
-        approvalDate: row.status === "PARTIAL_SUPPLIED" ? row.approvalDate : null,
+        approvedBy: supplyStatusKey(row.status) === "PARTIALLY_SUPPLIED" ? row.approvedBy : null,
+        approvalDate: supplyStatusKey(row.status) === "PARTIALLY_SUPPLIED" ? row.approvalDate : null,
         approvalComment: null,
         raisedBy: null,
         raisedAt: null,
-        actualQuantity: row.status === "PARTIAL_SUPPLIED" ? remainingQty : null,
+        actualQuantity: supplyStatusKey(row.status) === "PARTIALLY_SUPPLIED" ? remainingQty : null,
         quantityRequested: row.quantityRequested ?? row.quantity,
         quantity: row.quantityRequested ?? row.quantity,
         quantityRemaining: remainingQty,
@@ -1548,13 +1558,13 @@ export function rejectRequisition(id, rejectionComment, options = {}) {
         batchId: null,
         batchNumber: null,
         batchApprovedAt: null,
-        suppliedTo: row.status === "PARTIAL_SUPPLIED" ? row.suppliedTo : null,
+        suppliedTo: supplyStatusKey(row.status) === "PARTIALLY_SUPPLIED" ? row.suppliedTo : null,
         pendingOtp: null,
       };
       return updated;
     }
 
-    if (row.status === "PARTIAL_SUPPLIED") {
+    if (supplyStatusKey(row.status) === "PARTIALLY_SUPPLIED") {
       updated = {
         ...row,
         quantityRemaining: 0,

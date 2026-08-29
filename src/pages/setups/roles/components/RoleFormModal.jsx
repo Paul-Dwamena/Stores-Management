@@ -81,13 +81,14 @@ export default function RoleFormModal({
   };
 
   const handleConfirmSave = async () => {
+    if (saving) return;
     setSaving(true);
     try {
       await onSave(form);
       setConfirmOpen(false);
       onClose();
     } catch {
-      setConfirmOpen(false);
+      // Keep the confirmation open so the user can retry.
     } finally {
       setSaving(false);
     }
@@ -151,8 +152,13 @@ export default function RoleFormModal({
 
       <ConfirmationModal
         isOpen={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        onClose={() => {
+          if (saving) return;
+          setConfirmOpen(false);
+        }}
         onConfirm={handleConfirmSave}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         className="!z-[10002]"
         title={isEdit ? "Save role changes?" : "Create role?"}
         message={
@@ -160,7 +166,7 @@ export default function RoleFormModal({
             ? `Save changes to the "${form.name.trim()}" role?`
             : `Create the "${form.name.trim()}" role?`
         }
-        confirmText={isEdit ? "Save changes" : "Create role"}
+        confirmText={saving ? "Saving…" : isEdit ? "Save changes" : "Create role"}
       />
     </>
   );

@@ -19,6 +19,7 @@ const AddModal = ({
   secondaryAction,
   footerActions = null,
   hideCancelButton = false,
+  hideSaveButton = false,
   saveDisabled = false,
   fillViewport = false,
   flushViewport = false,
@@ -112,14 +113,16 @@ const AddModal = ({
                 Cancel
               </Button>
             )}
-            <Button
-              onClick={onSave ?? onClose}
-              variant={saveVariant}
-              size="modal"
-              disabled={saveDisabled}
-            >
-              {saveLabel}
-            </Button>
+            {!hideSaveButton ? (
+              <Button
+                onClick={onSave ?? onClose}
+                variant={saveVariant}
+                size="modal"
+                disabled={saveDisabled}
+              >
+                {saveLabel}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

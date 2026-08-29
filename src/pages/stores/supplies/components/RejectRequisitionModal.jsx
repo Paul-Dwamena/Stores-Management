@@ -35,6 +35,7 @@ export default function RejectRequisitionModal({
   requestLabel,
   title,
   mode = "entire",
+  saving = false,
 }) {
   const [reason, setReason] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -58,6 +59,7 @@ export default function RejectRequisitionModal({
   if (!isOpen) return null;
 
   const close = () => {
+    if (saving) return;
     setReason("");
     setConfirmOpen(false);
     onClose();
@@ -70,10 +72,8 @@ export default function RejectRequisitionModal({
 
   const finalizeReject = () => {
     const trimmed = reason.trim();
-    if (!trimmed) return;
+    if (!trimmed || saving) return;
     onConfirm(trimmed, mode);
-    setReason("");
-    setConfirmOpen(false);
   };
 
   return (
@@ -139,13 +139,18 @@ export default function RejectRequisitionModal({
 
       <ConfirmationModal
         isOpen={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        onClose={() => {
+          if (saving) return;
+          setConfirmOpen(false);
+        }}
         onConfirm={finalizeReject}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         isDanger
         className="!z-[10001]"
         title={copy.confirmTitle}
         message={copy.confirmMessage(requestLabel)}
-        confirmText={copy.confirmText}
+        confirmText={saving ? "Rejecting…" : copy.confirmText}
       />
     </>
   );

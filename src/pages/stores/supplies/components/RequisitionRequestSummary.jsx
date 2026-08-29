@@ -9,6 +9,7 @@ import {
 } from "../../../../mockdata/stores";
 import { getRequisitionIssuingStores, getRequisitionStoreIssueLines } from "./RaiseSupplyRequestModal";
 import { SupplyStatusBadge } from "../utils/SupplyStatusBadge";
+import { supplyStatusKey } from "../utils/supplyStatus";
 
 export function StoreAllocationsTable({ allocations = [] }) {
   if (!allocations.length) {
@@ -23,7 +24,7 @@ export function StoreAllocationsTable({ allocations = [] }) {
               Store
             </th>
             <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-              Quantity supplied
+              Quantity requested
             </th>
             {allocations.some((row) => Number(row.quantityIssued) > 0) ? (
               <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
@@ -91,10 +92,11 @@ export default function RequisitionRequestSummary({
       <DetailRow label="Quantity requested">
         {String(requisition.quantityRequested ?? requisition.quantity ?? "—")}
       </DetailRow>
-      {requisition.quantitySupplied != null ? (
+      {requisition.quantitySupplied != null && Number(requisition.quantitySupplied) > 0 ? (
         <DetailRow label="Quantity supplied">{String(requisition.quantitySupplied)}</DetailRow>
       ) : null}
-      {requisition.status === "PARTIAL_SUPPLIED" || getRequisitionRemainingQuantity(requisition) > 0 ? (
+      {supplyStatusKey(requisition.status) === "PARTIALLY_SUPPLIED"
+        || getRequisitionRemainingQuantity(requisition) > 0 ? (
         <DetailRow label="Quantity remaining">
           {String(getRequisitionRemainingQuantity(requisition))}
         </DetailRow>
@@ -111,9 +113,13 @@ export default function RequisitionRequestSummary({
         <DetailRow label="Date of approval">
           {formatRequisitionDate(requisition.approvalDate)}
         </DetailRow>
+      ) : requisition.approvedAt ? (
+        <DetailRow label="Date of approval">
+          {formatRequisitionDate(requisition.approvedAt)}
+        </DetailRow>
       ) : null}
       {storeAllocations.length > 0 ? (
-        <DetailRow label="Stores & quantity supplied">
+        <DetailRow label="Stores & quantity requested">
           <ul className="space-y-1.5">
             {storeAllocations.map((row) => {
               const remaining = row.remaining
@@ -126,7 +132,7 @@ export default function RequisitionRequestSummary({
                 >
                   <span>{row.location}</span>
                   <span className="tabular-nums text-slate-500">
-                    {row.quantity ?? "—"} supplied
+                    {row.quantity ?? "—"} requested
                     {showRemaining ? ` · ${remaining} remaining` : ""}
                   </span>
                 </li>

@@ -1,8 +1,10 @@
 export function supplyStatusKey(status) {
-  return String(status || "")
+  const key = String(status || "")
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
+  if (key === "PARTIAL_SUPPLIED") return "PARTIALLY_SUPPLIED";
+  return key;
 }
 
 export function supplyStatusBadgeClass(status) {
@@ -15,8 +17,8 @@ export function supplyStatusBadgeClass(status) {
       return "bg-violet-50 text-violet-700 border-violet-200";
     case "SUPPLIED":
       return "bg-success-muted text-success border-[#b7d4c8]";
-    case "PARTIAL_SUPPLIED":
-      return "bg-sky-50 text-sky-700 border-sky-200";
+    case "PARTIALLY_SUPPLIED":
+      return "bg-teal-50 text-teal-700 border-teal-200";
     case "REJECTED":
       return "bg-rose-50 text-rose-700 border-rose-200";
     default:
@@ -24,10 +26,26 @@ export function supplyStatusBadgeClass(status) {
   }
 }
 
+/** Chart fill colors aligned with supply status badge text colors. */
+const SUPPLY_STATUS_CHART_COLORS = {
+  PENDING_SUPPLY_REQUEST: "#374151",
+  PENDING_SUPPLY_APPROVAL: "#b45309",
+  PENDING_ISSUANCE: "#6d28d9",
+  SUPPLIED: "#205848",
+  PARTIALLY_SUPPLIED: "#0f766e",
+  REJECTED: "#be123c",
+};
+
+export function supplyStatusChartColor(status) {
+  return SUPPLY_STATUS_CHART_COLORS[supplyStatusKey(status)] || "#64748b";
+}
+
 export function getSupplyViewAction(status) {
   const key = supplyStatusKey(status);
   if (key === "PENDING_SUPPLY_REQUEST") return "raise_supply_request";
   if (key === "PENDING_SUPPLY_APPROVAL") return "approval_request";
-  if (key === "PENDING_ISSUANCE" || key === "PARTIAL_SUPPLIED") return "issue_item";
+  if (key === "PENDING_ISSUANCE" || key === "PARTIALLY_SUPPLIED") {
+    return "issue_item";
+  }
   return "view_details";
 }

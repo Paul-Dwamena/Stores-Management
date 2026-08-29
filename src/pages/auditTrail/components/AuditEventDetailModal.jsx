@@ -1,19 +1,24 @@
 import React from "react";
 import AddModal from "../../../components/common/AddModal";
 import { cn } from "../../../utils/cn";
-import { formatAuditWhen } from "../../../mockdata/administration/auditTrail";
+import { EMPTY_DISPLAY } from "../../../utils/apiResponseHelpers";
+import { formatAuditWhen } from "../../../services/auditService";
 
 function MetaItem({ label, value }) {
   return (
     <div className="space-y-1">
       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="text-[13px] font-medium text-slate-800 break-words">{value || "—"}</p>
+      <p className="text-[13px] font-medium text-slate-800 break-words">{value || EMPTY_DISPLAY}</p>
     </div>
   );
 }
 
 export default function AuditEventDetailModal({ isOpen, onClose, event }) {
   if (!event) return null;
+
+  const actorLabel = event.actorEmail
+    ? `${event.actor} (${event.actorEmail})`
+    : event.actor;
 
   return (
     <AddModal
@@ -27,23 +32,25 @@ export default function AuditEventDetailModal({ isOpen, onClose, event }) {
       onSave={onClose}
     >
       <div className="space-y-5">
-        <p className="text-[13px] text-slate-600 leading-relaxed">{event.summary}</p>
+        <p className="text-[13px] text-slate-600 leading-relaxed">
+          {event.summary || EMPTY_DISPLAY}
+        </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-slate-100 bg-slate-50/60 p-4">
           <MetaItem label="When" value={formatAuditWhen(event.at)} />
           <MetaItem label="Module" value={event.module} />
           <MetaItem label="Action" value={event.action} />
           <MetaItem label="Source" value={event.source} />
-          <MetaItem label="Actor" value={`${event.actor} (${event.actorEmail})`} />
+          <MetaItem label="Actor" value={actorLabel} />
           <MetaItem label="IP Address" value={event.ipAddress} />
         </div>
 
         <div>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Changes
+            Details
           </p>
           {(event.changes ?? []).length === 0 ? (
-            <p className="text-[12px] text-slate-400">No field-level changes recorded.</p>
+            <p className="text-[12px] text-slate-400">No extra metadata recorded.</p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-slate-200">
               <table className="w-full text-left">

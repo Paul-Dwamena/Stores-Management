@@ -45,9 +45,15 @@ const InputField = React.forwardRef(
             </button>
           ) : null}
         </div>
-        {error && (
-          <p className="text-[10px] font-medium text-red-500 mt-1">{error}</p>
-        )}
+        <p
+          className={cn(
+            "mt-1 min-h-[14px] text-[10px] font-medium leading-[14px]",
+            error ? "text-red-500" : "invisible",
+          )}
+          aria-live="polite"
+        >
+          {error || "\u00A0"}
+        </p>
       </div>
     );
   },

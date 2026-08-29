@@ -15,15 +15,32 @@ const toLine = (row) => ({
   brand: row.item?.brand || "",
 });
 
-const toStatusHistory = (row) => ({
-  id: row.id,
-  fromStatus: row.from_status || null,
-  toStatus: row.to_status || row.status || null,
-  status: row.to_status || row.status || null,
-  changedBy: row.changed_by,
-  comment: row.comment,
-  createdAt: row.created_at,
-});
+const toStatusHistory = (row) => {
+  const rawChangedBy = row.changed_by;
+  const nestedUser =
+    row.changed_by_user
+    || row.changer
+    || (rawChangedBy && typeof rawChangedBy === "object" ? rawChangedBy : null);
+  const changedById =
+    nestedUser?.id
+    ?? (typeof rawChangedBy === "number" || typeof rawChangedBy === "string"
+      ? rawChangedBy
+      : null);
+
+  return {
+    id: row.id,
+    fromStatus: row.from_status || null,
+    toStatus: row.to_status || row.status || null,
+    status: row.to_status || row.status || null,
+    changedBy: changedById,
+    changedByName:
+      (nestedUser ? requesterName(nestedUser) || nestedUser.name || nestedUser.email : "")
+      || row.changed_by_name
+      || "",
+    comment: row.comment,
+    createdAt: row.created_at,
+  };
+};
 
 const toRequest = (row) => ({
   id: row.id,
@@ -111,12 +128,18 @@ export const deleteGeneralRequest = async (requestId) => {
   }
 };
 
-export const rejectGeneralRequest = async (requestId, reason) => {
+export const rejectGeneralRequest = async (requestId, reason, requestItemId) => {
+  const params = {
+    reason: String(reason || "").trim() || "Rejected",
+  };
+  if (requestItemId != null && requestItemId !== "") {
+    params.request_item_id = Number(requestItemId);
+  }
   try {
     const { data } = await api.post(
       `/general-requests/${requestId}/reject`,
       null,
-      { params: { reason: String(reason || "").trim() || "Rejected" } },
+      { params },
     );
     return toRequest(data);
   } catch (err) {

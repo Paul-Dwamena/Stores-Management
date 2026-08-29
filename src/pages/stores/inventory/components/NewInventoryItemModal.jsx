@@ -367,6 +367,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [itemSearch, setItemSearch] = useState("");
   const [errors, setErrors] = useState({});
   const [pendingSave, setPendingSave] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [catalogTick, setCatalogTick] = useState(0);
   const [itemDetailsOpen, setItemDetailsOpen] = useState(true);
   const [supplyingDetailsOpen, setSupplyingDetailsOpen] = useState(true);
@@ -806,7 +807,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   };
 
   const handleConfirmSave = async () => {
-    if (!pendingSave) return;
+    if (!pendingSave || saving) return;
+    setSaving(true);
     try {
       await onSave?.({
         type: pendingSave.type,
@@ -816,6 +818,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       setPendingSave(null);
     } catch (error) {
       toast.error(error.message ?? "Could not save inventory item.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1233,15 +1237,28 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
 
       <ConfirmationModal
         isOpen={Boolean(pendingSave)}
-        onClose={() => setPendingSave(null)}
+        onClose={() => {
+          if (saving) return;
+          setPendingSave(null);
+        }}
         onConfirm={handleConfirmSave}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         title={pendingSave?.mode === "existing" ? "Receive stock?" : "Save item?"}
         message={
           pendingSave?.mode === "existing"
             ? `Receive stock for ${pendingSave?.label || "this item"}?`
             : `Add ${pendingSave?.label || "this item"} to inventory?`
         }
-        confirmText={pendingSave?.mode === "existing" ? "Receive stock" : "Save item"}
+        confirmText={
+          saving
+            ? pendingSave?.mode === "existing"
+              ? "Receiving…"
+              : "Saving…"
+            : pendingSave?.mode === "existing"
+              ? "Receive stock"
+              : "Save item"
+        }
       />
 
       <AddSupplierModal

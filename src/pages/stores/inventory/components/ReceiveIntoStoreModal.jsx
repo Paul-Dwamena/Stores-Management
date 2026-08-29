@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
+import Label from "../../../../components/common/base/Label";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import AddSupplierModal from "./AddSupplierModal";
@@ -53,6 +54,7 @@ export default function ReceiveIntoStoreModal({
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -64,6 +66,7 @@ export default function ReceiveIntoStoreModal({
     setOtp("");
     setOtpVerified(false);
     setOtpSending(false);
+    setSaving(false);
   }, [isOpen, item?.id]);
 
   const resetOtp = () => {
@@ -182,12 +185,15 @@ export default function ReceiveIntoStoreModal({
   };
 
   const handleConfirmReceive = async () => {
-    if (!pendingReceive) return;
+    if (!pendingReceive || saving) return;
+    setSaving(true);
     try {
       await onSave?.(pendingReceive);
       setPendingReceive(null);
     } catch (error) {
       toast.error(error.message ?? "Could not receive stock.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -296,30 +302,34 @@ export default function ReceiveIntoStoreModal({
               onChange={(e) => setField("waybillNumber", e.target.value)}
               placeholder="e.g. WB-2026-0041"
             />
-            <div>
-              <label
-                htmlFor="ssr-condition"
-                className={cn(
-                  "block text-[11px] font-bold uppercase tracking-wider mb-1.5",
-                  errors.condition ? "text-rose-500" : "text-slate-400",
-                )}
-              >
-                Item condition *
-              </label>
+            <div className="space-y-1.5">
+              <Label htmlFor="ssr-condition" className={errors.condition ? "text-red-500" : ""}>
+                Item condition
+                <span className="normal-case !text-red-500" aria-hidden="true">
+                  {" "}
+                  *
+                </span>
+              </Label>
               <select
                 id="ssr-condition"
                 value={form.condition}
                 onChange={(e) => setField("condition", e.target.value)}
-                className={cn(fieldClassName, errors.condition && "border-rose-500 bg-rose-50")}
+                className={cn(fieldClassName, errors.condition && "border-red-500 bg-red-50")}
               >
                 <option value="">Select condition</option>
                 {CONDITION_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
-              {errors.condition && (
-                <p className="mt-1 text-[11px] text-rose-600 font-medium">{errors.condition}</p>
-              )}
+              <p
+                className={cn(
+                  "mt-1 min-h-[14px] text-[10px] font-medium leading-[14px]",
+                  errors.condition ? "text-red-500" : "invisible",
+                )}
+                aria-live="polite"
+              >
+                {errors.condition || "\u00A0"}
+              </p>
             </div>
           </div>
 
@@ -350,15 +360,20 @@ export default function ReceiveIntoStoreModal({
 
       <ConfirmationModal
         isOpen={Boolean(pendingReceive)}
-        onClose={() => setPendingReceive(null)}
+        onClose={() => {
+          if (saving) return;
+          setPendingReceive(null);
+        }}
         onConfirm={handleConfirmReceive}
+        closeOnConfirm={false}
+        confirmLoading={saving}
         title="Receive stock?"
         message={
           pendingReceive
             ? `Receive ${pendingReceive.quantity} of ${item?.itemCode || "this item"} into store?`
             : "Receive this stock into store."
         }
-        confirmText="Receive stock"
+        confirmText={saving ? "Receiving…" : "Receive stock"}
       />
     </>
   );

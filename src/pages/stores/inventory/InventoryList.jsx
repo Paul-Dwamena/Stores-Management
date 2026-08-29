@@ -18,11 +18,14 @@ import {
   listInventoryItems,
   getInventoryItem,
   listItemReceipts,
+  listItemSupplies,
   stockItem,
   stockItemsBulk,
   formatInventoryStatus,
+  formatInventoryMoney,
 } from "../../../services/inventoryService";
-import { createItem, updateItem } from "../../../services/itemsService";
+import { getInventoryStats } from "../../../services/statsService";
+import { createItem, updateItem, updateItemPhoto } from "../../../services/itemsService";
 import {
   AccessoryDetailModal,
   NewInventoryItemModal,
@@ -66,14 +69,35 @@ export default function InventoryList({
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [stats, setStats] = useState([
+    { label: "Accessory items", value: "0", icon: Package, tone: "teal" },
+    { label: "Total quantity", value: "0", icon: Boxes, tone: "sky" },
+    { label: "Attention needed", value: "0", icon: AlertTriangle, tone: "amber" },
+    { label: "Purchase value", value: "—", icon: Wallet, tone: "violet" },
+  ]);
 
   const reload = async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      setItems(
-        (await listInventoryItems()).sort((a, b) => Number(b.id) - Number(a.id)),
-      );
+      const [rows, inventoryStats] = await Promise.all([
+        listInventoryItems(),
+        getInventoryStats().catch(() => null),
+      ]);
+      setItems(rows.sort((a, b) => Number(b.id) - Number(a.id)));
+      if (inventoryStats) {
+        setStats([
+          { label: "Accessory items", value: String(inventoryStats.totalItems), icon: Package, tone: "teal" },
+          { label: "Total quantity", value: String(inventoryStats.totalQuantity), icon: Boxes, tone: "sky" },
+          { label: "Attention needed", value: String(inventoryStats.attentionNeeded), icon: AlertTriangle, tone: "amber" },
+          {
+            label: "Purchase value",
+            value: formatInventoryMoney(inventoryStats.purchaseValue),
+            icon: Wallet,
+            tone: "violet",
+          },
+        ]);
+      }
     } catch (err) {
       setLoadError(err.message || "Unable to load inventory.");
     } finally {
@@ -121,18 +145,6 @@ export default function InventoryList({
     if (safePage !== page) setPage(safePage);
   }, [safePage, page]);
 
-  const stats = useMemo(() => {
-    const totalQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-    const outOfStock = items.filter((item) => item.status === "OUT_OF_STOCK").length;
-    const inactive = items.filter((item) => item.status === "INACTIVE").length;
-    return [
-      { label: "Accessory items", value: String(items.length), icon: Package, tone: "teal" },
-      { label: "Total quantity", value: String(totalQty), icon: Boxes, tone: "sky" },
-      { label: "Out of stock", value: String(outOfStock), icon: AlertTriangle, tone: "amber" },
-      { label: "Inactive", value: String(inactive), icon: Wallet, tone: "violet" },
-    ];
-  }, [items]);
-
   const applyDetailResult = (itemId, result) => {
     setSelected((prev) => {
       if (!prev || prev.id !== itemId) return prev;
@@ -174,7 +186,30 @@ export default function InventoryList({
     });
   };
 
-  const loadSelectedSections = async (itemId, { detail = true, receipts = true } = {}) => {
+  const applySuppliesResult = (itemId, result) => {
+    setSelected((prev) => {
+      if (!prev || prev.id !== itemId) return prev;
+      if (result.status === "fulfilled") {
+        return {
+          ...prev,
+          supplies: result.value,
+          suppliesLoading: false,
+          suppliesError: null,
+        };
+      }
+      return {
+        ...prev,
+        supplies: [],
+        suppliesLoading: false,
+        suppliesError: result.reason?.message || "Unable to load supplies.",
+      };
+    });
+  };
+
+  const loadSelectedSections = async (
+    itemId,
+    { detail = true, receipts = true, supplies = true } = {},
+  ) => {
     if (!itemId) return;
     setSelected((prev) => {
       if (!prev || prev.id !== itemId) return prev;
@@ -182,12 +217,14 @@ export default function InventoryList({
         ...prev,
         ...(detail ? { detailLoading: true, detailError: null } : null),
         ...(receipts ? { receiptsLoading: true, receiptsError: null } : null),
+        ...(supplies ? { suppliesLoading: true, suppliesError: null } : null),
       };
     });
 
     const tasks = [];
     if (detail) tasks.push(["detail", getInventoryItem(itemId)]);
     if (receipts) tasks.push(["receipts", listItemReceipts(itemId)]);
+    if (supplies) tasks.push(["supplies", listItemSupplies(itemId)]);
 
     const settled = await Promise.all(
       tasks.map(async ([key, promise]) => {
@@ -202,6 +239,7 @@ export default function InventoryList({
     settled.forEach(([key, result]) => {
       if (key === "detail") applyDetailResult(itemId, result);
       if (key === "receipts") applyReceiptsResult(itemId, result);
+      if (key === "supplies") applySuppliesResult(itemId, result);
     });
   };
 
@@ -217,6 +255,9 @@ export default function InventoryList({
       receipts: [],
       receiptsLoading: true,
       receiptsError: null,
+      supplies: [],
+      suppliesLoading: true,
+      suppliesError: null,
     });
     await loadSelectedSections(row.id);
   };
@@ -227,12 +268,29 @@ export default function InventoryList({
 
   const retryItemDetail = async () => {
     if (!selected?.id) return;
-    await loadSelectedSections(selected.id, { detail: true, receipts: false });
+    await loadSelectedSections(selected.id, {
+      detail: true,
+      receipts: false,
+      supplies: false,
+    });
   };
 
   const retryReceipts = async () => {
     if (!selected?.id) return;
-    await loadSelectedSections(selected.id, { detail: false, receipts: true });
+    await loadSelectedSections(selected.id, {
+      detail: false,
+      receipts: true,
+      supplies: false,
+    });
+  };
+
+  const retrySupplies = async () => {
+    if (!selected?.id) return;
+    await loadSelectedSections(selected.id, {
+      detail: false,
+      receipts: false,
+      supplies: true,
+    });
   };
 
   const handleSaveItem = async ({ type, mode = "new", payload }) => {
@@ -270,7 +328,11 @@ export default function InventoryList({
       unit: payload.unit?.trim() || null,
       is_active: payload.isActive !== false,
     });
-    toast.success("Item details updated.");
+    let nextPhoto = updated.photo || selected.photo || "";
+    if (payload.photoFile instanceof File) {
+      const photoResult = await updateItemPhoto(selected.id, payload.photoFile);
+      nextPhoto = photoResult.photo || nextPhoto;
+    }
     await reload();
     await loadSelectedSections(selected.id);
     setSelected((prev) => {
@@ -280,6 +342,7 @@ export default function InventoryList({
         unit: updated.unit || prev.unit || payload.unit?.trim() || "",
         itemCode: updated.itemCode || prev.itemCode,
         isActive: updated.isActive,
+        photo: nextPhoto || prev.photo,
       };
     });
   };
@@ -424,7 +487,7 @@ export default function InventoryList({
                     <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
                       {row.itemCode}
                     </td>
-                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800">
+                    <td className="px-6 py-3.5 text-[12px] font-semibold capitalize text-slate-800">
                       {row.name}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700">{row.brand}</td>
@@ -478,6 +541,7 @@ export default function InventoryList({
         onUpdateDetails={handleUpdateDetails}
         onRetryDetail={retryItemDetail}
         onRetryReceipts={retryReceipts}
+        onRetrySupplies={retrySupplies}
       />
 
       <NewInventoryItemModal

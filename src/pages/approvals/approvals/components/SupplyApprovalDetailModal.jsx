@@ -58,8 +58,20 @@ export default function SupplyApprovalDetailModal({
         </DetailRow>
         <DetailRow label="Requester">{request.requesterName || "—"}</DetailRow>
         <DetailRow label="Total quantity">{request.totalQuantityRequested ?? "—"}</DetailRow>
+        {Number(request.quantitySupplied) > 0 ? (
+          <DetailRow label="Quantity supplied">{request.quantitySupplied}</DetailRow>
+        ) : null}
+        {Number(request.quantityRemaining) > 0 ? (
+          <DetailRow label="Quantity remaining">{request.quantityRemaining}</DetailRow>
+        ) : null}
         <DetailRow label="Comment">{request.comment || "—"}</DetailRow>
         <DetailRow label="Approval comment">{request.approvalComment || "—"}</DetailRow>
+        {request.rejectionReason ? (
+          <DetailRow label="Rejection reason">{request.rejectionReason}</DetailRow>
+        ) : null}
+        {request.approvedAt ? (
+          <DetailRow label="Date approved">{formatApiDateTime(request.approvedAt)}</DetailRow>
+        ) : null}
         <DetailRow label="Date created">{formatApiDateTime(request.createdAt)}</DetailRow>
         <DetailRow label="Date updated">{formatApiDateTime(request.updatedAt)}</DetailRow>
       </AccordionSection>
@@ -73,7 +85,7 @@ export default function SupplyApprovalDetailModal({
           <p className="text-[13px] text-slate-400">No items on this supply request.</p>
         ) : (
           <div className="overflow-x-auto rounded border border-slate-200">
-            <table className="w-full min-w-[560px] text-left">
+            <table className="w-full min-w-[640px] text-left">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200">
                   <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
@@ -85,8 +97,16 @@ export default function SupplyApprovalDetailModal({
                   <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
                     Store
                   </th>
-                  <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                    Qty
+                  <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                    Qty requested
+                  </th>
+                  {request.items.some((item) => Number(item.quantityIssued) > 0) ? (
+                    <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                      Qty issued
+                    </th>
+                  ) : null}
+                  <th className="px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                    Status
                   </th>
                 </tr>
               </thead>
@@ -102,6 +122,14 @@ export default function SupplyApprovalDetailModal({
                     <td className="px-3 py-3 text-[12px] text-slate-700">{item.storeName || "—"}</td>
                     <td className="px-3 py-3 text-[12px] font-semibold tabular-nums">
                       {item.quantityRequested ?? "—"}
+                    </td>
+                    {request.items.some((row) => Number(row.quantityIssued) > 0) ? (
+                      <td className="px-3 py-3 text-[12px] font-semibold tabular-nums">
+                        {item.quantityIssued ?? "—"}
+                      </td>
+                    ) : null}
+                    <td className="px-3 py-3">
+                      <SupplyStatusBadge status={item.status || request.status} />
                     </td>
                   </tr>
                 ))}

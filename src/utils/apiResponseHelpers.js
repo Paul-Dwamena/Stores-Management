@@ -1,5 +1,13 @@
 /** Shared parsers for paginated Fleetly API responses */
 
+/** Em dash for empty/null values — use \u2014 so source files stay encoding-safe. */
+export const EMPTY_DISPLAY = "\u2014";
+
+export function displayValue(value) {
+  if (value == null || value === "") return EMPTY_DISPLAY;
+  return value;
+}
+
 export function parsePaginatedList(data) {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.content)) return data.content;
@@ -21,9 +29,9 @@ export function getPaginationMeta(data) {
 }
 
 export function formatApiDate(value) {
-  if (!value) return "—";
+  if (!value) return EMPTY_DISPLAY;
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return EMPTY_DISPLAY;
   return d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -32,9 +40,9 @@ export function formatApiDate(value) {
 }
 
 export function formatApiDateTime(value) {
-  if (!value) return "—";
+  if (!value) return EMPTY_DISPLAY;
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return EMPTY_DISPLAY;
   return d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -54,7 +62,7 @@ export function sortNewestFirst(rows, key = "createdAt") {
 
 /** Human-readable labels for API codes — e.g. DAILY_POST_TRIP → "Daily Post Trip" */
 export function formatStatusLabel(status) {
-  if (status == null || status === "") return "—";
+  if (status == null || status === "") return EMPTY_DISPLAY;
   const raw = status.toString().trim();
   const upper = raw.toUpperCase().replace(/-/g, "_");
 
@@ -96,6 +104,9 @@ export function formatStatusLabel(status) {
     PENDING_SUPPLY_REQUEST: "Pending Supply Request",
     PENDING_SUPPLY_APPROVAL: "Pending Supply Approval",
     PENDING_ISSUANCE: "Pending Issuance",
+    PARTIALLY_SUPPLIED: "Partially supplied",
+    PARTIAL_SUPPLIED: "Partially supplied",
+    SUPPLIED: "Supplied",
     READY_FOR_INSPECTION: "Ready for Inspection",
     INSPECTION_COMPLETE: "Inspection Complete",
     NOT_STARTED: "Not Started",

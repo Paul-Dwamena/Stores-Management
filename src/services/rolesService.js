@@ -7,10 +7,32 @@ export const formatRoleName = (name) =>
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
+const roleKey = (name) =>
+  String(name || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+/** Match backend role names like RECEIVER / Receiver / Reciever (API spelling). */
+export const isReceiverRoleName = (name) => {
+  const key = roleKey(name);
+  if (!key) return false;
+  if (key === "RECEIVER" || key === "RECEIVERS") return true;
+  // Backend schemas often use the "reciever" spelling.
+  if (key === "RECIEVER" || key === "RECIEVERS") return true;
+  return key.includes("RECEIVER") || key.includes("RECIEVER");
+};
+
+export const findReceiverRole = (roles = []) =>
+  roles.find((role) => isReceiverRoleName(role?.name) || isReceiverRoleName(role?.label));
+
 const PROTECTED_ROLE_NAMES = new Set(["SUPER_ADMIN", "STAFF", "STORE_MANAGER"]);
 
-export const isProtectedRole = (role) =>
-  PROTECTED_ROLE_NAMES.has(String(role?.name || "").toUpperCase());
+export const isProtectedRole = (role) => {
+  const name = String(role?.name || "").toUpperCase();
+  if (PROTECTED_ROLE_NAMES.has(name)) return true;
+  return isReceiverRoleName(role?.name) || isReceiverRoleName(role?.label);
+};
 
 const toPermission = (row) => ({
   id: row.id,

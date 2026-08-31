@@ -35,6 +35,8 @@ export default function InventoryUnitFields({
   required = true,
   className,
   inputClassName = "",
+  /** Put unit of measure + units per package on one row (single receive modals). */
+  packagingFieldsSameRow = false,
 }) {
   const resolvedBaseUnit = normalizeBaseUnit(baseUnit);
   const baseUnitOptions = getBaseUnitOptions();
@@ -53,6 +55,49 @@ export default function InventoryUnitFields({
       onUnitsPerPackChange?.("");
     }
   };
+
+  const unitOfMeasureField = (
+    <div className={cn("space-y-1.5", !packagingFieldsSameRow && "sm:col-span-2", className)}>
+      <Label htmlFor={`${idPrefix}-unit-of-measure`} className={errors.unitOfMeasure ? "text-red-500" : ""}>
+        {requiredFieldLabel("Packaging type", required)}
+      </Label>
+      <select
+        id={`${idPrefix}-unit-of-measure`}
+        value={unitOfMeasure}
+        onChange={(event) => handleUnitChange(event.target.value)}
+        className={cn(
+          fieldClassName,
+          inputClassName,
+          errors.unitOfMeasure && "border-red-500 bg-red-50",
+        )}
+      >
+        <option value="">Select packaging type…</option>
+        {INVENTORY_UNIT_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {errors.unitOfMeasure ? (
+        <p className="text-[10px] font-medium text-red-500">{errors.unitOfMeasure}</p>
+      ) : null}
+    </div>
+  );
+
+  const unitsPerPackField = showPackSize ? (
+    <InputField
+      id={`${idPrefix}-units-per-pack`}
+      label={inventoryPackSizeLabel()}
+      type="number"
+      min="1"
+      required={required}
+      value={unitsPerPack}
+      onChange={(event) => onUnitsPerPackChange?.(event.target.value)}
+      placeholder="e.g. 8"
+      error={errors.unitsPerPack}
+      className={inputClassName}
+    />
+  ) : null;
 
   return (
     <>
@@ -93,46 +138,17 @@ export default function InventoryUnitFields({
         </p>
       </div>
 
-      <div className={cn("space-y-1.5 sm:col-span-2", className)}>
-        <Label htmlFor={`${idPrefix}-unit-of-measure`} className={errors.unitOfMeasure ? "text-red-500" : ""}>
-          {requiredFieldLabel("Unit of measure", required)}
-        </Label>
-        <select
-          id={`${idPrefix}-unit-of-measure`}
-          value={unitOfMeasure}
-          onChange={(event) => handleUnitChange(event.target.value)}
-          className={cn(
-            fieldClassName,
-            inputClassName,
-            errors.unitOfMeasure && "border-red-500 bg-red-50",
-          )}
-        >
-          <option value="">Select unit of measure…</option>
-          {INVENTORY_UNIT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {errors.unitOfMeasure ? (
-          <p className="text-[10px] font-medium text-red-500">{errors.unitOfMeasure}</p>
-        ) : null}
-      </div>
-
-      {showPackSize ? (
-        <InputField
-          id={`${idPrefix}-units-per-pack`}
-          label={inventoryPackSizeLabel()}
-          type="number"
-          min="1"
-          required={required}
-          value={unitsPerPack}
-          onChange={(event) => onUnitsPerPackChange?.(event.target.value)}
-          placeholder="e.g. 8"
-          error={errors.unitsPerPack}
-          className={inputClassName}
-        />
-      ) : null}
+      {packagingFieldsSameRow ? (
+        <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+          {unitOfMeasureField}
+          {unitsPerPackField}
+        </div>
+      ) : (
+        <>
+          {unitOfMeasureField}
+          {unitsPerPackField}
+        </>
+      )}
 
       <div className={cn("space-y-1.5 sm:col-span-2", className)}>
         <Label htmlFor={`${idPrefix}-total-quantity`}>
@@ -140,11 +156,13 @@ export default function InventoryUnitFields({
         </Label>
         <div id={`${idPrefix}-total-quantity`} className={readOnlyClassName}>
           {quantity !== "" && totalQuantity != null
-            ? formatTotalBaseQuantity(totalQuantity, resolvedBaseUnit)
+            ? (summary || formatTotalBaseQuantity(totalQuantity, resolvedBaseUnit))
             : "—"}
         </div>
         <p className="text-[10px] text-slate-400">
-          {summary || (showPackSize ? "Quantity × units per package" : "Same as quantity when receiving in pieces")}
+          {showPackSize
+            ? "Package quantity × units per package"
+            : "Same as quantity when receiving in pieces"}
         </p>
       </div>
     </>

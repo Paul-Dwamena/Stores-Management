@@ -11,7 +11,7 @@ import MoneyInputField from "../../../../components/common/fields/MoneyInputFiel
 import ChoiceOption from "../../../../components/common/fields/ChoiceOption";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
+import { useBrandSelectOptions, useCategorySelectOptions } from "../../../../hooks/useCatalogOptions";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
@@ -74,6 +74,7 @@ const INITIAL_ACCESSORY = {
   itemCode: "",
   name: "",
   brand: "",
+  category: "",
   description: "",
   baseUnit: "piece",
   unitOfMeasure: "",
@@ -413,6 +414,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const brandOptions = useBrandSelectOptions(isOpen);
+  const categoryOptions = useCategorySelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -756,6 +758,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     const nextErrors = {};
     if (!accessoryForm.name.trim()) nextErrors.name = "Enter an item name.";
     if (!accessoryForm.brand.trim()) nextErrors.brand = "Select a brand.";
+    if (!accessoryForm.category.trim()) nextErrors.category = "Select a category.";
     validateStockFields(accessoryForm, nextErrors);
     validateInventoryUnitFields(accessoryForm, nextErrors, { baseUnitRequired: true });
     validateSupplyingDetails(accessoryForm, nextErrors);
@@ -773,6 +776,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         itemCode: accessoryForm.itemCode,
         name: accessoryForm.name,
         brand: accessoryForm.brand,
+        category: accessoryForm.category,
         description: accessoryForm.description,
         quantity: accessoryForm.quantity,
         unitCost: accessoryForm.unitPrice,
@@ -1090,7 +1094,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <InputField
-                    label="Quantity"
+                    label="Package quantity"
                     id="regQty"
                     type="number"
                     required
@@ -1113,6 +1117,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     baseUnit={resolveItemBaseUnit(selectedRegisteredItem?.unit)}
                     unitOfMeasure={registeredForm.unitOfMeasure}
                     unitsPerPack={registeredForm.unitsPerPack}
+                    packagingFieldsSameRow
                     onUnitChange={(value) => {
                       setRegisteredForm((prev) => ({
                         ...prev,
@@ -1195,16 +1200,46 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       <p className="text-[10px] font-medium text-red-500">{errors.brand}</p>
                     ) : null}
                   </div>
+                  <InputField
+                    label="Name"
+                    id="newAccName"
+                    required
+                    value={accessoryForm.name}
+                    onChange={handleAccessoryChange("name")}
+                    error={errors.name}
+                    placeholder="Enter item name..."
+                  />
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="newAccCategory"
+                      className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider",
+                        errors.category ? "text-red-500" : "text-slate-500",
+                      )}
+                    >
+                      Category
+                    </label>
+                    <select
+                      id="newAccCategory"
+                      value={accessoryForm.category}
+                      onChange={handleAccessoryChange("category")}
+                      className={cn(
+                        fieldClassName,
+                        errors.category && "border-red-500 bg-red-50",
+                      )}
+                    >
+                      <option value="">Select category…</option>
+                      {categoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.category ? (
+                      <p className="text-[10px] font-medium text-red-500">{errors.category}</p>
+                    ) : null}
+                  </div>
                 </div>
-                <InputField
-                  label="Name"
-                  id="newAccName"
-                  required
-                  value={accessoryForm.name}
-                  onChange={handleAccessoryChange("name")}
-                  error={errors.name}
-                  placeholder="Enter item name..."
-                />
                 <div className="space-y-1.5">
                   <label
                     htmlFor="newAccDescription"
@@ -1223,7 +1258,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <InputField
-                    label="Quantity"
+                    label="Package quantity"
                     id="newAccQty"
                     type="number"
                     required
@@ -1247,6 +1282,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     baseUnitEditable
                     unitOfMeasure={accessoryForm.unitOfMeasure}
                     unitsPerPack={accessoryForm.unitsPerPack}
+                    packagingFieldsSameRow
                     onBaseUnitChange={(value) => {
                       setAccessoryForm((prev) => ({ ...prev, baseUnit: value }));
                       clearError("baseUnit");

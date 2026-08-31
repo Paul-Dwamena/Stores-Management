@@ -88,8 +88,8 @@ export default function RegisterItemFromRequestModal({
       const result = await registerItemForRequest(generalRequestItemId, {
         name: form.name.trim(),
         description: form.description?.trim() || null,
-        brand: form.brand?.trim() || null,
-        category: form.category?.trim() || null,
+        brand_id: form.brand || null,
+        category_id: form.category || null,
         unit: form.unit?.trim() || null,
       });
 

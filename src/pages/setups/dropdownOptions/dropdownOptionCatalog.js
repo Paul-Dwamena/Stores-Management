@@ -14,12 +14,6 @@ export const DROPDOWN_OPTIONS = [
     description: "Brands available when receiving accessories into a store.",
     path: "/setups/dropdown-options/brands",
   },
-  {
-    id: "base-units",
-    title: "Base Units",
-    description: "Canonical units used for inventory quantity (piece, liter, kilogram, etc.).",
-    path: "/setups/dropdown-options/base-units",
-  },
 ];
 
 const customDropdownOptions = [];

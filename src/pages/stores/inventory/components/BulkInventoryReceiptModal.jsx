@@ -12,7 +12,8 @@ import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { formatInventoryMoney, sendDeliveryOtp } from "../../../../services/inventoryService";
 import { formatMoneyAmount } from "../../../../utils/displayFormatters";
-import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
+import { useBrandSelectOptions, useCategorySelectOptions } from "../../../../hooks/useCatalogOptions";
+import { catalogOptionLabel } from "../../../../utils/catalogRefHelpers";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
@@ -79,6 +80,7 @@ function createLine(inventoryType, mode) {
     itemId: "",
     name: "",
     brand: "",
+    category: "",
     description: "",
     make: "",
     model: "",
@@ -133,6 +135,7 @@ function getLineErrors(line, mode, inventoryType) {
   if (mode === "existing" && !line.itemId) next.itemId = "Select an inventory item.";
   if (mode === "new" && inventoryType === "accessory") {
     if (!line.brand) next.brand = "Select a brand.";
+    if (!line.category) next.category = "Select a category.";
     if (!line.name.trim()) next.name = "Enter an item name.";
   }
   if (mode === "new" && inventoryType === "vehicle_part") {
@@ -342,7 +345,7 @@ function ReceiveLineFields({ line, errors, onChange, mode, items = [] }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <InputField
-        label="Quantity"
+        label="Package quantity"
         required
         type="number"
         min="1"
@@ -750,6 +753,7 @@ function LineOverrideFields({ line, onChange }) {
 
 function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
   const brandOptions = useBrandSelectOptions(true);
+  const categoryOptions = useCategorySelectOptions(true);
   const identifyBlock = (
     <div className="space-y-3">
       <ItemPhotoField
@@ -770,6 +774,20 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
           ))}
         </select>
         <ErrorText>{errors.brand}</ErrorText>
+      </div>
+      <div>
+        <FieldLabel required error={Boolean(errors.category)}>Category</FieldLabel>
+        <select
+          value={line.category}
+          onChange={(event) => onChange("category", event.target.value)}
+          className={cn(fieldClassName, "mt-1", errors.category && "border-rose-500 bg-rose-50")}
+        >
+          <option value="">Select category</option>
+          {categoryOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <ErrorText>{errors.category}</ErrorText>
       </div>
       <InputField
         label="Name"
@@ -894,7 +912,7 @@ function applyLineChange(line, key, value) {
   return { ...line, [key]: value };
 }
 
-function lineMeta(line, items, mode) {
+function lineMeta(line, items, mode, brandOptions = []) {
   if (mode === "existing") {
     const item = items.find((row) => row.id === line.itemId);
     return [item?.itemCode, item?.brand ? formatBrand(item.brand) : null].filter(Boolean).join(" · ") || "—";
@@ -902,7 +920,8 @@ function lineMeta(line, items, mode) {
   if (line.inventoryType === "vehicle_part" || line.make) {
     return [line.make, line.model, line.year].filter(Boolean).join(" · ") || "—";
   }
-  return line.brand ? formatBrand(line.brand) : "—";
+  const brandLabel = catalogOptionLabel(brandOptions, line.brand);
+  return brandLabel || "—";
 }
 
 const thClass =
@@ -964,6 +983,7 @@ export default function BulkInventoryReceiptModal({
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [stores, setStores] = useState([]);
+  const brandOptions = useBrandSelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1358,7 +1378,7 @@ export default function BulkInventoryReceiptModal({
                             />
                           </td>
                           <td className={cn(tdClass, "text-slate-500")}>
-                            {lineMeta(line, items, mode)}
+                            {lineMeta(line, items, mode, brandOptions)}
                           </td>
                           <td className={tdClass}>{line.quantity || "—"}</td>
                           <td className={tdClass}>

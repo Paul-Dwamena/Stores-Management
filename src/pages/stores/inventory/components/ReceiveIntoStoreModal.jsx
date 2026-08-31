@@ -233,7 +233,7 @@ export default function ReceiveIntoStoreModal({
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InputField
-                label="Quantity"
+                label="Package quantity"
                 type="number"
                 required
                 value={form.quantity}

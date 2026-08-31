@@ -25,7 +25,7 @@ import {
   formatInventoryMoney,
 } from "../../../services/inventoryService";
 import { getInventoryStats } from "../../../services/statsService";
-import { createItem, updateItem, updateItemPhoto } from "../../../services/itemsService";
+import { updateItem, updateItemPhoto } from "../../../services/itemsService";
 import { buildInventoryUnitNotes, resolveItemBaseUnit } from "./utils/inventoryUnitOptions";
 import {
   AccessoryDetailModal,
@@ -138,6 +138,7 @@ export default function InventoryList({
         item.itemCode?.toLowerCase().includes(q) ||
         item.name?.toLowerCase().includes(q) ||
         item.brand?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q) ||
         (item.description || "").toLowerCase().includes(q)
       );
     });
@@ -309,15 +310,36 @@ export default function InventoryList({
       await stockItem(payload.itemId, toStockBody(payload));
       toast.success("Stock received.");
     } else {
-      const created = await createItem({
-        name: payload.name.trim(),
-        brand: payload.brand.trim(),
-        unit: payload.unit || "pcs",
-        description: payload.description?.trim() || null,
-        photo: payload.photoFile || null,
+      await stockItemsBulk({
+        mode: "new",
+        shared: {
+          supplierId: payload.supplierId,
+          deliveredByName: payload.deliveredByName,
+          deliveredByPhone: payload.deliveredByPhone,
+          deliveredByEmail: payload.deliveredByEmail,
+          waybillNumber: payload.waybillNumber,
+          condition: payload.condition,
+          notes: payload.notes || buildInventoryUnitNotes({
+            quantity: payload.quantity,
+            unitOfMeasure: payload.unitOfMeasure,
+            unitsPerPack: payload.unitsPerPack,
+            baseUnit: payload.baseUnit || resolveItemBaseUnit(payload.unit),
+          }),
+        },
+        lines: [{
+          name: payload.name?.trim(),
+          brand: payload.brand,
+          category: payload.category,
+          description: payload.description?.trim() || "",
+          unit: payload.unit || "pcs",
+          quantity: payload.quantity,
+          unitCost: payload.unitCost ?? payload.unitPrice,
+          location: payload.location,
+          condition: payload.condition,
+        }],
       });
-      await stockItem(created.id, toStockBody(payload));
-      toast.success(`${created.name} added to inventory.`);
+
+      toast.success(`${payload.name.trim()} added to inventory.`);
     }
     setAddOpen(false);
     setPage(0);
@@ -330,7 +352,8 @@ export default function InventoryList({
     const updated = await updateItem(selected.id, {
       name: payload.name?.trim() || null,
       code: payload.code?.trim() || null,
-      brand: payload.brand?.trim() || null,
+      brand_id: payload.brand_id ?? null,
+      category_id: payload.category_id ?? null,
       description: payload.description?.trim() || null,
       unit: payload.unit?.trim() || null,
       is_active: payload.isActive !== false,
@@ -346,6 +369,12 @@ export default function InventoryList({
       if (!prev || prev.id !== selected.id) return prev;
       return {
         ...prev,
+        name: updated.name || prev.name,
+        brand: updated.brand || prev.brand,
+        brandId: updated.brandId ?? prev.brandId,
+        category: updated.category || prev.category,
+        categoryId: updated.categoryId ?? prev.categoryId,
+        description: updated.description ?? prev.description,
         unit: updated.unit || prev.unit || payload.unit?.trim() || "",
         itemCode: updated.itemCode || prev.itemCode,
         isActive: updated.isActive,
@@ -404,7 +433,7 @@ export default function InventoryList({
 
           <div className="p-4 bg-slate-50/30 flex flex-col xl:flex-row justify-between gap-4">
             <SearchInput
-              placeholder="Search by code, name, brand, or description…"
+              placeholder="Search by code, name, brand, category, or description…"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -437,7 +466,7 @@ export default function InventoryList({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[920px]">
+          <table className="w-full text-left min-w-[1000px]">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
                 <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider w-16">
@@ -451,6 +480,9 @@ export default function InventoryList({
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                   Brand
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Category
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                   Description
@@ -469,7 +501,7 @@ export default function InventoryList({
             <tbody className="divide-y divide-slate-50">
               {loading || loadError ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-2">
+                  <td colSpan={9} className="px-4 py-2">
                     <SectionLoadState
                       loading={loading}
                       error={loadError}
@@ -481,7 +513,7 @@ export default function InventoryList({
                 </tr>
               ) : pagedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-[13px] text-slate-400">
+                  <td colSpan={9} className="px-6 py-12 text-center text-[13px] text-slate-400">
                     No accessories found.
                   </td>
                 </tr>
@@ -499,6 +531,9 @@ export default function InventoryList({
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700">
                       <BrandDisplay value={row.brand} />
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
+                      <DescriptionDisplay value={row.category} />
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-600 max-w-[240px]">
                       <span className="line-clamp-2">

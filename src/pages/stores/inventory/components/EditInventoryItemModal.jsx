@@ -7,6 +7,11 @@ import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import ItemPhotoField from "./ItemPhotoField";
 import {
+  useBrandSelectOptions,
+  useCategorySelectOptions,
+} from "../../../../hooks/useCatalogOptions";
+import { findCatalogOptionValue, toCatalogId } from "../../../../utils/catalogRefHelpers";
+import {
   baseUnitApiValue,
   baseUnitLabel,
   getBaseUnitOptions,
@@ -16,7 +21,8 @@ import {
 const EMPTY_FORM = {
   name: "",
   code: "",
-  brand: "",
+  brandId: "",
+  categoryId: "",
   description: "",
   baseUnit: "piece",
   photo: "",
@@ -40,13 +46,23 @@ export default function EditInventoryItemModal({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const baseUnitOptions = getBaseUnitOptions();
+  const brandOptions = useBrandSelectOptions(isOpen);
+  const categoryOptions = useCategorySelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen || !item) return;
+    const brandId = item.brandId != null
+      ? String(item.brandId)
+      : findCatalogOptionValue(brandOptions, item.brand);
+    const categoryId = item.categoryId != null
+      ? String(item.categoryId)
+      : findCatalogOptionValue(categoryOptions, item.category);
+
     setForm({
       name: item.name || "",
       code: item.itemCode || item.code || "",
-      brand: item.brand === "—" ? "" : item.brand || "",
+      brandId,
+      categoryId,
       description: item.description || "",
       baseUnit: resolveItemBaseUnit(item.unit),
       photo: item.photo || "",
@@ -55,7 +71,7 @@ export default function EditInventoryItemModal({
     });
     setErrors({});
     setSaving(false);
-  }, [isOpen, item]);
+  }, [isOpen, item, brandOptions, categoryOptions]);
 
   const setField = (key) => (event) => {
     const value = event?.target ? event.target.value : event;
@@ -81,7 +97,8 @@ export default function EditInventoryItemModal({
       await onSave?.({
         name: form.name,
         code: form.code,
-        brand: form.brand,
+        brand_id: toCatalogId(form.brandId),
+        category_id: toCatalogId(form.categoryId),
         description: form.description,
         unit: baseUnitApiValue(form.baseUnit),
         photo: form.photo,
@@ -153,13 +170,39 @@ export default function EditInventoryItemModal({
             onChange={setField("code")}
             placeholder="Optional code"
           />
-          <InputField
-            id="edit-item-brand"
-            label="Brand"
-            value={form.brand}
-            onChange={setField("brand")}
-          />
           <div className="space-y-1.5">
+            <Label htmlFor="edit-item-brand">Brand</Label>
+            <select
+              id="edit-item-brand"
+              value={form.brandId}
+              onChange={setField("brandId")}
+              className={cn(fieldClassName)}
+            >
+              <option value="">Select brand…</option>
+              {brandOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-item-category">Category</Label>
+            <select
+              id="edit-item-category"
+              value={form.categoryId}
+              onChange={setField("categoryId")}
+              className={cn(fieldClassName)}
+            >
+              <option value="">Select category…</option>
+              {categoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="edit-item-base-unit">Base unit</Label>
             <select
               id="edit-item-base-unit"

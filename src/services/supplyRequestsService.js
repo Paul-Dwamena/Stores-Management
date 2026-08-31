@@ -1,5 +1,6 @@
 import api from "./api";
 import { extractApiErrorDetail } from "../utils/apiResponseHelpers";
+import { toCatalogId } from "../utils/catalogRefHelpers";
 
 const requesterName = (requester) =>
   [requester?.first_name, requester?.last_name].filter(Boolean).join(" ").trim();
@@ -227,8 +228,8 @@ export const registerItemForRequest = async (generalRequestItemId, payload) => {
       {
         name: String(payload.name || "").trim(),
         description: payload.description?.trim() || null,
-        brand: payload.brand?.trim() || null,
-        category: payload.category?.trim() || null,
+        brand_id: toCatalogId(payload.brand_id ?? payload.brandId ?? payload.brand),
+        category_id: toCatalogId(payload.category_id ?? payload.categoryId ?? payload.category),
         unit: payload.unit?.trim() || null,
       },
     );

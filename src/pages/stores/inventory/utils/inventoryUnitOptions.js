@@ -1,5 +1,3 @@
-import { resolveDropdownOptionChoices } from "../../../../mockdata/setups/dropdownOptionChoices";
-
 export const INVENTORY_UNIT_OPTIONS = [
   { value: "pieces", label: "Pieces" },
   { value: "carton", label: "Carton" },
@@ -9,22 +7,57 @@ export const INVENTORY_UNIT_OPTIONS = [
   { value: "can", label: "Can" },
 ];
 
-export const DEFAULT_BASE_UNIT_OPTIONS = [
+export const BASE_UNIT_OPTIONS = [
   { value: "piece", label: "Piece" },
+  { value: "set", label: "Set" },
+  { value: "pair", label: "Pair" },
   { value: "liter", label: "Liter" },
+  { value: "milliliter", label: "Milliliter" },
+  { value: "gallon", label: "Gallon" },
   { value: "kilogram", label: "Kilogram" },
+  { value: "gram", label: "Gram" },
   { value: "meter", label: "Meter" },
+  { value: "centimeter", label: "Centimeter" },
+  { value: "roll", label: "Roll" },
+  { value: "sheet", label: "Sheet" },
+  { value: "bottle", label: "Bottle" },
 ];
 
+const BASE_UNIT_ALIASES = {
+  pc: "piece",
+  pcs: "piece",
+  pieces: "piece",
+  litre: "liter",
+  litres: "liter",
+  liters: "liter",
+  l: "liter",
+  ml: "milliliter",
+  millilitre: "milliliter",
+  milliliters: "milliliter",
+  millilitres: "milliliter",
+  gal: "gallon",
+  gallons: "gallon",
+  kg: "kilogram",
+  kilograms: "kilogram",
+  g: "gram",
+  grams: "gram",
+  m: "meter",
+  metre: "meter",
+  metres: "meter",
+  meters: "meter",
+  cm: "centimeter",
+  centimetre: "centimeter",
+  centimeters: "centimeter",
+  centimetres: "centimeter",
+  sets: "set",
+  pairs: "pair",
+  rolls: "roll",
+  sheets: "sheet",
+  bottles: "bottle",
+};
+
 export function getBaseUnitOptions() {
-  const fromSetup = resolveDropdownOptionChoices("base-units");
-  if (fromSetup.length) {
-    return fromSetup.map((option) => ({
-      value: option.value,
-      label: option.label,
-    }));
-  }
-  return DEFAULT_BASE_UNIT_OPTIONS;
+  return BASE_UNIT_OPTIONS;
 }
 
 export function normalizeInventoryUnit(unit) {
@@ -44,6 +77,7 @@ export function normalizeInventoryUnit(unit) {
 export function normalizeBaseUnit(unit) {
   const key = String(unit || "").trim().toLowerCase();
   if (!key) return "piece";
+  if (BASE_UNIT_ALIASES[key]) return BASE_UNIT_ALIASES[key];
   const options = getBaseUnitOptions();
   const match = options.find((option) => option.value === key || option.label.toLowerCase() === key);
   return match?.value || key;
@@ -53,7 +87,6 @@ export function normalizeBaseUnit(unit) {
 export function resolveItemBaseUnit(apiUnit) {
   const key = String(apiUnit || "").trim().toLowerCase();
   if (!key) return "piece";
-  if (key === "pc" || key === "pcs") return "piece";
   return normalizeBaseUnit(key);
 }
 
@@ -129,7 +162,9 @@ export function formatPackagingReceiptSummary({
 
   const packLabel = inventoryUnitLabel(unitOfMeasure).toLowerCase();
   const packPlural = qty === 1 ? packLabel : `${packLabel}s`;
-  return `${qty} ${packPlural} (${formatTotalBaseQuantity(total, baseUnit)})`;
+  const baseLabel = baseUnitLabel(baseUnit).toLowerCase();
+  const basePlural = perPack === 1 ? baseLabel : `${baseLabel}s`;
+  return `${qty} ${packPlural} × ${perPack} ${basePlural} = ${formatTotalBaseQuantity(total, baseUnit)}`;
 }
 
 export function buildInventoryUnitNotes({
@@ -174,7 +209,7 @@ export function validateInventoryUnitFields(form, errors, { required = true, bas
 
   const unit = normalizeInventoryUnit(form.unitOfMeasure);
   if (required && !unit) {
-    errors.unitOfMeasure = "Select a unit of measure.";
+    errors.unitOfMeasure = "Select a packaging type.";
     return;
   }
   if (!inventoryUnitRequiresPackSize(unit)) return;

@@ -1,6 +1,7 @@
 import api from "./api";
 import { extractApiErrorDetail, parsePaginatedList } from "../utils/apiResponseHelpers";
 import { formatMoneyGhs } from "../utils/displayFormatters";
+import { catalogDisplayName, normalizeCatalogRef, toCatalogId } from "../utils/catalogRefHelpers";
 
 const toStoreStock = (store) => ({
   id: store.store_id,
@@ -17,20 +18,28 @@ const inventoryStatus = (row) => {
   return "IN_STOCK";
 };
 
-export const toInventoryItem = (row) => ({
-  id: row.id,
-  name: row.name || "",
-  itemCode: row.item_code || row.code || "",
-  brand: row.brand || "",
-  description: row.description || "",
-  photo: row.image_url || row.photo_url || "",
-  unit: row.unit || "",
-  isActive: row.is_active !== false,
-  quantity: row.total_quantity,
-  totalQuantity: row.total_quantity,
-  stores: (row.stores || []).map(toStoreStock),
-  status: inventoryStatus(row),
-});
+export const toInventoryItem = (row) => {
+  const brand = normalizeCatalogRef(row.brand, row.brand_id);
+  const category = normalizeCatalogRef(row.category, row.category_id);
+
+  return {
+    id: row.id,
+    name: row.name || "",
+    itemCode: row.item_code || row.code || "",
+    brandId: brand.id,
+    brand: brand.name,
+    categoryId: category.id,
+    category: category.name,
+    description: row.description || "",
+    photo: row.image_url || row.photo_url || "",
+    unit: row.unit || "",
+    isActive: row.is_active !== false,
+    quantity: row.total_quantity,
+    totalQuantity: row.total_quantity,
+    stores: (row.stores || []).map(toStoreStock),
+    status: inventoryStatus(row),
+  };
+};
 
 const toDeliveredByPayload = (payload = {}) => ({
   full_name: String(payload.deliveredByName || payload.full_name || "").trim(),
@@ -50,7 +59,7 @@ export const toStockReceipt = (row = {}) => {
     itemId: row.item_id ?? row.item?.id ?? null,
     itemCode: row.item?.code || "",
     itemName: row.item?.name || "",
-    itemBrand: row.item?.brand || "",
+    itemBrand: catalogDisplayName(row.item?.brand) || "",
     supplierId: row.supplier_id ?? row.supplier?.id ?? null,
     supplierName: row.supplier?.name || "",
     supplierPhone: row.supplier?.phone || "",
@@ -103,11 +112,13 @@ export const toBulkStockPayload = ({ shared = {}, lines = [], mode = "existing" 
       item.item_id = Number(line.itemId || line.item_id);
     } else {
       const name = line.name?.trim();
-      const brand = line.brand?.trim();
+      const brandId = toCatalogId(line.brand ?? line.brandId);
+      const categoryId = toCatalogId(line.category ?? line.categoryId);
       const description = line.description?.trim();
       const unit = line.unit?.trim();
       if (name) item.name = name;
-      if (brand) item.brand = brand;
+      if (brandId != null) item.brand = brandId;
+      if (categoryId != null) item.category = categoryId;
       if (description) item.description = description;
       if (unit) item.unit = unit;
     }

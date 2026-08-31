@@ -624,6 +624,9 @@ export default function AccessoryDetailModal({
                       <DetailRow label="Brand">
                         <BrandDisplay value={item.brand} />
                       </DetailRow>
+                      <DetailRow label="Category">
+                        <DescriptionDisplay value={item.category} />
+                      </DetailRow>
                     </>
                   ) : (
                     <>
@@ -632,6 +635,9 @@ export default function AccessoryDetailModal({
                       </DetailRow>
                       <DetailRow label="Brand">
                         <BrandDisplay value={item.brand} />
+                      </DetailRow>
+                      <DetailRow label="Category">
+                        <DescriptionDisplay value={item.category} />
                       </DetailRow>
                     </>
                   )}

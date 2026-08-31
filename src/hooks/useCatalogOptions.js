@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { refreshCatalogOptions } from "../services/catalogOptionsCache";
 import { formatBrand } from "../utils/displayFormatters";
 
-function activeNamedOptions(rows = [], { formatLabel } = {}) {
+function activeCatalogOptions(rows = [], { formatLabel } = {}) {
   return rows
     .filter((row) => row.active !== false)
     .map((row) => {
+      const id = row.id;
       const name = String(row.name || "").trim();
-      if (!name) return null;
+      if (id == null || !name) return null;
       return {
-        value: name,
+        value: String(id),
         label: formatLabel ? formatLabel(name) : name,
       };
     })
@@ -26,7 +27,7 @@ export function useBrandSelectOptions(enabled = true) {
     refreshCatalogOptions("brands")
       .then((rows) => {
         if (!cancelled) {
-          setOptions(activeNamedOptions(rows, { formatLabel: formatBrand }));
+          setOptions(activeCatalogOptions(rows, { formatLabel: formatBrand }));
         }
       })
       .catch(() => {
@@ -50,7 +51,9 @@ export function useCategorySelectOptions(enabled = true) {
 
     refreshCatalogOptions("item-categories")
       .then((rows) => {
-        if (!cancelled) setOptions(activeNamedOptions(rows));
+        if (!cancelled) {
+          setOptions(activeCatalogOptions(rows));
+        }
       })
       .catch(() => {
         if (!cancelled) setOptions([]);

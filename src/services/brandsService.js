@@ -33,10 +33,12 @@ export const getBrand = async (brandId) => {
   }
 };
 
-export const createBrand = async ({ name, description }) => {
+export const createBrand = async ({ name, description, short_name }) => {
+  const trimmedName = String(name || "").trim();
   try {
     const { data } = await api.post("/brands", {
-      name: String(name || "").trim(),
+      name: trimmedName,
+      short_name: String(short_name || trimmedName).trim() || trimmedName,
       description: description?.trim() || null,
     });
     return toBrand(data);

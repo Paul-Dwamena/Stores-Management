@@ -36,6 +36,7 @@ import InventoryUnitFields from "./InventoryUnitFields";
 import {
   baseUnitApiValue,
   buildInventoryUnitNotes,
+  calcInventoryPurchaseTotal,
   calcInventoryTotalQuantity,
   normalizeBaseUnit,
   normalizeInventoryUnit,
@@ -123,11 +124,13 @@ function linePhoto(line, mode, items) {
   return "";
 }
 
-function calcLineTotal(quantity, unitCost) {
-  const qty = Number(quantity);
-  const unit = Number(unitCost);
-  if (Number.isNaN(qty) || Number.isNaN(unit) || quantity === "" || unitCost === "") return null;
-  return qty * unit;
+function calcLineTotal(line) {
+  return calcInventoryPurchaseTotal(
+    line.quantity,
+    line.unitsPerPack,
+    line.unitOfMeasure,
+    line.unitCost,
+  );
 }
 
 function getLineErrors(line, mode, inventoryType) {
@@ -341,7 +344,7 @@ function ReceiveLineFields({ line, errors, onChange, mode, items = [] }) {
   const baseUnit = line.itemId
     ? resolveItemBaseUnit(selectedItem?.unit)
     : normalizeBaseUnit(line.baseUnit || "piece");
-  const total = calcLineTotal(line.quantity, line.unitCost);
+  const total = calcLineTotal(line);
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <InputField
@@ -389,7 +392,7 @@ function ReceiveLineFields({ line, errors, onChange, mode, items = [] }) {
           {total == null ? "—" : formatMoneyAmount(total)}
         </div>
         <p className="text-[10px] text-slate-400">
-          Auto-calculated from quantity × unit price
+          Auto-calculated from total base quantity × unit price
         </p>
       </div>
       <div className="sm:col-span-2">
@@ -752,8 +755,8 @@ function LineOverrideFields({ line, onChange }) {
 }
 
 function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
-  const brandOptions = useBrandSelectOptions(true);
-  const categoryOptions = useCategorySelectOptions(true);
+  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(true);
+  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(true);
   const identifyBlock = (
     <div className="space-y-3">
       <ItemPhotoField
@@ -766,9 +769,15 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
         <select
           value={line.brand}
           onChange={(event) => onChange("brand", event.target.value)}
-          className={cn(fieldClassName, "mt-1", errors.brand && "border-rose-500 bg-rose-50")}
+          disabled={brandsLoading}
+          className={cn(
+            fieldClassName,
+            "mt-1",
+            errors.brand && "border-rose-500 bg-rose-50",
+            brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
+          )}
         >
-          <option value="">Select brand</option>
+          <option value="">{brandsLoading ? "Loading brands…" : "Select brand"}</option>
           {brandOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
@@ -780,9 +789,15 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
         <select
           value={line.category}
           onChange={(event) => onChange("category", event.target.value)}
-          className={cn(fieldClassName, "mt-1", errors.category && "border-rose-500 bg-rose-50")}
+          disabled={categoriesLoading}
+          className={cn(
+            fieldClassName,
+            "mt-1",
+            errors.category && "border-rose-500 bg-rose-50",
+            categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
+          )}
         >
-          <option value="">Select category</option>
+          <option value="">{categoriesLoading ? "Loading categories…" : "Select category"}</option>
           {categoryOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
@@ -983,7 +998,7 @@ export default function BulkInventoryReceiptModal({
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [stores, setStores] = useState([]);
-  const brandOptions = useBrandSelectOptions(isOpen);
+  const { options: brandOptions } = useBrandSelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1039,7 +1054,7 @@ export default function BulkInventoryReceiptModal({
   );
   const totalQuantity = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
   const totalValue = lines.reduce(
-    (sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitCost) || 0),
+    (sum, line) => sum + (calcLineTotal(line) || 0),
     0,
   );
   const editorOpen = Boolean(editor);
@@ -1354,7 +1369,7 @@ export default function BulkInventoryReceiptModal({
                   </thead>
                   <tbody>
                     {lines.map((line, index) => {
-                      const total = calcLineTotal(line.quantity, line.unitCost);
+                      const total = calcLineTotal(line);
                       const selected = editor?.line.clientId === line.clientId;
                       return (
                         <tr

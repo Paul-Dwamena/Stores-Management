@@ -17,52 +17,45 @@ function activeCatalogOptions(rows = [], { formatLabel } = {}) {
     .filter(Boolean);
 }
 
-export function useBrandSelectOptions(enabled = true) {
+function useCatalogSelectOptions(optionId, enabled = true, { formatLabel } = {}) {
   const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(Boolean(enabled));
 
   useEffect(() => {
-    if (!enabled) return undefined;
-    let cancelled = false;
+    if (!enabled) {
+      setOptions([]);
+      setLoading(false);
+      return undefined;
+    }
 
-    refreshCatalogOptions("brands")
+    let cancelled = false;
+    setLoading(true);
+
+    refreshCatalogOptions(optionId)
       .then((rows) => {
         if (!cancelled) {
-          setOptions(activeCatalogOptions(rows, { formatLabel: formatBrand }));
+          setOptions(activeCatalogOptions(rows, { formatLabel }));
         }
       })
       .catch(() => {
         if (!cancelled) setOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, optionId, formatLabel]);
 
-  return options;
+  return { options, loading };
+}
+
+export function useBrandSelectOptions(enabled = true) {
+  return useCatalogSelectOptions("brands", enabled, { formatLabel: formatBrand });
 }
 
 export function useCategorySelectOptions(enabled = true) {
-  const [options, setOptions] = useState([]);
-
-  useEffect(() => {
-    if (!enabled) return undefined;
-    let cancelled = false;
-
-    refreshCatalogOptions("item-categories")
-      .then((rows) => {
-        if (!cancelled) {
-          setOptions(activeCatalogOptions(rows));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setOptions([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
-
-  return options;
+  return useCatalogSelectOptions("item-categories", enabled);
 }

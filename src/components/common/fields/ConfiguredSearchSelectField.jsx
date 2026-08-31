@@ -34,6 +34,7 @@ export default function ConfiguredSearchSelectField({
   spanClass,
   required = false,
   action = null,
+  loading = false,
 }) {
   const formKey = field.formKey || field.key;
   const value = values[formKey] ?? "";
@@ -161,11 +162,13 @@ export default function ConfiguredSearchSelectField({
             if (selected) setQuery("");
           }}
           placeholder={
-            options.length === 0
-              ? "No options available"
-              : (field.placeholder?.trim() || "Search…")
+            loading
+              ? "Loading…"
+              : options.length === 0
+                ? "No options available"
+                : (field.placeholder?.trim() || "Search…")
           }
-          disabled={options.length === 0}
+          disabled={loading || options.length === 0}
           autoComplete="off"
           className={cn(inputClassName, error && "border-red-500 bg-red-50")}
         />

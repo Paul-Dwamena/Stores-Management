@@ -15,16 +15,25 @@ export default function SupplierPicker({
   reloadToken = 0,
 }) {
   const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+
     listSuppliers()
       .then((rows) => {
-        if (!cancelled) setSuppliers(rows.filter((row) => row.isActive !== false));
+        if (!cancelled) {
+          setSuppliers(rows.filter((row) => row.isActive !== false));
+        }
       })
       .catch(() => {
         if (!cancelled) setSuppliers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
@@ -46,6 +55,7 @@ export default function SupplierPicker({
       }}
       values={{ supplierId: value == null ? "" : String(value) }}
       error={error}
+      loading={loading}
       onChange={(_key, next) => {
         const match = suppliers.find((row) => String(row.id) === String(next));
         onChange?.(next ?? "", match || null);

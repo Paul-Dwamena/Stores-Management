@@ -23,7 +23,7 @@ const INITIAL_FORM = {
 export default function AddAccessoryModal({ isOpen, onClose, onSave }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
-  const brandOptions = useBrandSelectOptions(isOpen);
+  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -88,9 +88,13 @@ export default function AddAccessoryModal({ isOpen, onClose, onSave }) {
             id="accessoryBrand"
             value={form.brand}
             onChange={handleChange("brand")}
-            className={fieldClassName}
+            disabled={brandsLoading}
+            className={cn(
+              fieldClassName,
+              brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
+            )}
           >
-            <option value="">Select brand…</option>
+            <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
             {brandOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

@@ -46,8 +46,8 @@ export default function EditInventoryItemModal({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const baseUnitOptions = getBaseUnitOptions();
-  const brandOptions = useBrandSelectOptions(isOpen);
-  const categoryOptions = useCategorySelectOptions(isOpen);
+  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
+  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen || !item) return;
@@ -176,9 +176,10 @@ export default function EditInventoryItemModal({
               id="edit-item-brand"
               value={form.brandId}
               onChange={setField("brandId")}
-              className={cn(fieldClassName)}
+              disabled={brandsLoading}
+              className={cn(fieldClassName, brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed")}
             >
-              <option value="">Select brand…</option>
+              <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
               {brandOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -192,9 +193,10 @@ export default function EditInventoryItemModal({
               id="edit-item-category"
               value={form.categoryId}
               onChange={setField("categoryId")}
-              className={cn(fieldClassName)}
+              disabled={categoriesLoading}
+              className={cn(fieldClassName, categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed")}
             >
-              <option value="">Select category…</option>
+              <option value="">{categoriesLoading ? "Loading categories…" : "Select category…"}</option>
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}

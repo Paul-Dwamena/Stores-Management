@@ -42,8 +42,8 @@ export default function RegisterItemFromRequestModal({
   const [errors, setErrors] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const brandOptions = useBrandSelectOptions(isOpen);
-  const categoryOptions = useCategorySelectOptions(isOpen);
+  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
+  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(isOpen);
 
   const generalRequestItemId =
     requisition?.generalRequestItemId ?? requisition?.id ?? null;
@@ -168,9 +168,13 @@ export default function RegisterItemFromRequestModal({
                 id="register-item-brand"
                 value={form.brand}
                 onChange={setField("brand")}
-                className={fieldClassName}
+                disabled={brandsLoading}
+                className={cn(
+                  fieldClassName,
+                  brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
+                )}
               >
-                <option value="">Select brand…</option>
+                <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
                 {brandOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -184,9 +188,13 @@ export default function RegisterItemFromRequestModal({
                 id="register-item-category"
                 value={form.category}
                 onChange={setField("category")}
-                className={fieldClassName}
+                disabled={categoriesLoading}
+                className={cn(
+                  fieldClassName,
+                  categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
+                )}
               >
-                <option value="">Select category…</option>
+                <option value="">{categoriesLoading ? "Loading categories…" : "Select category…"}</option>
                 {categoryOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}

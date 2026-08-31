@@ -36,6 +36,7 @@ import InventoryUnitFields from "./InventoryUnitFields";
 import { sendDeliveryOtp } from "../../../../services/inventoryService";
 import {
   buildReceiveStockPayload,
+  calcInventoryPurchaseTotal,
   normalizeInventoryUnit,
   resolveItemBaseUnit,
   validateInventoryUnitFields,
@@ -128,11 +129,8 @@ function resolveComponentName(form) {
   return levels[levels.length - 1] || "";
 }
 
-function calcTotalPrice(quantity, unitPrice) {
-  const qty = Number(quantity);
-  const unit = Number(unitPrice);
-  if (Number.isNaN(qty) || Number.isNaN(unit) || quantity === "" || unitPrice === "") return null;
-  return qty * unit;
+function calcTotalPrice(quantity, unitPrice, unitsPerPack, unitOfMeasure) {
+  return calcInventoryPurchaseTotal(quantity, unitsPerPack, unitOfMeasure, unitPrice);
 }
 
 function formatTotalPriceDisplay(total) {
@@ -408,13 +406,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
   const [supplierTick, setSupplierTick] = useState(0);
   const [catalogItems, setCatalogItems] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [componentFilterOpen, setComponentFilterOpen] = useState(true);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
-  const brandOptions = useBrandSelectOptions(isOpen);
-  const categoryOptions = useCategorySelectOptions(isOpen);
+  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
+  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -444,12 +443,16 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+    setCatalogLoading(true);
     listItems()
       .then((rows) => {
         if (!cancelled) setCatalogItems(rows);
       })
       .catch(() => {
         if (!cancelled) setCatalogItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
       });
     return () => {
       cancelled = true;
@@ -542,8 +545,18 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   );
 
   const accessoryTotal = useMemo(
-    () => calcTotalPrice(accessoryForm.quantity, accessoryForm.unitPrice),
-    [accessoryForm.quantity, accessoryForm.unitPrice],
+    () => calcTotalPrice(
+      accessoryForm.quantity,
+      accessoryForm.unitPrice,
+      accessoryForm.unitsPerPack,
+      accessoryForm.unitOfMeasure,
+    ),
+    [
+      accessoryForm.quantity,
+      accessoryForm.unitPrice,
+      accessoryForm.unitsPerPack,
+      accessoryForm.unitOfMeasure,
+    ],
   );
 
   const vehicleTotal = useMemo(
@@ -552,8 +565,18 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   );
 
   const registeredTotal = useMemo(
-    () => calcTotalPrice(registeredForm.quantity, registeredForm.unitPrice),
-    [registeredForm.quantity, registeredForm.unitPrice],
+    () => calcTotalPrice(
+      registeredForm.quantity,
+      registeredForm.unitPrice,
+      registeredForm.unitsPerPack,
+      registeredForm.unitOfMeasure,
+    ),
+    [
+      registeredForm.quantity,
+      registeredForm.unitPrice,
+      registeredForm.unitsPerPack,
+      registeredForm.unitOfMeasure,
+    ],
   );
 
   const componentName = useMemo(() => resolveComponentName(vehicleForm), [vehicleForm]);
@@ -1049,7 +1072,11 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                         ) : null}
                       </div>
                       <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white">
-                        {filteredCatalog.length === 0 ? (
+                        {catalogLoading ? (
+                          <p className="px-3 py-3 text-[11px] text-slate-400">
+                            Loading items…
+                          </p>
+                        ) : filteredCatalog.length === 0 ? (
                           <p className="px-3 py-3 text-[11px] text-slate-400">
                             No registered items found.
                           </p>
@@ -1139,7 +1166,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     </p>
                     <div className={readOnlyClassName}>{formatTotalPriceDisplay(registeredTotal)}</div>
                     <p className="text-[10px] text-slate-400">
-                      Auto-calculated from quantity × unit price
+                      Auto-calculated from total base quantity × unit price
                     </p>
                   </div>
                   <StoreLocationField
@@ -1184,12 +1211,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       id="newAccBrand"
                       value={accessoryForm.brand}
                       onChange={handleAccessoryChange("brand")}
+                      disabled={brandsLoading}
                       className={cn(
                         fieldClassName,
                         errors.brand && "border-red-500 bg-red-50",
+                        brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
                       )}
                     >
-                      <option value="">Select brand…</option>
+                      <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
                       {brandOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
@@ -1223,12 +1252,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       id="newAccCategory"
                       value={accessoryForm.category}
                       onChange={handleAccessoryChange("category")}
+                      disabled={categoriesLoading}
                       className={cn(
                         fieldClassName,
                         errors.category && "border-red-500 bg-red-50",
+                        categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
                       )}
                     >
-                      <option value="">Select category…</option>
+                      <option value="">{categoriesLoading ? "Loading categories…" : "Select category…"}</option>
                       {categoryOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
@@ -1308,7 +1339,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     </p>
                     <div className={readOnlyClassName}>{formatTotalPriceDisplay(accessoryTotal)}</div>
                     <p className="text-[10px] text-slate-400">
-                      Auto-calculated from quantity × unit price
+                      Auto-calculated from total base quantity × unit price
                     </p>
                   </div>
                   <StoreLocationField

@@ -132,6 +132,14 @@ export function calcInventoryTotalQuantity(quantity, unitsPerPack, unitOfMeasure
   return qty * perPack;
 }
 
+/** Total purchase cost = total base quantity × unit price. */
+export function calcInventoryPurchaseTotal(quantity, unitsPerPack, unitOfMeasure, unitPrice) {
+  const totalQty = calcInventoryTotalQuantity(quantity, unitsPerPack, unitOfMeasure);
+  const price = Number(unitPrice);
+  if (totalQty == null || !Number.isFinite(price) || unitPrice === "") return null;
+  return totalQty * price;
+}
+
 export function formatTotalBaseQuantity(total, baseUnit = "piece") {
   if (total == null || Number.isNaN(Number(total))) return "—";
   const label = baseUnitLabel(baseUnit);

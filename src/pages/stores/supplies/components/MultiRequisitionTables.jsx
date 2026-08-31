@@ -10,6 +10,11 @@ import {
 } from "../../../requests/requests/utils/requestHelpers";
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { ItemPhotoThumb } from "../../inventory/components/ItemPhotoField";
+import {
+  BrandDisplay,
+  DescriptionDisplay,
+  ItemNameDisplay,
+} from "../../../../components/common/display/FormattedDisplay";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -74,7 +79,9 @@ function SelectedAccessoryCard({ item, onChange }) {
       <div className="flex min-w-0 items-center gap-2.5">
         <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
         <div className="min-w-0">
-          <p className="truncate text-[12px] font-semibold text-slate-900">{item.name}</p>
+          <p className="truncate text-[12px]">
+            <ItemNameDisplay value={item.name} className="text-slate-900" />
+          </p>
           {meta ? (
             <p className="truncate text-[10px] leading-tight text-slate-500">{meta}</p>
           ) : null}
@@ -363,7 +370,9 @@ export function MultiAccessoryRequisitionTable({
                             <div className="flex min-w-0 items-center gap-2.5">
                               <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
                               <div className="min-w-0">
-                                <p className="text-[12px] font-bold text-slate-900">{item.name}</p>
+                                <p className="text-[12px]">
+                                  <ItemNameDisplay value={item.name} className="text-slate-900" />
+                                </p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">
                                   {item.itemCode} · {item.brand}
                                 </p>
@@ -554,12 +563,16 @@ export function MultiAccessoryRequisitionTable({
                       <td className={cn(tdClass, "font-mono text-[11px] text-slate-600")}>
                         {line.itemCode?.trim() ? line.itemCode : "—"}
                       </td>
-                      <td className={cn(tdClass, "font-semibold text-slate-900")}>
-                        {line.name || "—"}
+                      <td className={tdClass}>
+                        <ItemNameDisplay value={line.name} className="text-slate-900" />
                       </td>
-                      <td className={tdClass}>{line.brand || "—"}</td>
+                      <td className={tdClass}>
+                        <BrandDisplay value={line.brand} />
+                      </td>
                       <td className={cn(tdClass, "max-w-[220px]")}>
-                        <span className="line-clamp-2">{line.description || "—"}</span>
+                        <span className="line-clamp-2">
+                          <DescriptionDisplay value={line.description} />
+                        </span>
                       </td>
                       <td className={tdClass}>
                         <input

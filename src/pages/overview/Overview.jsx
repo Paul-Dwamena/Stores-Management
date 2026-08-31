@@ -16,14 +16,18 @@ import {
 import PageHeader from "../../components/common/PageHeader";
 import SummaryStatCard from "../../components/common/SummaryStatCard";
 import SectionLoadState from "../../components/common/SectionLoadState";
+import { ItemNameDisplay } from "../../components/common/display/FormattedDisplay";
 import { cn } from "../../utils/cn";
 import { formatApiDateTime } from "../../utils/apiResponseHelpers";
+import { formatStoreLocation } from "../../utils/displayFormatters";
 import { getDashboardStats } from "../../services/statsService";
 import { listSupplyRequests } from "../../services/supplyRequestsService";
 import { SupplyStatusBadge } from "../stores/supplies/utils/SupplyStatusBadge";
 import { supplyStatusChartColor } from "../stores/supplies/utils/supplyStatus";
 
 const STORE_BAR_COLORS = ["#0a0a0a", "#404040", "#737373", "#b91c1c", "#991b1b"];
+
+const OVERVIEW_TABLE_LIMIT = 5;
 
 const CHART_TOOLTIP_STYLE = {
   borderRadius: "6px",
@@ -61,13 +65,21 @@ function EmptyState({ children }) {
 function ColumnChart({ items, emptyLabel }) {
   if (!items.length) return <EmptyState>{emptyLabel}</EmptyState>;
 
-  const data = items.map((item, index) => ({
-    name: item.label.replace(" Store", "").split(" ")[0],
-    store: item.label,
-    units: item.value,
-    skuCount: item.skuCount,
-    color: STORE_BAR_COLORS[index % STORE_BAR_COLORS.length],
-  }));
+  const data = items.map((item, index) => {
+    const storeLabel = formatStoreLocation(item.label);
+    const shortName = formatStoreLocation(
+      String(item.label || "")
+        .replace(/\s+store$/i, "")
+        .split(" ")[0] || item.label,
+    );
+    return {
+      name: shortName,
+      store: storeLabel,
+      units: item.value,
+      skuCount: item.skuCount,
+      color: STORE_BAR_COLORS[index % STORE_BAR_COLORS.length],
+    };
+  });
 
   return (
     <div className="h-[210px]">
@@ -285,14 +297,16 @@ export default function Overview() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {lowStockItems.slice(0, 8).map((item) => {
+                      {lowStockItems.slice(0, OVERVIEW_TABLE_LIMIT).map((item) => {
                         const out =
                           item.status === "OUT_OF_STOCK"
                           || item.status.includes("OUT");
                         return (
                           <tr key={item.id}>
                             <td className="py-2.5 pr-3">
-                              <p className="text-[12px] font-semibold text-text truncate max-w-[180px]">{item.name}</p>
+                              <p className="text-[12px] truncate max-w-[180px]">
+                                <ItemNameDisplay value={item.name} className="text-text" />
+                              </p>
                               {item.itemCode ? (
                                 <p className="text-[10px] text-muted font-mono">{item.itemCode}</p>
                               ) : null}
@@ -333,7 +347,7 @@ export default function Overview() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {pendingApprovals.slice(0, 8).map((request) => (
+                      {pendingApprovals.slice(0, OVERVIEW_TABLE_LIMIT).map((request) => (
                         <tr key={request.id}>
                           <td className="py-2.5 pr-3">
                             <p className="text-[12px] font-bold text-text whitespace-nowrap">#{request.id}</p>

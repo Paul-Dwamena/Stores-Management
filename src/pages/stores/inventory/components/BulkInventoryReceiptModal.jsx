@@ -5,12 +5,14 @@ import Button from "../../../../components/common/base/Button";
 import SlideOverSheet from "../../../../components/common/SlideOverSheet";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
+import MoneyInputField from "../../../../components/common/fields/MoneyInputField";
 import TableIconAction from "../../../../components/common/tableActions/TableIconAction";
 import TableRowActions from "../../../../components/common/tableActions/TableRowActions";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { formatInventoryMoney, sendDeliveryOtp } from "../../../../services/inventoryService";
-import { ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
+import { formatMoneyAmount } from "../../../../utils/displayFormatters";
+import { getAccessoryBrandOptions } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
@@ -19,10 +21,23 @@ import {
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
+import {
+  ItemNameDisplay,
+  StoreLocationDisplay,
+} from "../../../../components/common/display/FormattedDisplay";
+import { formatBrand } from "../../../../utils/displayFormatters";
+import { listStores } from "../../../../services/storesService";
 import AddSupplierModal from "./AddSupplierModal";
 import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
+import InventoryUnitFields from "./InventoryUnitFields";
+import {
+  buildInventoryUnitNotes,
+  inventoryUnitApiValue,
+  normalizeInventoryUnit,
+  validateInventoryUnitFields,
+} from "../utils/inventoryUnitOptions";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -31,6 +46,9 @@ const readOnlyClassName =
   "w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-600 cursor-not-allowed";
 
 const whiteInputClassName = "bg-white focus:bg-white";
+
+const changeItemButtonClassName =
+  "inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-rose-700 hover:text-rose-600";
 
 const CONDITION_OPTIONS = [
   { value: "GOOD", label: "Good" },
@@ -70,6 +88,8 @@ function createLine(inventoryType, mode) {
     level5: "",
     level6: "",
     quantity: "",
+    unitOfMeasure: "",
+    unitsPerPack: "",
     unitCost: "",
     location: "",
     photo: "",
@@ -124,6 +144,7 @@ function getLineErrors(line, mode, inventoryType) {
     next.unitCost = "Enter a valid unit price.";
   }
   if (!line.location?.trim()) next.location = "Select a store location.";
+  validateInventoryUnitFields(line, next);
   return next;
 }
 
@@ -309,7 +330,7 @@ function LocationSelect({ value, onChange, error }) {
 function ReceiveLineFields({ line, errors, onChange }) {
   const total = calcLineTotal(line.quantity, line.unitCost);
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <InputField
         label="Quantity"
         required
@@ -320,30 +341,48 @@ function ReceiveLineFields({ line, errors, onChange }) {
         error={errors.quantity}
         className={whiteInputClassName}
       />
-      <InputField
-        label="Unit price (GH₵)"
+      <MoneyInputField
+        label="Unit price (GHS)"
         required
-        type="number"
-        min="0"
-        step="0.01"
+        placeholder="0.00"
         value={line.unitCost}
         onChange={(event) => onChange("unitCost", event.target.value)}
         error={errors.unitCost}
         className={whiteInputClassName}
       />
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Total price (GH₵)
-        </p>
-        <div className={cn(readOnlyClassName, "mt-1")}>
-          {total == null ? "—" : formatInventoryMoney(total).replace("GH₵ ", "")}
-        </div>
-      </div>
-      <LocationSelect
-        value={line.location}
-        onChange={(value) => onChange("location", value)}
-        error={errors.location}
+      <InventoryUnitFields
+        idPrefix={`bulk-${line.clientId}`}
+        quantity={line.quantity}
+        unitOfMeasure={line.unitOfMeasure}
+        unitsPerPack={line.unitsPerPack}
+        onUnitChange={(value) => {
+          onChange("unitOfMeasure", value);
+          if (normalizeInventoryUnit(value) === "pieces") {
+            onChange("unitsPerPack", "");
+          }
+        }}
+        onUnitsPerPackChange={(value) => onChange("unitsPerPack", value)}
+        errors={errors}
+        inputClassName={whiteInputClassName}
       />
+      <div className="sm:col-span-2 space-y-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          Total price (GHS)
+        </p>
+        <div className={readOnlyClassName}>
+          {total == null ? "—" : formatMoneyAmount(total)}
+        </div>
+        <p className="text-[10px] text-slate-400">
+          Auto-calculated from quantity × unit price
+        </p>
+      </div>
+      <div className="sm:col-span-2">
+        <LocationSelect
+          value={line.location}
+          onChange={(value) => onChange("location", value)}
+          error={errors.location}
+        />
+      </div>
     </div>
   );
 }
@@ -583,6 +622,8 @@ function ExistingLineFields({
                         if (!line.unitCost && item.unitCost != null) {
                           onChange("unitCost", String(item.unitCost));
                         }
+                        onChange("unitOfMeasure", normalizeInventoryUnit(item.unit) || "");
+                        onChange("unitsPerPack", "");
                         setSearch("");
                       }}
                       className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
@@ -590,10 +631,12 @@ function ExistingLineFields({
                       <div className="flex min-w-0 items-center gap-2.5">
                         <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
                         <div className="min-w-0">
-                          <p className="text-[12px] font-semibold text-slate-800">{item.name}</p>
+                          <p className="text-[12px]">
+                            <ItemNameDisplay value={item.name} className="text-slate-800" />
+                          </p>
                           <p className="text-[10px] text-slate-500">
                             {item.itemCode}
-                            {item.brand ? ` · ${item.brand}` : ""}
+                            {item.brand ? ` · ${formatBrand(item.brand)}` : ""}
                           </p>
                         </div>
                       </div>
@@ -613,7 +656,9 @@ function ExistingLineFields({
         </>
       ) : (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-[12px] text-slate-600">
-          Selected <span className="font-semibold text-slate-900">{selected.name}</span>. Change it from Item details.
+          Selected{" "}
+          <ItemNameDisplay value={selected.name} className="inline text-slate-900" />
+          . Change it from Item details.
         </p>
       )}
     </div>
@@ -626,11 +671,13 @@ function ExistingLineFields({
           <div className="flex min-w-0 items-center gap-2.5">
             <ItemPhotoThumb src={selected.photo} name={selected.name} className="h-9 w-9" />
             <div className="min-w-0">
-              <p className="truncate text-[12px] font-semibold text-slate-900">{selected.name}</p>
+              <p className="truncate text-[12px]">
+                <ItemNameDisplay value={selected.name} className="text-slate-900" />
+              </p>
               <p className="truncate text-[10px] leading-tight text-slate-500">
               {[
                 selected.itemCode,
-                selected.brand,
+                selected.brand ? formatBrand(selected.brand) : null,
                 selected.make
                   ? `${selected.make} ${selected.model || ""} ${selected.year || ""}`.trim()
                   : null,
@@ -642,7 +689,7 @@ function ExistingLineFields({
           <button
             type="button"
             onClick={() => onChange("itemId", "")}
-            className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-hover"
+            className={changeItemButtonClassName}
           >
             <Replace size={12} />
             Change
@@ -691,6 +738,11 @@ function LineOverrideFields({ line, onChange }) {
 function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
   const identifyBlock = (
     <div className="space-y-3">
+      <ItemPhotoField
+        id={`bulk-acc-photo-${line.clientId}`}
+        value={line.photo}
+        onChange={(photo) => onChange("photo", photo)}
+      />
       <div>
         <FieldLabel required error={Boolean(errors.brand)}>Brand</FieldLabel>
         <select
@@ -699,7 +751,7 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
           className={cn(fieldClassName, "mt-1", errors.brand && "border-rose-500 bg-rose-50")}
         >
           <option value="">Select brand</option>
-          {ACCESSORY_BRAND_OPTIONS.map((option) => (
+          {getAccessoryBrandOptions().map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
@@ -708,6 +760,7 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
       <InputField
         label="Name"
         required
+        placeholder="Enter item name..."
         value={line.name}
         onChange={(event) => onChange("name", event.target.value)}
         error={errors.name}
@@ -715,14 +768,10 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
       />
       <InputField
         label="Description"
+        placeholder="Enter item description..."
         value={line.description}
         onChange={(event) => onChange("description", event.target.value)}
         className={whiteInputClassName}
-      />
-      <ItemPhotoField
-        id={`bulk-acc-photo-${line.clientId}`}
-        value={line.photo}
-        onChange={(photo) => onChange("photo", photo)}
       />
     </div>
   );
@@ -830,12 +879,12 @@ function applyLineChange(line, key, value) {
 function lineMeta(line, items, mode) {
   if (mode === "existing") {
     const item = items.find((row) => row.id === line.itemId);
-    return [item?.itemCode, item?.brand].filter(Boolean).join(" · ") || "—";
+    return [item?.itemCode, item?.brand ? formatBrand(item.brand) : null].filter(Boolean).join(" · ") || "—";
   }
   if (line.inventoryType === "vehicle_part" || line.make) {
     return [line.make, line.model, line.year].filter(Boolean).join(" · ") || "—";
   }
-  return line.brand || "—";
+  return line.brand ? formatBrand(line.brand) : "—";
 }
 
 const thClass =
@@ -896,6 +945,24 @@ export default function BulkInventoryReceiptModal({
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [stores, setStores] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    listStores()
+      .then((rows) => {
+        if (!cancelled) {
+          setStores(rows.filter((store) => store.isActive !== false));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStores([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -914,6 +981,16 @@ export default function BulkInventoryReceiptModal({
     setOtpVerified(false);
     setOtpSending(false);
   }, [isOpen, inventoryType, forcedMode]);
+
+  const storeNameById = useMemo(
+    () => new Map(stores.map((store) => [String(store.id), store.name])),
+    [stores],
+  );
+
+  const resolveStoreLabel = (location) => {
+    if (!location) return null;
+    return storeNameById.get(String(location)) || location;
+  };
 
   const lines = mode === "new" ? newLines : existingLines;
   const setLines = mode === "new" ? setNewLines : setExistingLines;
@@ -1096,14 +1173,25 @@ export default function BulkInventoryReceiptModal({
       mode,
       inventoryType,
       shared,
-      lines: lines.map((line) => ({
-        ...line,
-        name: lineName(line, inventoryType, mode, items),
-        quantity: Number(line.quantity),
-        unitCost: Number(line.unitCost),
-        condition: line.condition || shared.condition,
-        notes: line.notes.trim() || shared.notes.trim(),
-      })),
+      lines: lines.map((line) => {
+        const unitOfMeasure = normalizeInventoryUnit(line.unitOfMeasure);
+        const unitNotes = buildInventoryUnitNotes({
+          unitOfMeasure,
+          unitsPerPack: line.unitsPerPack,
+        });
+        const notes = [line.notes.trim(), shared.notes.trim(), unitNotes].filter(Boolean).join(" | ");
+        return {
+          ...line,
+          name: lineName(line, inventoryType, mode, items),
+          quantity: Number(line.quantity),
+          unitCost: Number(line.unitCost),
+          unitOfMeasure,
+          unitsPerPack: line.unitsPerPack,
+          unit: inventoryUnitApiValue(unitOfMeasure),
+          condition: line.condition || shared.condition,
+          notes,
+        };
+      }),
     });
   };
 
@@ -1148,7 +1236,7 @@ export default function BulkInventoryReceiptModal({
         saveDisabled={!otpVerified}
         contentClassName="!p-0 overflow-hidden flex flex-col min-h-0"
       >
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="shrink-0 space-y-4 border-b border-slate-100 px-4 py-4 sm:px-6">
             {!forcedMode ? (
               <RegistrationTabs value={mode} onChange={changeMode} />
@@ -1183,8 +1271,7 @@ export default function BulkInventoryReceiptModal({
             />
           </div>
 
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div className="h-full overflow-y-auto">
+          <div className="relative shrink-0">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
@@ -1204,7 +1291,7 @@ export default function BulkInventoryReceiptModal({
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto pb-20">
+              <div className="overflow-x-auto pb-24">
                 <table className="w-full min-w-[720px] text-left">
                   <thead className="sticky top-0 bg-slate-50/95">
                     <tr className="border-b border-slate-200">
@@ -1239,9 +1326,10 @@ export default function BulkInventoryReceiptModal({
                             />
                           </td>
                           <td className={tdClass}>
-                            <p className="font-semibold text-slate-800">
-                              {lineName(line, inventoryType, mode, items)}
-                            </p>
+                            <ItemNameDisplay
+                              value={lineName(line, inventoryType, mode, items)}
+                              className="text-slate-800"
+                            />
                           </td>
                           <td className={cn(tdClass, "text-slate-500")}>
                             {lineMeta(line, items, mode)}
@@ -1256,7 +1344,7 @@ export default function BulkInventoryReceiptModal({
                             {total == null ? "—" : formatInventoryMoney(total)}
                           </td>
                           <td className={cn(tdClass, "max-w-[180px] truncate")}>
-                            {line.location || "—"}
+                            <StoreLocationDisplay value={resolveStoreLabel(line.location)} />
                           </td>
                           <td className={tdClass}>
                             <TableRowActions>
@@ -1283,17 +1371,18 @@ export default function BulkInventoryReceiptModal({
                 </table>
               </div>
             )}
-            </div>
 
-            <button
-              type="button"
-              onClick={openAddEditor}
-              className="absolute bottom-5 right-5 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg shadow-slate-200/80 hover:bg-black"
-              aria-label="Add item"
-            >
-              <Plus size={22} />
-            </button>
+            <div className="pointer-events-none sticky bottom-4 flex justify-end px-4 pb-4 sm:px-6">
+              <button
+                type="button"
+                onClick={openAddEditor}
+                className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg shadow-slate-200/80 hover:bg-black"
+                aria-label="Add item"
+              >
+                <Plus size={22} />
+              </button>
             </div>
+          </div>
         </div>
       </AddModal>
 

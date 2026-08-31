@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
+import MoneyInputField from "../../../../components/common/fields/MoneyInputField";
 import Label from "../../../../components/common/base/Label";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
@@ -9,7 +10,13 @@ import AddSupplierModal from "./AddSupplierModal";
 import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
+import InventoryUnitFields from "./InventoryUnitFields";
 import { sendDeliveryOtp } from "../../../../services/inventoryService";
+import {
+  buildInventoryUnitNotes,
+  normalizeInventoryUnit,
+  validateInventoryUnitFields,
+} from "../utils/inventoryUnitOptions";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -27,6 +34,8 @@ const CONDITION_OPTIONS = [
 
 const INITIAL = {
   quantity: "",
+  unitOfMeasure: "",
+  unitsPerPack: "",
   unitCost: "",
   location: "",
   supplierId: "",
@@ -58,7 +67,10 @@ export default function ReceiveIntoStoreModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setForm(INITIAL);
+    setForm({
+      ...INITIAL,
+      unitOfMeasure: normalizeInventoryUnit(item?.unit) || "",
+    });
     setErrors({});
     setPendingReceive(null);
     setAddSupplierOpen(false);
@@ -158,6 +170,7 @@ export default function ReceiveIntoStoreModal({
       nextErrors.deliveredByEmail = "Enter a valid email address.";
     }
     if (!form.condition) nextErrors.condition = "Select the item condition.";
+    validateInventoryUnitFields(form, nextErrors);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warning("Complete the required fields before receiving stock.");
@@ -171,6 +184,8 @@ export default function ReceiveIntoStoreModal({
     setPendingReceive({
       quantity,
       unitCost,
+      unitOfMeasure: normalizeInventoryUnit(form.unitOfMeasure),
+      unitsPerPack: form.unitsPerPack,
       location: form.location.trim(),
       supplierId: form.supplierId,
       waybillNumber: form.waybillNumber.trim(),
@@ -180,7 +195,10 @@ export default function ReceiveIntoStoreModal({
       supplierPhone: form.supplierPhone.trim(),
       supplierEmail: form.supplierEmail.trim(),
       condition: form.condition,
-      notes: "",
+      notes: buildInventoryUnitNotes({
+        unitOfMeasure: form.unitOfMeasure,
+        unitsPerPack: form.unitsPerPack,
+      }),
     });
   };
 
@@ -215,25 +233,46 @@ export default function ReceiveIntoStoreModal({
         panelClassName="max-w-2xl"
       >
         <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 p-4 space-y-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Item details
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <InputField
+                label="Quantity"
+                type="number"
+                required
+                value={form.quantity}
+                onChange={(e) => setField("quantity", e.target.value)}
+                placeholder="e.g. 10"
+                error={errors.quantity}
+              />
+              <MoneyInputField
+                label="Unit cost (GHS)"
+                required
+                value={form.unitCost}
+                onChange={(e) => setField("unitCost", e.target.value)}
+                placeholder="0.00"
+                error={errors.unitCost}
+              />
+              <InventoryUnitFields
+                idPrefix="ssr"
+                quantity={form.quantity}
+                unitOfMeasure={form.unitOfMeasure}
+                unitsPerPack={form.unitsPerPack}
+                onUnitChange={(value) => {
+                  setField("unitOfMeasure", value);
+                  if (normalizeInventoryUnit(value) === "pieces") {
+                    setField("unitsPerPack", "");
+                  }
+                }}
+                onUnitsPerPackChange={(value) => setField("unitsPerPack", value)}
+                errors={errors}
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <InputField
-              label="Quantity"
-              type="number"
-              required
-              value={form.quantity}
-              onChange={(e) => setField("quantity", e.target.value)}
-              placeholder="e.g. 10"
-              error={errors.quantity}
-            />
-            <InputField
-              label="Unit cost (GH₵)"
-              type="number"
-              required
-              value={form.unitCost}
-              onChange={(e) => setField("unitCost", e.target.value)}
-              placeholder="e.g. 85.00"
-              error={errors.unitCost}
-            />
             <div className="sm:col-span-2">
               <StoreSelect
                 id="ssr-location"

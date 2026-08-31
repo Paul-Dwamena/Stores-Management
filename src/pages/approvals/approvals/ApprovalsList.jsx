@@ -10,6 +10,7 @@ import { cn } from "../../../utils/cn";
 import { formatApiDateTime, sortNewestFirst } from "../../../utils/apiResponseHelpers";
 import { listSupplyRequests } from "../../../services/supplyRequestsService";
 import { SupplyStatusBadge } from "../../stores/supplies/utils/SupplyStatusBadge";
+import { UserNameDisplay } from "../../../components/common/display/FormattedDisplay";
 
 const PAGE_SIZE = 10;
 
@@ -161,7 +162,7 @@ export default function ApprovalsList() {
                       #{row.generalRequestId}
                     </td>
                     <td className="px-4 py-3 text-[13px] font-semibold text-slate-900">
-                      {row.requesterName || "—"}
+                      <UserNameDisplay value={row.requesterName} />
                     </td>
                     <td className="px-4 py-3 text-[13px] font-bold text-slate-800 tabular-nums">
                       {row.totalQuantityRequested ?? "—"}

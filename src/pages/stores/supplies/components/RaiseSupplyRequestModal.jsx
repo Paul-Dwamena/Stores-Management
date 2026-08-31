@@ -28,6 +28,12 @@ import {
 } from "../../../../mockdata/stores";
 import RequisitionRequestSummary from "./RequisitionRequestSummary";
 import RejectRequisitionModal from "./RejectRequisitionModal";
+import {
+  DescriptionDisplay,
+  ItemNameDisplay,
+  StoreLocationDisplay,
+} from "../../../../components/common/display/FormattedDisplay";
+import { formatStoreLocation } from "../../../../utils/displayFormatters";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700 resize-none";
@@ -270,7 +276,7 @@ export default function RaiseSupplyRequestModal({
     () =>
       stockLocations.map((row) => ({
         value: row.location,
-        label: row.name || row.location,
+        label: formatStoreLocation(row.name || row.location),
         description:
           row.quantity == null ? "Store" : `Available Stock: ${row.quantity}`,
       })),
@@ -507,8 +513,8 @@ export default function RaiseSupplyRequestModal({
                       <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 w-36">
                         Item name
                       </th>
-                      <td className="px-3 py-2 text-[12px] font-semibold text-slate-900">
-                        {requisition?.itemName || "—"}
+                      <td className="px-3 py-2 text-[12px]">
+                        <ItemNameDisplay value={requisition?.itemName} className="text-slate-900" />
                       </td>
                     </tr>
                     <tr>
@@ -516,7 +522,7 @@ export default function RaiseSupplyRequestModal({
                         Description
                       </th>
                       <td className="px-3 py-2 text-[12px] text-slate-700">
-                        {requisition?.description || "—"}
+                        <DescriptionDisplay value={requisition?.description} />
                       </td>
                     </tr>
                     <tr>
@@ -676,7 +682,7 @@ export default function RaiseSupplyRequestModal({
                           return (
                             <tr key={location}>
                               <td className="px-3 py-2 text-[12px] text-slate-800">
-                                {stockRow?.name || location}
+                                <StoreLocationDisplay value={stockRow?.name || location} />
                               </td>
                               <td className="px-3 py-2 text-[12px] font-semibold text-slate-700 whitespace-nowrap">
                                 {stock == null ? "—" : stock}

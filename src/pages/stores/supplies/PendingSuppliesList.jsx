@@ -36,6 +36,8 @@ import {
   toRequisitionFromSupplyRequest,
 } from "../../../services/supplyRequestsService";
 import { getSuppliesStats } from "../../../services/statsService";
+import { formatStoreLocation } from "../../../utils/displayFormatters";
+import { getRequisitionRemainingQuantity } from "../../../mockdata/stores";
 import RaiseSupplyRequestModal, { buildIssueStoreOptions } from "./components/RaiseSupplyRequestModal";
 import RegisterItemFromRequestModal from "./components/RegisterItemFromRequestModal";
 import ReceiveIntoStoreModal from "../inventory/components/ReceiveIntoStoreModal";
@@ -47,6 +49,11 @@ import {
   supplyStatusKey,
 } from "./utils/supplyStatus";
 import { SupplyStatusBadge } from "./utils/SupplyStatusBadge";
+import {
+  DescriptionDisplay,
+  ItemNameDisplay,
+  UserNameDisplay,
+} from "../../../components/common/display/FormattedDisplay";
 
 const PAGE_SIZE = 10;
 
@@ -149,10 +156,47 @@ function pendingLinesNotRaised(pendingLines = [], supplyRequests = []) {
   );
 }
 
+function buildGeneralItemQuantities(generalRequests = [], pendingLines = []) {
+  const quantities = {};
+  generalRequests.forEach((request) => {
+    (request.items || []).forEach((item) => {
+      if (item.id != null && item.quantity != null) {
+        quantities[item.id] = item.quantity;
+      }
+    });
+  });
+  pendingLines.forEach((row) => {
+    const id = row.generalRequestItemId ?? row.id;
+    if (id != null && row.quantity != null) {
+      quantities[id] = row.quantity;
+    }
+  });
+  return quantities;
+}
+
+function resolveOriginalQuantityRequested(request, quantityByGeneralItemId = {}) {
+  const itemIds = [
+    ...new Set((request.items || []).map((item) => item.generalRequestItemId).filter(Boolean)),
+  ];
+  if (itemIds.length === 0) return null;
+
+  let total = 0;
+  let found = false;
+  itemIds.forEach((id) => {
+    const qty = quantityByGeneralItemId[Number(id)];
+    if (qty != null && qty !== "") {
+      total += Number(qty) || 0;
+      found = true;
+    }
+  });
+  return found ? total : null;
+}
+
 export default function PendingSuppliesList({ embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [supplyRows, setSupplyRows] = useState([]);
+  const [generalItemQuantities, setGeneralItemQuantities] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -194,6 +238,7 @@ export default function PendingSuppliesList({ embedded = false }) {
         generalRequests.map((request) => [request.id, request.requestNumber]),
       );
       setRows(sortNewestFirst(pending));
+      setGeneralItemQuantities(buildGeneralItemQuantities(generalRequests, pending));
       setSupplyRows(
         sortNewestFirst(
           supplies.map((request) => ({
@@ -276,18 +321,30 @@ export default function PendingSuppliesList({ embedded = false }) {
   }, [searchParams, setSearchParams]);
 
   const displayRows = useMemo(() => {
-    const pending = pendingLinesNotRaised(rows, supplyRows).map((row) => ({
-      ...row,
-      listKey: `line-${row.id}`,
-      source: "pending_line",
-    }));
-    const raised = supplyRows.map((request) => ({
-      ...toRequisitionFromSupplyRequest(request),
-      listKey: `supply-${request.id}`,
-      source: "supply_request",
-    }));
+    const pending = pendingLinesNotRaised(rows, supplyRows).map((row) => {
+      const quantityRequested = row.quantity ?? row.quantityRequested ?? null;
+      return {
+        ...row,
+        listKey: `line-${row.id}`,
+        source: "pending_line",
+        quantityRequested,
+        quantityToSupply: null,
+        quantityRemaining: quantityRequested,
+      };
+    });
+    const raised = supplyRows.map((request) => {
+      const requisition = toRequisitionFromSupplyRequest(request);
+      return {
+        ...requisition,
+        listKey: `supply-${request.id}`,
+        source: "supply_request",
+        quantityRequested: resolveOriginalQuantityRequested(request, generalItemQuantities),
+        quantityToSupply: request.totalQuantityRequested ?? null,
+        quantityRemaining: getRequisitionRemainingQuantity(requisition),
+      };
+    });
     return sortNewestFirst([...pending, ...raised], "createdAt");
-  }, [rows, supplyRows]);
+  }, [rows, supplyRows, generalItemQuantities]);
 
   const rowStoreNames = (row) => {
     if (Array.isArray(row.storeAllocations) && row.storeAllocations.length) {
@@ -427,7 +484,7 @@ export default function PendingSuppliesList({ embedded = false }) {
       await openRow({ ...activeRow, itemId: inventoryItem.id });
     }
   };
-  const colSpan = 9 + (showBulkSelection ? 1 : 0);
+  const colSpan = 11 + (showBulkSelection ? 1 : 0);
 
   const toggleRowSelected = (listKey) => {
     setSelectedIds((prev) =>
@@ -785,7 +842,7 @@ export default function PendingSuppliesList({ embedded = false }) {
                     <option value="ALL">All locations</option>
                     {locationOptions.map((store) => (
                       <option key={store} value={store}>
-                        {store}
+                        {formatStoreLocation(store)}
                       </option>
                     ))}
                   </select>
@@ -813,7 +870,7 @@ export default function PendingSuppliesList({ embedded = false }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] text-left">
+          <table className="w-full min-w-[1360px] text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
                 {showBulkSelection ? (
@@ -840,7 +897,13 @@ export default function PendingSuppliesList({ embedded = false }) {
                   Description
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                  Quantity
+                  Quantity Requested
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                  Quantity to Supply
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                  Quantity Remaining
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                   Date requested
@@ -898,20 +961,28 @@ export default function PendingSuppliesList({ embedded = false }) {
                     <td className="px-6 py-3.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">
                       {row.itemCode || "—"}
                     </td>
-                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-900">
-                      {row.itemName || "—"}
+                    <td className="px-6 py-3.5 text-[12px] min-w-[180px]">
+                      <ItemNameDisplay value={row.itemName} className="text-slate-900" />
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700 max-w-[280px]">
-                      <span className="line-clamp-2">{row.description || "—"}</span>
+                      <span className="line-clamp-2">
+                        <DescriptionDisplay value={row.description} />
+                      </span>
                     </td>
                     <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
-                      {row.quantity ?? row.quantityRequested ?? "—"}
+                      {row.quantityRequested ?? "—"}
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                      {row.quantityToSupply ?? "—"}
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                      {row.quantityRemaining ?? "—"}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-600 whitespace-nowrap">
                       {formatApiDateTime(row.createdAt)}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                      {row.requesterName || row.requestedBy || "—"}
+                      <UserNameDisplay value={row.requesterName || row.requestedBy} />
                     </td>
                     <td className="px-6 py-3.5 whitespace-nowrap">
                       <SupplyStatusBadge status={row.status} />

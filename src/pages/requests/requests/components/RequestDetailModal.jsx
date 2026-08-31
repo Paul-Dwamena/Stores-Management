@@ -7,6 +7,11 @@ import Button from "../../../../components/common/base/Button";
 import LoadingSpinner from "../../../../components/common/LoadingSpinner";
 import { formatApiDateTime, formatStatusLabel } from "../../../../utils/apiResponseHelpers";
 import { SupplyStatusBadge } from "../../../stores/supplies/utils/SupplyStatusBadge";
+import {
+  BrandDisplay,
+  DescriptionDisplay,
+  ItemNameDisplay,
+} from "../../../../components/common/display/FormattedDisplay";
 
 export default function RequestDetailModal({
   isOpen,
@@ -123,14 +128,16 @@ export default function RequestDetailModal({
                         <td className="px-3 py-3 align-middle font-mono text-[11px] text-slate-600">
                           {item.itemCode || "—"}
                         </td>
-                        <td className="px-3 py-3 align-middle text-[12px] font-semibold text-slate-900">
-                          {item.name || "—"}
+                        <td className="px-3 py-3 align-middle text-[12px]">
+                          <ItemNameDisplay value={item.name} className="text-slate-900" />
                         </td>
-                        <td className="px-3 py-3 align-middle text-[12px] text-slate-700">
-                          {item.brand || "—"}
+                        <td className="px-3 py-3 align-middle text-[12px]">
+                          <BrandDisplay value={item.brand} />
                         </td>
                         <td className="px-3 py-3 align-middle text-[12px] text-slate-700 max-w-[280px]">
-                          <span className="line-clamp-2">{item.description || "—"}</span>
+                          <span className="line-clamp-2">
+                            <DescriptionDisplay value={item.description} />
+                          </span>
                         </td>
                         <td className="px-3 py-3 align-middle text-[12px] font-semibold text-slate-800 tabular-nums">
                           {item.quantity ?? "—"}

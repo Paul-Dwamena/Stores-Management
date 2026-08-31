@@ -20,6 +20,13 @@ const PENDING_QUEUE_STATUSES = new Set([
 const sumQuantityIssued = (items = []) =>
   items.reduce((sum, item) => sum + (Number(item.quantityIssued) || 0), 0);
 
+const summarizeItemNames = (items = []) => {
+  const names = [...new Set(items.map((item) => item.itemName).filter(Boolean))];
+  if (names.length === 0) return items[0]?.itemName || "";
+  if (names.length === 1) return names[0];
+  return names.join(", ");
+};
+
 export const toPendingSupplyLine = (row) => ({
   id: row.general_request_item_id,
   generalRequestId: row.general_request_id,
@@ -100,10 +107,7 @@ export const toRequisitionFromSupplyRequest = (request) => {
     requestNumber: request.requestNumber || `Supply #${request.id}`,
     itemId: first.itemId,
     itemCode: first.itemCode,
-    itemName:
-      items.length > 1
-        ? items.map((item) => item.itemName).filter(Boolean).join(", ")
-        : first.itemName,
+    itemName: summarizeItemNames(items),
     description: first.description,
     quantity: totalRequested,
     quantityRequested: totalRequested,

@@ -45,6 +45,13 @@ import {
 import { getRequisitionStoreAllocations, getRequisitionStoreIssueLines, getStoreIssueRemaining, getStoresWithRemainingQty } from "./components/RaiseSupplyRequestModal";
 import { supplyStatusKey } from "./utils/supplyStatus";
 import { SupplyStatusBadge } from "./utils/SupplyStatusBadge";
+import {
+  DescriptionDisplay,
+  ItemNameDisplay,
+  StoreLocationDisplay,
+  UserNameDisplay,
+} from "../../../components/common/display/FormattedDisplay";
+import { formatStoreLocation } from "../../../utils/displayFormatters";
 
 const PAGE_SIZE = 10;
 
@@ -601,7 +608,7 @@ export default function RequisitionsList({
                     <option value="ALL">All locations</option>
                     {issuanceStoreOptions.map((store) => (
                       <option key={store} value={store}>
-                        {store}
+                        {formatStoreLocation(store)}
                       </option>
                     ))}
                   </select>
@@ -766,9 +773,9 @@ export default function RequisitionsList({
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
                         {row.itemCode || "—"}
                       </td>
-                      <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 min-w-[180px]">
+                      <td className="px-6 py-3.5 text-[12px] min-w-[180px]">
                         <span className="inline-flex items-center gap-1.5 flex-wrap">
-                          {displayName}
+                          <ItemNameDisplay value={displayName} className="text-slate-800" />
                           {row.isOther ? (
                             <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold border bg-violet-50 text-violet-700 border-violet-200 whitespace-nowrap">
                               Other
@@ -777,7 +784,9 @@ export default function RequisitionsList({
                         </span>
                       </td>
                       <td className="px-6 py-3.5 text-[12px] text-slate-600 min-w-[280px] max-w-[360px]">
-                        <span className="line-clamp-2">{description}</span>
+                        <span className="line-clamp-2">
+                          <DescriptionDisplay value={description} />
+                        </span>
                       </td>
                       <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800 whitespace-nowrap">
                         {row.quantity}
@@ -786,7 +795,7 @@ export default function RequisitionsList({
                         {formatRequisitionDate(row.createdAt)}
                       </td>
                       <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                        {row.requestedBy}
+                        <UserNameDisplay value={row.requestedBy} />
                       </td>
                       {showApprovalSelection && (
                         <>
@@ -795,7 +804,7 @@ export default function RequisitionsList({
                               <span className="block space-y-1">
                                 {storeAllocations.map((allocation) => (
                                   <span key={allocation.location} className="block leading-snug">
-                                    {allocation.location}
+                                    <StoreLocationDisplay value={allocation.location} />
                                   </span>
                                 ))}
                               </span>
@@ -824,7 +833,7 @@ export default function RequisitionsList({
                             <span className="block space-y-1">
                               {issueLines.map((line) => (
                                 <span key={line.location} className="block leading-snug">
-                                  {line.location}
+                                  <StoreLocationDisplay value={line.location} />
                                   {` · ${line.remaining} left`}
                                 </span>
                               ))}
@@ -836,19 +845,19 @@ export default function RequisitionsList({
                       )}
                       {showReceiverColumn && (
                         <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                          {row.suppliedTo || row.requestedBy || "—"}
+                          <UserNameDisplay value={row.suppliedTo || row.requestedBy} />
                         </td>
                       )}
                       {showSuppliedMeta && (
                         <>
                           <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                            {row.approvedBy || "—"}
+                            <UserNameDisplay value={row.approvedBy} />
                           </td>
                           <td className="px-6 py-3.5 text-[12px] text-slate-600 whitespace-nowrap">
                             {formatRequisitionDate(row.approvalDate)}
                           </td>
                           <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                            {row.suppliedTo || "—"}
+                            <UserNameDisplay value={row.suppliedTo} />
                           </td>
                         </>
                       )}

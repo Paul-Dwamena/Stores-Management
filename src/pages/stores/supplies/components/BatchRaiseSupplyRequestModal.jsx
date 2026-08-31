@@ -5,6 +5,7 @@ import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import CheckboxMultiSelect from "../../../../components/common/fields/CheckboxMultiSelect";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
+import { formatStoreLocation } from "../../../../utils/displayFormatters";
 import { getLocationStock, getStockLocationsForRequisition, sumStoreQuantities } from "./RaiseSupplyRequestModal";
 
 const fieldClassName =
@@ -267,7 +268,7 @@ export default function BatchRaiseSupplyRequestModal({
                               searchPlaceholder="Search locations…"
                               options={locations.map((loc) => ({
                                 value: loc.location,
-                                label: loc.location,
+                                label: formatStoreLocation(loc.location),
                                 description: `Available Stock: ${loc.quantity}`,
                               }))}
                               value={selected}
@@ -296,7 +297,9 @@ export default function BatchRaiseSupplyRequestModal({
                                 return (
                                   <div key={location} className="flex items-start gap-2">
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-[11px] font-medium text-slate-700 leading-snug">{location}</p>
+                                      <p className="text-[11px] font-medium uppercase text-slate-700 leading-snug">
+                                        {formatStoreLocation(location)}
+                                      </p>
                                       <p className="text-[10px] text-slate-400">Stock {stock}</p>
                                     </div>
                                     <div className="w-24 shrink-0">

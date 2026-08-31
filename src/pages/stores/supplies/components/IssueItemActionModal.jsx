@@ -8,6 +8,7 @@ import { requiredFieldLabel } from "../../../../components/common/fields/require
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { EMPTY_DISPLAY } from "../../../../utils/apiResponseHelpers";
+import { formatStoreLocation } from "../../../../utils/displayFormatters";
 import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
 import {
   ISSUE_ITEM_FORM_FIELD_CATALOG,
@@ -360,7 +361,7 @@ export default function IssueItemActionModal({
                           });
                         }}
                         disabled={remainingStores.length === 0}
-                        className={cn(tableFieldClassName, errors.issueStore && "border-rose-500 bg-rose-50")}
+                        className={cn(tableFieldClassName, "uppercase", errors.issueStore && "border-rose-500 bg-rose-50")}
                       >
                         <option value="">Select store</option>
                         {remainingStores.map((store) => {
@@ -369,11 +370,12 @@ export default function IssueItemActionModal({
                           );
                           const storeRequested = storeLine?.quantity || 0;
                           const stockQty = getLocationStock(stockLocations, store);
+                          const storeLabel = formatStoreLocation(store);
                           return (
                             <option key={store} value={store}>
                               {isPartialRemaining
-                                ? `${store} (stock ${stockQty}${storeRequested > 0 ? ` ${EMPTY_DISPLAY} ${storeRequested} requested` : ""})`
-                                : `${store} (${storeRequested} requested)`}
+                                ? `${storeLabel} (stock ${stockQty}${storeRequested > 0 ? ` ${EMPTY_DISPLAY} ${storeRequested} requested` : ""})`
+                                : `${storeLabel} (${storeRequested} requested)`}
                             </option>
                           );
                         })}

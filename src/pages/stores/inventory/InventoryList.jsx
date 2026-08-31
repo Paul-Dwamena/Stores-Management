@@ -26,11 +26,17 @@ import {
 } from "../../../services/inventoryService";
 import { getInventoryStats } from "../../../services/statsService";
 import { createItem, updateItem, updateItemPhoto } from "../../../services/itemsService";
+import { buildInventoryUnitNotes, inventoryUnitApiValue } from "./utils/inventoryUnitOptions";
 import {
   AccessoryDetailModal,
   NewInventoryItemModal,
 } from "./components";
 import { ItemPhotoThumb } from "./components/ItemPhotoField";
+import {
+  BrandDisplay,
+  DescriptionDisplay,
+  ItemNameDisplay,
+} from "../../../components/common/display/FormattedDisplay";
 import { STATUS_BADGE_CLASS, workflowStatusBadgeClass } from "../../../utils/workflowStatusBadge";
 
 const PAGE_SIZE = 10;
@@ -115,7 +121,7 @@ export default function InventoryList({
     deliveredByPhone: payload.deliveredByPhone,
     deliveredByEmail: payload.deliveredByEmail,
     waybillNumber: payload.waybillNumber,
-    notes: payload.notes,
+    notes: payload.notes || buildInventoryUnitNotes(payload),
   });
 
   const filtered = useMemo(() => {
@@ -301,7 +307,7 @@ export default function InventoryList({
       const created = await createItem({
         name: payload.name.trim(),
         brand: payload.brand.trim(),
-        unit: "pcs",
+        unit: inventoryUnitApiValue(payload.unitOfMeasure || payload.unit) || "pcs",
         description: payload.description?.trim() || null,
         photo: payload.photoFile || null,
       });
@@ -480,15 +486,19 @@ export default function InventoryList({
                     <td className="px-6 py-3.5">
                       <ItemPhotoThumb src={row.photo} name={row.name} />
                     </td>
-                    <td className="px-6 py-3.5 text-[12px] font-bold text-slate-900 whitespace-nowrap">
-                      {row.itemCode}
+                    <td className="px-6 py-3.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">
+                      {row.itemCode || "—"}
                     </td>
-                    <td className="px-6 py-3.5 text-[12px] font-semibold capitalize text-slate-800">
-                      {row.name}
+                    <td className="px-6 py-3.5 text-[12px] whitespace-nowrap">
+                      <ItemNameDisplay value={row.name} className="text-slate-800" />
                     </td>
-                    <td className="px-6 py-3.5 text-[12px] text-slate-700">{row.brand}</td>
+                    <td className="px-6 py-3.5 text-[12px] text-slate-700">
+                      <BrandDisplay value={row.brand} />
+                    </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-600 max-w-[240px]">
-                      <span className="line-clamp-2">{row.description || "—"}</span>
+                      <span className="line-clamp-2">
+                        <DescriptionDisplay value={row.description} />
+                      </span>
                     </td>
                     <td className="px-6 py-3.5 text-[12px] font-bold text-slate-800">
                       {row.quantity}

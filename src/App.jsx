@@ -11,6 +11,7 @@ import StoresHub from "./pages/stores/StoresHub";
 import { RequestsList } from "./pages/requests";
 import { ApprovalsList } from "./pages/approvals";
 import { SetupsHub } from "./pages/setups";
+import { DropdownOptionPlaceholder } from "./pages/setups/dropdownOptions";
 import { AuditTrailList } from "./pages/auditTrail";
 import { AccountSettings } from "./pages/settings";
 
@@ -43,6 +44,8 @@ function App() {
             <Route path="requests" element={<RequestsList />} />
             <Route path="approvals" element={<ApprovalsList />} />
             <Route path="setups" element={<SetupsHub />} />
+            <Route path="setups/dropdown-options" element={<Navigate to="/setups?tab=dropdown" replace />} />
+            <Route path="setups/dropdown-options/:optionSlug" element={<DropdownOptionPlaceholder />} />
             <Route path="audit-trail" element={<AuditTrailList />} />
             <Route path="settings" element={<AccountSettings />} />
           </Route>

@@ -1,5 +1,8 @@
 /** Seed accessories inventory with collection and supply history. */
 
+import { resolveDropdownOptionChoices } from "../setups/dropdownOptionChoices";
+import { formatBrand, formatMoneyGhs } from "../../utils/displayFormatters";
+
 export const ACCESSORY_STATUS_OPTIONS = [
   { value: "ALL", label: "All statuses" },
   { value: "ACTIVE", label: "Active" },
@@ -8,14 +11,16 @@ export const ACCESSORY_STATUS_OPTIONS = [
   { value: "INACTIVE", label: "Inactive" },
 ];
 
-export const ACCESSORY_BRAND_OPTIONS = [
-  { value: "AutoGuard", label: "AutoGuard" },
-  { value: "Anker", label: "Anker" },
-  { value: "Bosch", label: "Bosch" },
-  { value: "NOCO", label: "NOCO" },
-  { value: "RoadSafe", label: "RoadSafe" },
-  { value: "SafeFleet", label: "SafeFleet" },
-];
+/** Active brands from Setups → Dropdown Options. */
+export function getAccessoryBrandOptions() {
+  return resolveDropdownOptionChoices("brands").map((option) => ({
+    ...option,
+    label: formatBrand(option.label),
+  }));
+}
+
+/** @deprecated Prefer getAccessoryBrandOptions() for live dropdown store values. */
+export const ACCESSORY_BRAND_OPTIONS = getAccessoryBrandOptions();
 
 export const SEED_ACCESSORIES = [
   {
@@ -889,12 +894,7 @@ export function receiveAccessoryStockBatch(lines = [], shared = {}) {
 }
 
 export function formatAccessoryMoney(amount) {
-  const value = Number(amount);
-  if (Number.isNaN(value)) return "GH₵ 0.00";
-  return `GH₵ ${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatMoneyGhs(amount);
 }
 
 /** Weighted average unit cost from store receipts (supplies). Falls back to stored averages. */

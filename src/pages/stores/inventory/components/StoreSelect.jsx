@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "../../../../utils/cn";
 import { listStores } from "../../../../services/storesService";
+import { formatStoreLocation } from "../../../../utils/displayFormatters";
 
 export default function StoreSelect({
   id,
@@ -44,7 +45,7 @@ export default function StoreSelect({
         value={value ?? ""}
         onChange={(event) => onChange?.(event.target.value)}
         className={cn(
-          "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700",
+          "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] uppercase outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700",
           error && "border-red-500 bg-red-50",
           className,
         )}
@@ -52,7 +53,7 @@ export default function StoreSelect({
         <option value="">Select store location…</option>
         {stores.map((store) => (
           <option key={store.id} value={String(store.id)}>
-            {store.name}
+            {formatStoreLocation(store.name)}
           </option>
         ))}
       </select>

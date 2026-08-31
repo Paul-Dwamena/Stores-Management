@@ -7,6 +7,7 @@ import { ConfiguredCustomFields } from "../../../../components/common/Configured
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
+import { formatStoreLocation } from "../../../../utils/displayFormatters";
 import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
 import {
   NEW_INTER_STORE_TRANSFER_FORM_FIELD_CATALOG,
@@ -381,12 +382,12 @@ export default function NewInterStoreTransferModal({
                   id="transferFromStore"
                   value={fromStoreId}
                   onChange={(e) => handleFromStoreChange(e.target.value)}
-                  className={cn(fieldClassName, errors.fromStore && "border-rose-400 bg-rose-50")}
+                  className={cn(fieldClassName, "uppercase", errors.fromStore && "border-rose-400 bg-rose-50")}
                 >
                   <option value="">Select sending store</option>
                   {fromStoreOptions.map((store) => (
                     <option key={store.id} value={store.id}>
-                      {store.name}
+                      {formatStoreLocation(store.name)}
                     </option>
                   ))}
                 </select>
@@ -410,6 +411,7 @@ export default function NewInterStoreTransferModal({
                   disabled={!fromStoreId}
                   className={cn(
                     fieldClassName,
+                    "uppercase",
                     errors.toStore && "border-rose-400 bg-rose-50",
                     !fromStoreId && "opacity-60 cursor-not-allowed",
                   )}
@@ -417,7 +419,7 @@ export default function NewInterStoreTransferModal({
                   <option value="">Select receiving store</option>
                   {destinationOptions.map((store) => (
                     <option key={store.id} value={store.id}>
-                      {store.name}
+                      {formatStoreLocation(store.name)}
                     </option>
                   ))}
                 </select>

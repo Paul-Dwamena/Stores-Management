@@ -6,6 +6,7 @@ import InputField from "../../../../components/common/fields/InputField";
 import SectionLoadState from "../../../../components/common/SectionLoadState";
 import { toast } from "../../../../components/common/ToastNotification";
 import { EMPTY_DISPLAY } from "../../../../utils/apiResponseHelpers";
+import { StoreLocationDisplay } from "../../../../components/common/display/FormattedDisplay";
 import {
   getItemStoreStock,
   getStoreItemLocation,
@@ -160,7 +161,7 @@ export default function ItemStoreStockModal({ isOpen, onClose, item }) {
                     {stores.map((store) => (
                       <tr key={store.id} className="align-middle">
                         <td className="px-4 py-3 text-[13px] font-semibold text-slate-800">
-                          {store.name || EMPTY_DISPLAY}
+                          <StoreLocationDisplay value={store.name} />
                         </td>
                         <td className="px-4 py-3 text-[13px] tabular-nums text-slate-700">
                           {store.quantity ?? 0}

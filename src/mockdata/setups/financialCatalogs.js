@@ -4,6 +4,7 @@
 
 import { reorderTreeSibling, sortTreeSiblings } from "../../utils/treeReorder";
 import { createSessionTreeStore } from "./sessionTreeStore";
+import { formatMoneyGhs as formatMoneyGhsDisplay } from "../../utils/displayFormatters";
 
 function clone(row) {
   return { ...row };
@@ -1481,10 +1482,5 @@ export function getSpendingRequestNumber(row) {
 }
 
 export function formatMoneyGhs(amount) {
-  const value = Number(amount);
-  if (Number.isNaN(value)) return "GHS 0.00";
-  return `GHS ${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatMoneyGhsDisplay(amount);
 }

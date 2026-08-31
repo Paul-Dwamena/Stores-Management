@@ -11,6 +11,14 @@ import {
   formatInventoryStatus,
 } from "../../../../services/inventoryService";
 import { displayValue, EMPTY_DISPLAY, formatApiDateTime } from "../../../../utils/apiResponseHelpers";
+import {
+  BrandDisplay,
+  DescriptionDisplay,
+  ItemNameDisplay,
+  StoreLocationDisplay,
+  UserNameDisplay,
+} from "../../../../components/common/display/FormattedDisplay";
+import { formatStoreLocationLabel, formatUserName } from "../../../../utils/displayFormatters";
 import { STATUS_BADGE_CLASS, workflowStatusBadgeClass } from "../../../../utils/workflowStatusBadge";
 import { SupplyStatusBadge } from "../../supplies/utils/SupplyStatusBadge";
 import ReceiveIntoStoreModal from "./ReceiveIntoStoreModal";
@@ -197,10 +205,7 @@ const RECEIPT_COLUMNS = [
     wrap: true,
     render: (row) => {
       if (!row.storeName && !row.storeCode) return EMPTY_DISPLAY;
-      if (row.storeName && row.storeCode) {
-        return `${row.storeName} (${row.storeCode})`;
-      }
-      return row.storeName || row.storeCode;
+      return formatStoreLocationLabel(row.storeName, row.storeCode);
     },
   },
   {
@@ -212,7 +217,7 @@ const RECEIPT_COLUMNS = [
       if (!row.deliveredByName && !row.deliveredByPhone) return EMPTY_DISPLAY;
       return (
         <div>
-          <div>{row.deliveredByName || EMPTY_DISPLAY}</div>
+          <div>{row.deliveredByName ? formatUserName(row.deliveredByName) : EMPTY_DISPLAY}</div>
           {row.deliveredByPhone ? (
             <div className="mt-0.5 text-[11px] text-slate-500">{row.deliveredByPhone}</div>
           ) : null}
@@ -253,7 +258,7 @@ const SUPPLY_COLUMNS = [
     label: "Store",
     minWidth: 160,
     wrap: true,
-    render: (row) => cellValue(row.location),
+    render: (row) => <StoreLocationDisplay value={row.location} />,
   },
   {
     key: "quantityRequested",
@@ -608,18 +613,28 @@ export default function AccessoryDetailModal({
                       <DetailRow label="Model">{displayValue(item.model)}</DetailRow>
                       <DetailRow label="Year">{displayValue(item.year)}</DetailRow>
                       <DetailRow label="Chassis Number">{displayValue(item.chassisNumber)}</DetailRow>
-                      <DetailRow label="Name">{displayValue(item.name)}</DetailRow>
+                      <DetailRow label="Name">
+                        <ItemNameDisplay value={item.name} />
+                      </DetailRow>
                       <DetailRow label="Component path">{displayValue(item.componentPath)}</DetailRow>
-                      <DetailRow label="Brand">{displayValue(item.brand)}</DetailRow>
+                      <DetailRow label="Brand">
+                        <BrandDisplay value={item.brand} />
+                      </DetailRow>
                     </>
                   ) : (
                     <>
-                      <DetailRow label="Name">{displayValue(item.name)}</DetailRow>
-                      <DetailRow label="Brand">{displayValue(item.brand)}</DetailRow>
+                      <DetailRow label="Name">
+                        <ItemNameDisplay value={item.name} />
+                      </DetailRow>
+                      <DetailRow label="Brand">
+                        <BrandDisplay value={item.brand} />
+                      </DetailRow>
                     </>
                   )}
                   <DetailRow label="Unit">{displayValue(item.unit)}</DetailRow>
-                  <DetailRow label="Description">{displayValue(item.description)}</DetailRow>
+                  <DetailRow label="Description">
+                    <DescriptionDisplay value={item.description} />
+                  </DetailRow>
                   <DetailRow label="Total quantity">{item.quantity}</DetailRow>
                   <DetailRow label="Average unit cost">
                     {formatInventoryMoney(averageUnitCost)}
@@ -638,9 +653,9 @@ export default function AccessoryDetailModal({
                             className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5"
                           >
                             <span>
-                              {row.location}
+                              <StoreLocationDisplay value={row.location} />
                               {row.shelfPosition ? (
-                                <span className="ml-1.5 text-[11px] font-normal text-slate-400">
+                                <span className="ml-1.5 text-[11px] font-normal text-slate-400 normal-case">
                                   ({row.shelfPosition})
                                 </span>
                               ) : null}

@@ -7,32 +7,48 @@ import {
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
+import MoneyInputField from "../../../../components/common/fields/MoneyInputField";
 import ChoiceOption from "../../../../components/common/fields/ChoiceOption";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { ACCESSORY_BRAND_OPTIONS } from "../../../../mockdata/stores/accessories";
+import { getAccessoryBrandOptions } from "../../../../mockdata/stores/accessories";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
   getVehiclePartYearOptions,
 } from "../../../../mockdata/stores/vehiclePartsInventory";
 import { formatInventoryMoney } from "../../../../services/inventoryService";
+import { formatMoneyAmount } from "../../../../utils/displayFormatters";
 import { listItems } from "../../../../services/itemsService";
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
 import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import BulkInventoryReceiptModal from "./BulkInventoryReceiptModal";
 import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
+import {
+  ItemNameDisplay,
+} from "../../../../components/common/display/FormattedDisplay";
+import { formatBrand } from "../../../../utils/displayFormatters";
 import AddSupplierModal from "./AddSupplierModal";
 import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
+import InventoryUnitFields from "./InventoryUnitFields";
 import { sendDeliveryOtp } from "../../../../services/inventoryService";
+import {
+  buildInventoryUnitNotes,
+  inventoryUnitApiValue,
+  normalizeInventoryUnit,
+  validateInventoryUnitFields,
+} from "../utils/inventoryUnitOptions";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
 
 const readOnlyClassName =
   "w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-600 cursor-not-allowed";
+
+const changeItemButtonClassName =
+  "inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-rose-700 hover:text-rose-600";
 
 const ITEM_CONDITION_OPTIONS = [
   { value: "GOOD", label: "Good" },
@@ -59,6 +75,8 @@ const INITIAL_ACCESSORY = {
   name: "",
   brand: "",
   description: "",
+  unitOfMeasure: "",
+  unitsPerPack: "",
   quantity: "",
   unitPrice: "",
   location: "",
@@ -95,6 +113,8 @@ const INITIAL_REGISTERED = {
   level4: "",
   level5: "",
   level6: "",
+  unitOfMeasure: "",
+  unitsPerPack: "",
   quantity: "",
   unitPrice: "",
   location: "",
@@ -109,8 +129,13 @@ function resolveComponentName(form) {
 function calcTotalPrice(quantity, unitPrice) {
   const qty = Number(quantity);
   const unit = Number(unitPrice);
-  if (Number.isNaN(qty) || Number.isNaN(unit) || quantity === "" || unitPrice === "") return "";
-  return (qty * unit).toFixed(2);
+  if (Number.isNaN(qty) || Number.isNaN(unit) || quantity === "" || unitPrice === "") return null;
+  return qty * unit;
+}
+
+function formatTotalPriceDisplay(total) {
+  if (total == null || Number.isNaN(total)) return "—";
+  return formatMoneyAmount(total);
 }
 
 function RegistrationTabs({ value, onChange }) {
@@ -172,7 +197,7 @@ function CollapsibleSection({ title, description, open, onToggle, children }) {
 function SelectedItemCard({ item, onChange }) {
   const meta = [
     item.itemCode,
-    item.brand,
+    item.brand ? formatBrand(item.brand) : null,
     item.make
       ? `${item.make} ${item.model || ""} ${item.year || ""}`.trim()
       : null,
@@ -187,7 +212,9 @@ function SelectedItemCard({ item, onChange }) {
       <div className="flex min-w-0 items-center gap-2.5">
         <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
         <div className="min-w-0">
-          <p className="truncate text-[12px] font-semibold text-slate-900">{item.name}</p>
+          <p className="truncate text-[12px]">
+            <ItemNameDisplay value={item.name} className="text-slate-900" />
+          </p>
           {meta ? (
             <p className="truncate text-[10px] leading-tight text-slate-500">{meta}</p>
           ) : null}
@@ -196,7 +223,7 @@ function SelectedItemCard({ item, onChange }) {
       <button
         type="button"
         onClick={onChange}
-        className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-hover"
+        className={changeItemButtonClassName}
       >
         <Replace size={12} />
         Change
@@ -345,6 +372,7 @@ function validateStockFields(form, errors) {
   ) {
     errors.quantity = "Enter a valid quantity.";
   }
+  validateInventoryUnitFields(form, errors);
   if (
     form.unitPrice === ""
     || Number.isNaN(Number(form.unitPrice))
@@ -353,6 +381,21 @@ function validateStockFields(form, errors) {
     errors.unitPrice = "Enter a valid unit price.";
   }
   if (!form.location?.trim()) errors.location = "Select a store location.";
+}
+
+function withInventoryUnitPayload(form, payload) {
+  const unitOfMeasure = normalizeInventoryUnit(form.unitOfMeasure);
+  return {
+    ...payload,
+    unitOfMeasure,
+    unitsPerPack: form.unitsPerPack,
+    unit: inventoryUnitApiValue(unitOfMeasure),
+    notes: buildInventoryUnitNotes({
+      unitOfMeasure,
+      unitsPerPack: form.unitsPerPack,
+      notes: form.notes,
+    }),
+  };
 }
 
 export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkSave }) {
@@ -643,6 +686,8 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setRegisteredForm((prev) => ({
       ...prev,
       itemId: item.id,
+      unitOfMeasure: normalizeInventoryUnit(item.unit) || prev.unitOfMeasure,
+      unitsPerPack: normalizeInventoryUnit(item.unit) === "pieces" ? "" : prev.unitsPerPack,
       unitPrice:
         prev.unitPrice
         || (item.unitCost != null ? String(item.unitCost) : ""),
@@ -701,7 +746,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       type: itemType === "vehicle_part" ? "vehicle_part" : "accessory",
       mode: "existing",
       label: selectedRegisteredItem.name,
-      payload: {
+      payload: withInventoryUnitPayload(registeredForm, {
         itemId: registeredForm.itemId,
         quantity: registeredForm.quantity,
         unitCost: registeredForm.unitPrice,
@@ -714,8 +759,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         supplierPhone: registeredForm.supplierPhone,
         supplierEmail: registeredForm.supplierEmail,
         condition: registeredForm.condition,
-        notes: registeredForm.notes,
-      },
+      }),
     });
   };
 
@@ -735,7 +779,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       type: "accessory",
       mode: "new",
       label: accessoryForm.name.trim(),
-      payload: {
+      payload: withInventoryUnitPayload(accessoryForm, {
         itemCode: accessoryForm.itemCode,
         name: accessoryForm.name,
         brand: accessoryForm.brand,
@@ -754,8 +798,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         supplierPhone: accessoryForm.supplierPhone,
         supplierEmail: accessoryForm.supplierEmail,
         condition: accessoryForm.condition,
-        notes: accessoryForm.notes,
-      },
+      }),
     });
   };
 
@@ -1027,10 +1070,12 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                               <div className="flex min-w-0 items-center gap-2.5">
                                 <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
                                 <div className="min-w-0">
-                                  <p className="text-[12px] font-semibold text-slate-800">{item.name}</p>
+                                  <p className="text-[12px]">
+                                    <ItemNameDisplay value={item.name} className="text-slate-800" />
+                                  </p>
                                   <p className="text-[10px] text-slate-500">
                                     {item.itemCode}
-                                    {item.brand ? ` · ${item.brand}` : ""}
+                                    {item.brand ? ` · ${formatBrand(item.brand)}` : ""}
                                   </p>
                                 </div>
                               </div>
@@ -1063,20 +1108,40 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     onChange={handleRegisteredChange("quantity")}
                     error={errors.quantity}
                   />
-                  <InputField
-                    label="Unit price (GH₵)"
+                  <MoneyInputField
+                    label="Unit price (GHS)"
                     id="regUnitPrice"
-                    type="number"
                     required
+                    placeholder="0.00"
                     value={registeredForm.unitPrice}
                     onChange={handleRegisteredChange("unitPrice")}
                     error={errors.unitPrice}
                   />
+                  <InventoryUnitFields
+                    idPrefix="reg"
+                    quantity={registeredForm.quantity}
+                    unitOfMeasure={registeredForm.unitOfMeasure}
+                    unitsPerPack={registeredForm.unitsPerPack}
+                    onUnitChange={(value) => {
+                      setRegisteredForm((prev) => ({
+                        ...prev,
+                        unitOfMeasure: value,
+                        unitsPerPack: normalizeInventoryUnit(value) === "pieces" ? "" : prev.unitsPerPack,
+                      }));
+                      clearError("unitOfMeasure");
+                      clearError("unitsPerPack");
+                    }}
+                    onUnitsPerPackChange={(value) => {
+                      setRegisteredForm((prev) => ({ ...prev, unitsPerPack: value }));
+                      clearError("unitsPerPack");
+                    }}
+                    errors={errors}
+                  />
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Total price (GH₵)
+                      Total price (GHS)
                     </p>
-                    <div className={readOnlyClassName}>{registeredTotal || "—"}</div>
+                    <div className={readOnlyClassName}>{formatTotalPriceDisplay(registeredTotal)}</div>
                     <p className="text-[10px] text-slate-400">
                       Auto-calculated from quantity × unit price
                     </p>
@@ -1091,6 +1156,12 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
               </>
             ) : (
               <>
+                <ItemPhotoField
+                  id="newAccPhoto"
+                  value={accessoryForm.photo}
+                  onChange={(photo) => handleAccessoryChange("photo")(photo)}
+                  onFileChange={(file) => handleAccessoryChange("photoFile")(file)}
+                />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <label
@@ -1123,7 +1194,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       )}
                     >
                       <option value="">Select brand…</option>
-                      {ACCESSORY_BRAND_OPTIONS.map((option) => (
+                      {getAccessoryBrandOptions().map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -1137,10 +1208,11 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                 <InputField
                   label="Name"
                   id="newAccName"
+                  required
                   value={accessoryForm.name}
                   onChange={handleAccessoryChange("name")}
                   error={errors.name}
-                  placeholder="Accessory name"
+                  placeholder="Enter item name..."
                 />
                 <div className="space-y-1.5">
                   <label
@@ -1155,15 +1227,9 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     value={accessoryForm.description}
                     onChange={handleAccessoryChange("description")}
                     className={cn(fieldClassName, "resize-none")}
-                    placeholder="Short description…"
+                    placeholder="Enter item description..."
                   />
                 </div>
-                <ItemPhotoField
-                  id="newAccPhoto"
-                  value={accessoryForm.photo}
-                  onChange={(photo) => handleAccessoryChange("photo")(photo)}
-                  onFileChange={(file) => handleAccessoryChange("photoFile")(file)}
-                />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <InputField
                     label="Quantity"
@@ -1174,20 +1240,40 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     onChange={handleAccessoryChange("quantity")}
                     error={errors.quantity}
                   />
-                  <InputField
-                    label="Unit price (GH₵)"
+                  <MoneyInputField
+                    label="Unit price (GHS)"
                     id="newAccUnitPrice"
-                    type="number"
                     required
+                    placeholder="0.00"
                     value={accessoryForm.unitPrice}
                     onChange={handleAccessoryChange("unitPrice")}
                     error={errors.unitPrice}
                   />
+                  <InventoryUnitFields
+                    idPrefix="newAcc"
+                    quantity={accessoryForm.quantity}
+                    unitOfMeasure={accessoryForm.unitOfMeasure}
+                    unitsPerPack={accessoryForm.unitsPerPack}
+                    onUnitChange={(value) => {
+                      setAccessoryForm((prev) => ({
+                        ...prev,
+                        unitOfMeasure: value,
+                        unitsPerPack: normalizeInventoryUnit(value) === "pieces" ? "" : prev.unitsPerPack,
+                      }));
+                      clearError("unitOfMeasure");
+                      clearError("unitsPerPack");
+                    }}
+                    onUnitsPerPackChange={(value) => {
+                      setAccessoryForm((prev) => ({ ...prev, unitsPerPack: value }));
+                      clearError("unitsPerPack");
+                    }}
+                    errors={errors}
+                  />
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Total price (GH₵)
+                      Total price (GHS)
                     </p>
-                    <div className={readOnlyClassName}>{accessoryTotal || "—"}</div>
+                    <div className={readOnlyClassName}>{formatTotalPriceDisplay(accessoryTotal)}</div>
                     <p className="text-[10px] text-slate-400">
                       Auto-calculated from quantity × unit price
                     </p>

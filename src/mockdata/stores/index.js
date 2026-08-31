@@ -11,6 +11,7 @@ export {
 export {
   ACCESSORY_STATUS_OPTIONS,
   ACCESSORY_BRAND_OPTIONS,
+  getAccessoryBrandOptions,
   SEED_ACCESSORIES,
   getAccessories,
   getAccessoryById,

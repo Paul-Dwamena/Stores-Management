@@ -1,16 +1,17 @@
 import React from "react";
-import { Building2, Shield, Users, Warehouse } from "lucide-react";
+import { Building2, LayoutGrid, Shield, Users, Warehouse } from "lucide-react";
 import TabbedPageHub from "../../components/common/TabbedPageHub";
 import UsersList from "./UsersList";
 import RolesPermissionsList from "./RolesPermissionsList";
 import StoreManagementList from "./StoreManagementList";
 import SuppliersList from "./SuppliersList";
+import { DropdownOptionsHub } from "./dropdownOptions";
 
 export default function SetupsHub() {
   return (
     <TabbedPageHub
       title="Setups"
-      description="Users, roles, stores, and suppliers used across inventory, supplies, and transfers."
+      description="Users, roles, stores, suppliers, and dropdown lists used across inventory, supplies, and transfers."
       defaultTab="users"
       tabs={[
         {
@@ -40,6 +41,14 @@ export default function SetupsHub() {
           icon: Building2,
           description: "Maintain the supplier list used when receiving accessories into a store.",
           element: <SuppliersList />,
+        },
+        {
+          id: "dropdown",
+          label: "Dropdown Options",
+          icon: LayoutGrid,
+          description:
+            "Select a card to open its setup page. Manage item categories, brands, and other master lists.",
+          element: <DropdownOptionsHub embedded />,
         },
       ]}
     />

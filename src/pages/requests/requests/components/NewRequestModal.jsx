@@ -13,6 +13,8 @@ import {
 } from "../../../../services/generalRequestsService";
 import { MultiAccessoryRequisitionTable } from "../../../stores/supplies/components/MultiRequisitionTables";
 import { ItemPhotoThumb } from "../../../stores/inventory/components/ItemPhotoField";
+import { ItemNameDisplay } from "../../../../components/common/display/FormattedDisplay";
+import { formatBrand } from "../../../../utils/displayFormatters";
 import { isPositiveInt, toGeneralRequestWriteBody, UNREGISTERED_ITEM_DESCRIPTION_HELPER, UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER } from "../utils/requestHelpers";
 
 const fieldClassName =
@@ -24,14 +26,16 @@ function sameId(a, b) {
 }
 
 function SelectedItemCard({ item, onChange }) {
-  const meta = [item.itemCode, item.brand].filter(Boolean).join(" · ");
+  const meta = [item.itemCode, item.brand ? formatBrand(item.brand) : ""].filter(Boolean).join(" · ");
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
       <div className="flex min-w-0 items-center gap-2.5">
         <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
         <div className="min-w-0">
-          <p className="truncate text-[12px] font-semibold text-slate-900">{item.name}</p>
+          <p className="truncate text-[12px]">
+            <ItemNameDisplay value={item.name} className="text-slate-900" />
+          </p>
           {meta ? (
             <p className="truncate text-[10px] leading-tight text-slate-500">{meta}</p>
           ) : null}
@@ -552,9 +556,13 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                             <div className="flex min-w-0 items-center gap-2.5">
                               <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
                               <div className="min-w-0">
-                                <p className="text-[12px] font-bold text-slate-900">{item.name}</p>
+                                <p className="text-[12px]">
+                                  <ItemNameDisplay value={item.name} className="text-slate-900" />
+                                </p>
                                 <p className="text-[11px] text-slate-500 mt-0.5">
-                                  {[item.itemCode, item.brand].filter(Boolean).join(" · ") || "—"}
+                                  {[item.itemCode, item.brand ? formatBrand(item.brand) : ""]
+                                    .filter(Boolean)
+                                    .join(" · ") || "—"}
                                 </p>
                               </div>
                             </div>

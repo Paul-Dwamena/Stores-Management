@@ -6,6 +6,11 @@ import RequestDetailsModal, {
 import Button from "../../../../components/common/base/Button";
 import { formatApiDateTime, formatStatusLabel } from "../../../../utils/apiResponseHelpers";
 import { SupplyStatusBadge } from "../../../stores/supplies/utils/SupplyStatusBadge";
+import {
+  ItemNameDisplay,
+  StoreLocationDisplay,
+  UserNameDisplay,
+} from "../../../../components/common/display/FormattedDisplay";
 
 export default function SupplyApprovalDetailModal({
   isOpen,
@@ -56,7 +61,9 @@ export default function SupplyApprovalDetailModal({
         <DetailRow label="Status">
           <SupplyStatusBadge status={request.status} />
         </DetailRow>
-        <DetailRow label="Requester">{request.requesterName || "—"}</DetailRow>
+        <DetailRow label="Requester">
+          <UserNameDisplay value={request.requesterName} />
+        </DetailRow>
         <DetailRow label="Total quantity">{request.totalQuantityRequested ?? "—"}</DetailRow>
         {Number(request.quantitySupplied) > 0 ? (
           <DetailRow label="Quantity supplied">{request.quantitySupplied}</DetailRow>
@@ -117,9 +124,11 @@ export default function SupplyApprovalDetailModal({
                       {item.itemCode || "—"}
                     </td>
                     <td className="px-3 py-3 text-[12px] font-semibold text-slate-900">
-                      {item.itemName || "—"}
+                      <ItemNameDisplay value={item.itemName} />
                     </td>
-                    <td className="px-3 py-3 text-[12px] text-slate-700">{item.storeName || "—"}</td>
+                    <td className="px-3 py-3 text-[12px] text-slate-700">
+                      <StoreLocationDisplay value={item.storeName} />
+                    </td>
                     <td className="px-3 py-3 text-[12px] font-semibold tabular-nums">
                       {item.quantityRequested ?? "—"}
                     </td>

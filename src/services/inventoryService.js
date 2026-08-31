@@ -1,5 +1,6 @@
 import api from "./api";
 import { extractApiErrorDetail, parsePaginatedList } from "../utils/apiResponseHelpers";
+import { formatMoneyGhs } from "../utils/displayFormatters";
 
 const toStoreStock = (store) => ({
   id: store.store_id,
@@ -104,9 +105,11 @@ export const toBulkStockPayload = ({ shared = {}, lines = [], mode = "existing" 
       const name = line.name?.trim();
       const brand = line.brand?.trim();
       const description = line.description?.trim();
+      const unit = line.unit?.trim();
       if (name) item.name = name;
       if (brand) item.brand = brand;
       if (description) item.description = description;
+      if (unit) item.unit = unit;
     }
     return item;
   });
@@ -316,12 +319,7 @@ export const verifyDeliveryOtp = async ({ phone, otp }) => {
 };
 
 export function formatInventoryMoney(amount) {
-  const value = Number(amount);
-  if (Number.isNaN(value)) return "GH₵ 0.00";
-  return `GH₵ ${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatMoneyGhs(amount);
 }
 
 export function formatInventoryStatus(status) {

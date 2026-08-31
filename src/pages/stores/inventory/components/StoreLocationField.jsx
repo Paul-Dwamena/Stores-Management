@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "../../../../utils/cn";
 import { getStoreLocationOptions } from "../../../../mockdata/stores";
+import { formatStoreLocation } from "../../../../utils/displayFormatters";
 import StoreFormModal from "../../../setups/components/StoreFormModal";
 
 const defaultSelectClassName =
@@ -50,12 +51,12 @@ export default function StoreLocationField({
           id={id}
           value={value}
           onChange={(event) => setValue(event.target.value)}
-          className={cn(selectClassName || defaultSelectClassName, error && "border-red-500 bg-red-50")}
+          className={cn(selectClassName || defaultSelectClassName, "uppercase", error && "border-red-500 bg-red-50")}
         >
           <option value="">Select store location…</option>
           {locations.map((location) => (
             <option key={location} value={location}>
-              {location}
+              {formatStoreLocation(location)}
             </option>
           ))}
         </select>

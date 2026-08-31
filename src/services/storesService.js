@@ -1,5 +1,6 @@
 import api from "./api";
 import { extractApiErrorDetail } from "../utils/apiResponseHelpers";
+import { formatUserName } from "../utils/displayFormatters";
 
 const toManager = (manager) => {
   if (!manager) return null;
@@ -31,7 +32,8 @@ const toStore = (row) => {
 
 export const formatStoreManagerName = (manager) => {
   if (!manager) return "—";
-  return manager.name || manager.email || "—";
+  const raw = manager.name || manager.email || "—";
+  return raw === "—" ? raw : formatUserName(raw);
 };
 
 export const listStores = async () => {

@@ -7,6 +7,8 @@ import { formatApiDateTime, sortNewestFirst } from "../../utils/apiResponseHelpe
 import CatalogTable, { StatusBadge } from "./components/CatalogTable";
 import CatalogDetailModal from "./components/CatalogDetailModal";
 import UserFormModal from "./components/UserFormModal";
+import { UserNameDisplay } from "../../components/common/display/FormattedDisplay";
+import { formatUserName } from "../../utils/displayFormatters";
 
 export default function UsersList() {
   const [rows, setRows] = useState([]);
@@ -103,7 +105,7 @@ export default function UsersList() {
             label: "Name",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-900">{row.name}</p>
+                <UserNameDisplay value={row.name} className="font-semibold text-slate-900" />
                 <p className="text-[11px] text-slate-400">{row.email}</p>
               </div>
             ),
@@ -129,7 +131,7 @@ export default function UsersList() {
         status={viewing?.status}
         identifier={viewing?.email}
         fields={[
-          { label: "Name", value: viewing?.name },
+          { label: "Name", value: formatUserName(viewing?.name) },
           { label: "Email", value: viewing?.email },
           { label: "Phone", value: viewing?.phone || "—" },
           { label: "Role", value: roleName(viewing?.roleId) },

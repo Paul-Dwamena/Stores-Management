@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "../../components/common/ToastNotification";
 import { TableViewAction } from "../../components/common/tableActions";
 import { listStores, getStore, createStore, updateStore, formatStoreManagerName } from "../../services/storesService";
+import { formatStoreLocation } from "../../utils/displayFormatters";
+import {
+  StoreLocationDisplay,
+  UserNameDisplay,
+} from "../../components/common/display/FormattedDisplay";
 import { listUsers } from "../../services/usersService";
 import { listRoles } from "../../services/rolesService";
 import { formatApiDateTime, sortNewestFirst } from "../../utils/apiResponseHelpers";
@@ -231,7 +236,7 @@ export default function StoreManagementList() {
             label: "Store",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-900">{row.name}</p>
+                <StoreLocationDisplay value={row.name} className="font-semibold text-slate-900" />
                 <p className="text-[11px] text-slate-400">{row.address || "—"}</p>
               </div>
             ),
@@ -241,7 +246,7 @@ export default function StoreManagementList() {
           {
             key: "manager",
             label: "Store manager",
-            render: (row) => formatStoreManagerName(row.manager),
+            render: (row) => <UserNameDisplay value={row.manager?.name || row.manager?.email} />,
           },
           { key: "createdAt", label: "Date created", render: (row) => formatApiDateTime(row.createdAt) },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
@@ -262,7 +267,7 @@ export default function StoreManagementList() {
         status={viewing?.status}
         identifier={viewing?.name}
         fields={[
-          { label: "Store", value: viewing?.name },
+          { label: "Store", value: formatStoreLocation(viewing?.name) },
           { label: "Code", value: viewing?.code },
           { label: "Address", value: viewing?.address || "—" },
           { label: "City", value: viewing?.city },

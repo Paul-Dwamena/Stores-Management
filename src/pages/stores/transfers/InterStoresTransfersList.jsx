@@ -32,6 +32,11 @@ import {
 } from "../../../services/transfersService";
 import { TransferStatusBadge } from "./utils/TransferStatusBadge";
 import {
+  ItemNameDisplay,
+  StoreLocationDisplay,
+  UserNameDisplay,
+} from "../../../components/common/display/FormattedDisplay";
+import {
   TRANSFER_STATUS_OPTIONS,
   transferStatusKey,
 } from "./utils/transferStatus";
@@ -486,7 +491,10 @@ export default function InterStoresTransfersList({ embedded = false }) {
                     <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 min-w-[320px]">
                       <p className="font-mono text-slate-700">{row.itemCode}</p>
                       <p className="text-[11px] text-slate-500 font-medium">
-                        {row.itemName}
+                        <ItemNameDisplay
+                          value={row.itemName}
+                          className="text-[11px] text-slate-500 font-medium"
+                        />
                         {(row.itemCount || 1) > 1 ? ` +${row.itemCount - 1} more` : ""}
                       </p>
                     </td>
@@ -494,16 +502,16 @@ export default function InterStoresTransfersList({ embedded = false }) {
                       {row.quantity}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700">
-                      {row.fromStore}
+                      <StoreLocationDisplay value={row.fromStore} />
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700">
-                      {row.toStoreLabel || row.toStore}
+                      <StoreLocationDisplay value={row.toStoreLabel || row.toStore} />
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-600 whitespace-nowrap">
                       {formatApiDateTime(row.createdAt)}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-700 whitespace-nowrap">
-                      {row.requestedBy}
+                      <UserNameDisplay value={row.requestedBy} />
                     </td>
                     <td className="px-6 py-3.5 whitespace-nowrap">
                       <TransferStatusBadge status={row.status} />

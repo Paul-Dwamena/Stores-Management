@@ -228,6 +228,7 @@ export const registerItemForRequest = async (generalRequestItemId, payload) => {
         name: String(payload.name || "").trim(),
         description: payload.description?.trim() || null,
         brand: payload.brand?.trim() || null,
+        category: payload.category?.trim() || null,
         unit: payload.unit?.trim() || null,
       },
     );

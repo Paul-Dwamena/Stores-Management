@@ -6,22 +6,23 @@ import ToggleField from "../../../../components/common/fields/ToggleField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import ItemPhotoField from "./ItemPhotoField";
+import {
+  baseUnitApiValue,
+  baseUnitLabel,
+  getBaseUnitOptions,
+  resolveItemBaseUnit,
+} from "../utils/inventoryUnitOptions";
 
 const EMPTY_FORM = {
   name: "",
   code: "",
   brand: "",
   description: "",
-  unit: "",
+  baseUnit: "piece",
   photo: "",
   photoFile: null,
   isActive: true,
 };
-
-const UNIT_OPTIONS = [
-  { value: "carton", label: "Carton" },
-  { value: "box", label: "Box" },
-];
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-brand transition-colors text-slate-700";
@@ -38,6 +39,7 @@ export default function EditInventoryItemModal({
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const baseUnitOptions = getBaseUnitOptions();
 
   useEffect(() => {
     if (!isOpen || !item) return;
@@ -46,7 +48,7 @@ export default function EditInventoryItemModal({
       code: item.itemCode || item.code || "",
       brand: item.brand === "—" ? "" : item.brand || "",
       description: item.description || "",
-      unit: item.unit || "",
+      baseUnit: resolveItemBaseUnit(item.unit),
       photo: item.photo || "",
       photoFile: null,
       isActive: item.isActive !== false,
@@ -76,7 +78,16 @@ export default function EditInventoryItemModal({
 
     setSaving(true);
     try {
-      await onSave?.(form);
+      await onSave?.({
+        name: form.name,
+        code: form.code,
+        brand: form.brand,
+        description: form.description,
+        unit: baseUnitApiValue(form.baseUnit),
+        photo: form.photo,
+        photoFile: form.photoFile,
+        isActive: form.isActive,
+      });
       toast.success("Item details updated.");
       onClose?.();
     } catch (error) {
@@ -149,25 +160,22 @@ export default function EditInventoryItemModal({
             onChange={setField("brand")}
           />
           <div className="space-y-1.5">
-            <Label htmlFor="edit-item-unit" className={errors.unit ? "text-red-500" : ""}>
-              Unit
-            </Label>
+            <Label htmlFor="edit-item-base-unit">Base unit</Label>
             <select
-              id="edit-item-unit"
-              value={form.unit}
-              onChange={setField("unit")}
-              className={cn(fieldClassName, errors.unit && "border-red-500 bg-red-50")}
+              id="edit-item-base-unit"
+              value={form.baseUnit}
+              onChange={setField("baseUnit")}
+              className={cn(fieldClassName)}
             >
-              <option value="">Select unit…</option>
-              {UNIT_OPTIONS.map((option) => (
+              {baseUnitOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
             </select>
-            {errors.unit ? (
-              <p className="text-[10px] font-medium text-red-500">{errors.unit}</p>
-            ) : null}
+            <p className="text-[10px] text-slate-400">
+              Stock is always tracked in {baseUnitLabel(form.baseUnit).toLowerCase()}s.
+            </p>
           </div>
         </div>
 

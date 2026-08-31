@@ -37,7 +37,6 @@ import {
 } from "../../../services/supplyRequestsService";
 import { getSuppliesStats } from "../../../services/statsService";
 import { formatStoreLocation } from "../../../utils/displayFormatters";
-import { getRequisitionRemainingQuantity } from "../../../mockdata/stores";
 import RaiseSupplyRequestModal, { buildIssueStoreOptions } from "./components/RaiseSupplyRequestModal";
 import RegisterItemFromRequestModal from "./components/RegisterItemFromRequestModal";
 import ReceiveIntoStoreModal from "../inventory/components/ReceiveIntoStoreModal";
@@ -329,7 +328,6 @@ export default function PendingSuppliesList({ embedded = false }) {
         source: "pending_line",
         quantityRequested,
         quantityToSupply: null,
-        quantityRemaining: quantityRequested,
       };
     });
     const raised = supplyRows.map((request) => {
@@ -340,7 +338,6 @@ export default function PendingSuppliesList({ embedded = false }) {
         source: "supply_request",
         quantityRequested: resolveOriginalQuantityRequested(request, generalItemQuantities),
         quantityToSupply: request.totalQuantityRequested ?? null,
-        quantityRemaining: getRequisitionRemainingQuantity(requisition),
       };
     });
     return sortNewestFirst([...pending, ...raised], "createdAt");
@@ -484,7 +481,7 @@ export default function PendingSuppliesList({ embedded = false }) {
       await openRow({ ...activeRow, itemId: inventoryItem.id });
     }
   };
-  const colSpan = 11 + (showBulkSelection ? 1 : 0);
+  const colSpan = 10 + (showBulkSelection ? 1 : 0);
 
   const toggleRowSelected = (listKey) => {
     setSelectedIds((prev) =>
@@ -897,13 +894,10 @@ export default function PendingSuppliesList({ embedded = false }) {
                   Description
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                  Quantity Requested
+                  Customer request
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                   Quantity to Supply
-                </th>
-                <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                  Quantity Remaining
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                   Date requested
@@ -974,9 +968,6 @@ export default function PendingSuppliesList({ embedded = false }) {
                     </td>
                     <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
                       {row.quantityToSupply ?? "—"}
-                    </td>
-                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
-                      {row.quantityRemaining ?? "—"}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-600 whitespace-nowrap">
                       {formatApiDateTime(row.createdAt)}

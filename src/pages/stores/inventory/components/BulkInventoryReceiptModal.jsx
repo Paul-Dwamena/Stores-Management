@@ -12,7 +12,7 @@ import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { formatInventoryMoney, sendDeliveryOtp } from "../../../../services/inventoryService";
 import { formatMoneyAmount } from "../../../../utils/displayFormatters";
-import { getAccessoryBrandOptions } from "../../../../mockdata/stores/accessories";
+import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
@@ -33,9 +33,12 @@ import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
 import InventoryUnitFields from "./InventoryUnitFields";
 import {
+  baseUnitApiValue,
   buildInventoryUnitNotes,
-  inventoryUnitApiValue,
+  calcInventoryTotalQuantity,
+  normalizeBaseUnit,
   normalizeInventoryUnit,
+  resolveItemBaseUnit,
   validateInventoryUnitFields,
 } from "../utils/inventoryUnitOptions";
 
@@ -88,6 +91,7 @@ function createLine(inventoryType, mode) {
     level5: "",
     level6: "",
     quantity: "",
+    baseUnit: "piece",
     unitOfMeasure: "",
     unitsPerPack: "",
     unitCost: "",
@@ -144,7 +148,9 @@ function getLineErrors(line, mode, inventoryType) {
     next.unitCost = "Enter a valid unit price.";
   }
   if (!line.location?.trim()) next.location = "Select a store location.";
-  validateInventoryUnitFields(line, next);
+  validateInventoryUnitFields(line, next, {
+    baseUnitRequired: mode === "new" && inventoryType === "accessory",
+  });
   return next;
 }
 
@@ -327,7 +333,11 @@ function LocationSelect({ value, onChange, error }) {
   );
 }
 
-function ReceiveLineFields({ line, errors, onChange }) {
+function ReceiveLineFields({ line, errors, onChange, mode, items = [] }) {
+  const selectedItem = line.itemId ? items.find((item) => item.id === line.itemId) : null;
+  const baseUnit = line.itemId
+    ? resolveItemBaseUnit(selectedItem?.unit)
+    : normalizeBaseUnit(line.baseUnit || "piece");
   const total = calcLineTotal(line.quantity, line.unitCost);
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -353,8 +363,11 @@ function ReceiveLineFields({ line, errors, onChange }) {
       <InventoryUnitFields
         idPrefix={`bulk-${line.clientId}`}
         quantity={line.quantity}
+        baseUnit={baseUnit}
+        baseUnitEditable={mode === "new" && !line.itemId}
         unitOfMeasure={line.unitOfMeasure}
         unitsPerPack={line.unitsPerPack}
+        onBaseUnitChange={(value) => onChange("baseUnit", value)}
         onUnitChange={(value) => {
           onChange("unitOfMeasure", value);
           if (normalizeInventoryUnit(value) === "pieces") {
@@ -622,8 +635,6 @@ function ExistingLineFields({
                         if (!line.unitCost && item.unitCost != null) {
                           onChange("unitCost", String(item.unitCost));
                         }
-                        onChange("unitOfMeasure", normalizeInventoryUnit(item.unit) || "");
-                        onChange("unitsPerPack", "");
                         setSearch("");
                       }}
                       className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
@@ -704,7 +715,9 @@ function ExistingLineFields({
     </p>
   );
 
-  const receiveBlock = <ReceiveLineFields line={line} errors={errors} onChange={onChange} />;
+  const receiveBlock = (
+    <ReceiveLineFields line={line} errors={errors} onChange={onChange} mode="existing" items={items} />
+  );
 
   return (
     <div className={splitPanes ? "contents" : "space-y-3"}>
@@ -736,6 +749,7 @@ function LineOverrideFields({ line, onChange }) {
 }
 
 function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
+  const brandOptions = useBrandSelectOptions(true);
   const identifyBlock = (
     <div className="space-y-3">
       <ItemPhotoField
@@ -751,7 +765,7 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
           className={cn(fieldClassName, "mt-1", errors.brand && "border-rose-500 bg-rose-50")}
         >
           <option value="">Select brand</option>
-          {getAccessoryBrandOptions().map((option) => (
+          {brandOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
@@ -776,7 +790,9 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
     </div>
   );
   const detailsBlock = <LineOverrideFields line={line} onChange={onChange} />;
-  const receiveBlock = <ReceiveLineFields line={line} errors={errors} onChange={onChange} />;
+  const receiveBlock = (
+    <ReceiveLineFields line={line} errors={errors} onChange={onChange} mode="new" items={[]} />
+  );
 
   return (
     <div className={splitPanes ? "contents" : "space-y-3"}>
@@ -858,7 +874,9 @@ function NewVehiclePartFields({ line, errors, onChange, splitPanes = false }) {
     </div>
   );
   const detailsBlock = <LineOverrideFields line={line} onChange={onChange} />;
-  const receiveBlock = <ReceiveLineFields line={line} errors={errors} onChange={onChange} />;
+  const receiveBlock = (
+    <ReceiveLineFields line={line} errors={errors} onChange={onChange} mode="new" items={[]} />
+  );
 
   return (
     <div className={splitPanes ? "contents" : "space-y-3"}>
@@ -1174,20 +1192,28 @@ export default function BulkInventoryReceiptModal({
       inventoryType,
       shared,
       lines: lines.map((line) => {
+        const catalogItem = line.itemId ? items.find((item) => item.id === line.itemId) : null;
         const unitOfMeasure = normalizeInventoryUnit(line.unitOfMeasure);
+        const baseUnit = line.itemId
+          ? resolveItemBaseUnit(catalogItem?.unit)
+          : normalizeBaseUnit(line.baseUnit || "piece");
+        const totalQty = calcInventoryTotalQuantity(line.quantity, line.unitsPerPack, unitOfMeasure);
         const unitNotes = buildInventoryUnitNotes({
+          quantity: line.quantity,
           unitOfMeasure,
           unitsPerPack: line.unitsPerPack,
+          baseUnit,
         });
         const notes = [line.notes.trim(), shared.notes.trim(), unitNotes].filter(Boolean).join(" | ");
         return {
           ...line,
           name: lineName(line, inventoryType, mode, items),
-          quantity: Number(line.quantity),
+          quantity: totalQty ?? Number(line.quantity),
           unitCost: Number(line.unitCost),
           unitOfMeasure,
           unitsPerPack: line.unitsPerPack,
-          unit: inventoryUnitApiValue(unitOfMeasure),
+          baseUnit,
+          unit: baseUnitApiValue(baseUnit),
           condition: line.condition || shared.condition,
           notes,
         };

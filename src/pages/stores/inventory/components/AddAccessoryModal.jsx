@@ -4,7 +4,7 @@ import InputField from "../../../../components/common/fields/InputField";
 import MoneyInputField from "../../../../components/common/fields/MoneyInputField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { getAccessoryBrandOptions } from "../../../../mockdata/stores/accessories";
+import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -23,6 +23,7 @@ const INITIAL_FORM = {
 export default function AddAccessoryModal({ isOpen, onClose, onSave }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
+  const brandOptions = useBrandSelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -90,7 +91,7 @@ export default function AddAccessoryModal({ isOpen, onClose, onSave }) {
             className={fieldClassName}
           >
             <option value="">Select brand…</option>
-            {getAccessoryBrandOptions().map((option) => (
+            {brandOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

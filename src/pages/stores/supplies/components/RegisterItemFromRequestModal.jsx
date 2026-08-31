@@ -9,6 +9,7 @@ import { cn } from "../../../../utils/cn";
 import { registerItemForRequest } from "../../../../services/supplyRequestsService";
 import { updateItemPhoto } from "../../../../services/itemsService";
 import ItemPhotoField from "../../inventory/components/ItemPhotoField";
+import { useBrandSelectOptions, useCategorySelectOptions } from "../../../../hooks/useCatalogOptions";
 
 const UNIT_OPTIONS = [
   { value: "carton", label: "Carton" },
@@ -24,6 +25,7 @@ const textareaClassName =
 const EMPTY_FORM = {
   name: "",
   brand: "",
+  category: "",
   unit: "",
   description: "",
   photo: "",
@@ -40,6 +42,8 @@ export default function RegisterItemFromRequestModal({
   const [errors, setErrors] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const brandOptions = useBrandSelectOptions(isOpen);
+  const categoryOptions = useCategorySelectOptions(isOpen);
 
   const generalRequestItemId =
     requisition?.generalRequestItemId ?? requisition?.id ?? null;
@@ -49,6 +53,7 @@ export default function RegisterItemFromRequestModal({
     setForm({
       name: requisition.itemName || "",
       brand: "",
+      category: "",
       unit: "",
       description: requisition.description || "",
       photo: "",
@@ -84,6 +89,7 @@ export default function RegisterItemFromRequestModal({
         name: form.name.trim(),
         description: form.description?.trim() || null,
         brand: form.brand?.trim() || null,
+        category: form.category?.trim() || null,
         unit: form.unit?.trim() || null,
       });
 
@@ -156,13 +162,38 @@ export default function RegisterItemFromRequestModal({
               onChange={setField("name")}
               error={errors.name}
             />
-            <InputField
-              id="register-item-brand"
-              label="Brand"
-              value={form.brand}
-              onChange={setField("brand")}
-              placeholder="Optional"
-            />
+            <div className="space-y-1.5">
+              <Label htmlFor="register-item-brand">Brand</Label>
+              <select
+                id="register-item-brand"
+                value={form.brand}
+                onChange={setField("brand")}
+                className={fieldClassName}
+              >
+                <option value="">Select brand…</option>
+                {brandOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="register-item-category">Category</Label>
+              <select
+                id="register-item-category"
+                value={form.category}
+                onChange={setField("category")}
+                className={fieldClassName}
+              >
+                <option value="">Select category…</option>
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="register-item-unit">Unit</Label>
               <select

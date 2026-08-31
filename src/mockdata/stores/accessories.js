@@ -11,7 +11,7 @@ export const ACCESSORY_STATUS_OPTIONS = [
   { value: "INACTIVE", label: "Inactive" },
 ];
 
-/** Active brands from Setups → Dropdown Options. */
+/** Active brands from API cache (Setups → Dropdown Options / GET /brands). */
 export function getAccessoryBrandOptions() {
   return resolveDropdownOptionChoices("brands").map((option) => ({
     ...option,

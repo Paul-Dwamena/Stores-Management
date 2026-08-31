@@ -23,6 +23,12 @@ export const MANAGED_DROPDOWN_SEEDS = {
     item("br-5", "RoadSafe", "RoadSafe safety and fleet accessories."),
     item("br-6", "SafeFleet", "SafeFleet branded fleet supplies."),
   ],
+  "base-units": [
+    item("bu-1", "Piece", "Countable items such as chargers and accessories."),
+    item("bu-2", "Liter", "Fluids such as engine oil and coolant."),
+    item("bu-3", "Kilogram", "Weight-based items."),
+    item("bu-4", "Meter", "Length-based items such as cable."),
+  ],
 };
 
 const store = Object.fromEntries(
@@ -32,7 +38,10 @@ const store = Object.fromEntries(
   ]),
 );
 
+const API_BACKED_OPTION_IDS = new Set(["brands", "item-categories"]);
+
 export function isManagedDropdownOption(optionId) {
+  if (API_BACKED_OPTION_IDS.has(optionId)) return false;
   return Object.prototype.hasOwnProperty.call(store, optionId);
 }
 

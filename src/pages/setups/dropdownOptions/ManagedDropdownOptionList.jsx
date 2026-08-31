@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "../../../components/common/PageHeader";
 import BackToDropdownOptionsLink from "../components/BackToDropdownOptionsLink";
@@ -9,6 +9,7 @@ import ConfirmationModal from "../../../components/common/ConfirmationModal";
 import InputField from "../../../components/common/fields/InputField";
 import Label from "../../../components/common/base/Label";
 import ToggleField from "../../../components/common/fields/ToggleField";
+import SectionLoadState from "../../../components/common/SectionLoadState";
 import {
   TableIconAction,
   TableRowActions,
@@ -16,6 +17,20 @@ import {
 import { toast } from "../../../components/common/ToastNotification";
 import { BrandDisplay } from "../../../components/common/display/FormattedDisplay";
 import { cn } from "../../../utils/cn";
+import {
+  isApiBackedCatalogOption,
+  refreshCatalogOptions,
+} from "../../../services/catalogOptionsCache";
+import {
+  createBrand,
+  deleteBrand,
+  updateBrand,
+} from "../../../services/brandsService";
+import {
+  createCategory,
+  deleteCategory,
+  updateCategory,
+} from "../../../services/categoriesService";
 import {
   listManagedDropdownItems,
   replaceManagedDropdownItems,
@@ -38,18 +53,125 @@ function StatusBadge({ active }) {
   );
 }
 
+async function loadItems(optionId) {
+  if (isApiBackedCatalogOption(optionId)) {
+    return refreshCatalogOptions(optionId);
+  }
+  return listManagedDropdownItems(optionId);
+}
+
+async function createCatalogItem(optionId, { name, description, active }) {
+  const payload = {
+    name,
+    description: description || null,
+  };
+  if (optionId === "brands") {
+    const created = await createBrand(payload);
+    return {
+      id: created.id,
+      name: created.name,
+      description: created.description || "",
+      active: created.isActive !== false,
+    };
+  }
+  if (optionId === "item-categories") {
+    const created = await createCategory(payload);
+    return {
+      id: created.id,
+      name: created.name,
+      description: created.description || "",
+      active: created.isActive !== false,
+    };
+  }
+  return {
+    id: `${optionId}-${Date.now()}`,
+    name,
+    description,
+    active,
+  };
+}
+
+async function updateCatalogItem(optionId, id, { name, description, active }) {
+  if (optionId === "brands") {
+    const updated = await updateBrand(id, {
+      name,
+      description,
+      is_active: active,
+    });
+    return {
+      id: updated.id,
+      name: updated.name,
+      description: updated.description || "",
+      active: updated.isActive !== false,
+    };
+  }
+  if (optionId === "item-categories") {
+    const updated = await updateCategory(id, {
+      name,
+      description,
+      is_active: active,
+    });
+    return {
+      id: updated.id,
+      name: updated.name,
+      description: updated.description || "",
+      active: updated.isActive !== false,
+    };
+  }
+  return { id, name, description, active };
+}
+
+async function deleteCatalogItem(optionId, id) {
+  if (optionId === "brands") {
+    await deleteBrand(id);
+    return;
+  }
+  if (optionId === "item-categories") {
+    await deleteCategory(id);
+    return;
+  }
+}
+
 export default function ManagedDropdownOptionList({ optionId, title }) {
-  const [items, setItems] = useState(() => listManagedDropdownItems(optionId));
+  const usesApi = isApiBackedCatalogOption(optionId);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(Boolean(usesApi));
+  const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const reload = useCallback(async () => {
+    if (usesApi) {
+      setLoading(true);
+      setLoadError(null);
+    }
+    try {
+      const rows = await loadItems(optionId);
+      setItems(rows);
+    } catch (error) {
+      setItems([]);
+      if (usesApi) {
+        setLoadError(error.message || `Unable to load ${title.toLowerCase()}.`);
+      }
+    } finally {
+      if (usesApi) setLoading(false);
+    }
+  }, [optionId, title, usesApi]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const syncItems = (next) => {
     setItems(next);
-    replaceManagedDropdownItems(optionId, next);
+    if (!usesApi) {
+      replaceManagedDropdownItems(optionId, next);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -59,8 +181,10 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
         !q ||
         row.name.toLowerCase().includes(q) ||
         (row.description || "").toLowerCase().includes(q);
-      const matchesActive = showInactive || row.active !== false;
-      return matchesSearch && matchesActive;
+      const matchesActiveStatus = showInactive
+        ? row.active === false
+        : true;
+      return matchesSearch && matchesActiveStatus;
     });
   }, [items, search, showInactive]);
 
@@ -95,42 +219,71 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
     });
   };
 
-  const handleConfirmAction = () => {
-    if (!confirmAction) return;
+  const handleConfirmAction = async () => {
+    if (!confirmAction || saving) return;
+    setSaving(true);
 
-    if (confirmAction.type === "delete") {
-      syncItems(items.filter((row) => row.id !== confirmAction.id));
-      toast.success(`${title} item removed.`);
-    } else if (confirmAction.type === "update") {
-      syncItems(
-        items.map((row) =>
-          row.id === confirmAction.editingId
-            ? {
-                ...row,
-                name: confirmAction.name,
-                description: confirmAction.description,
-                active: confirmAction.active,
-              }
-            : row,
-        ),
-      );
-      toast.success(`${title} item updated.`);
-    } else {
-      syncItems([
-        {
-          id: `${optionId}-${Date.now()}`,
+    try {
+      if (confirmAction.type === "delete") {
+        if (usesApi) {
+          await deleteCatalogItem(optionId, confirmAction.id);
+          await reload();
+        } else {
+          syncItems(items.filter((row) => row.id !== confirmAction.id));
+        }
+        toast.success(`${title} item removed.`);
+      } else if (confirmAction.type === "update") {
+        if (usesApi) {
+          await updateCatalogItem(optionId, confirmAction.editingId, {
+            name: confirmAction.name,
+            description: confirmAction.description,
+            active: confirmAction.active,
+          });
+          await reload();
+        } else {
+          syncItems(
+            items.map((row) =>
+              row.id === confirmAction.editingId
+                ? {
+                    ...row,
+                    name: confirmAction.name,
+                    description: confirmAction.description,
+                    active: confirmAction.active,
+                  }
+                : row,
+            ),
+          );
+        }
+        toast.success(`${title} item updated.`);
+      } else if (usesApi) {
+        await createCatalogItem(optionId, {
           name: confirmAction.name,
           description: confirmAction.description,
           active: confirmAction.active,
-        },
-        ...items,
-      ]);
-      toast.success(`${title} item created.`);
-    }
+        });
+        await reload();
+        toast.success(`${title} item created.`);
+      } else {
+        syncItems([
+          {
+            id: `${optionId}-${Date.now()}`,
+            name: confirmAction.name,
+            description: confirmAction.description,
+            active: confirmAction.active,
+          },
+          ...items,
+        ]);
+        toast.success(`${title} item created.`);
+      }
 
-    setConfirmAction(null);
-    setEditing(null);
-    setForm(EMPTY_FORM);
+      setConfirmAction(null);
+      setEditing(null);
+      setForm(EMPTY_FORM);
+    } catch (error) {
+      toast.error(error.message || "Could not save changes.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getConfirmModalProps = () => {
@@ -166,99 +319,106 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
     <div className="space-y-6 pb-8">
       <BackToDropdownOptionsLink />
       <PageHeader title={title} description={`Manage ${title.toLowerCase()} setups.`}>
-        <Button onClick={openCreate}>
+        <Button onClick={openCreate} disabled={loading}>
           <Plus size={16} /> Add item
         </Button>
       </PageHeader>
 
-      <div className="card overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <SearchInput
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <label className="flex items-center gap-2 text-[13px] text-slate-600 cursor-pointer select-none shrink-0">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-slate-900/25"
+      <SectionLoadState
+        loading={loading}
+        error={loadError}
+        onRetry={reload}
+        variant="card"
+      >
+        <div className="card overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+            <SearchInput
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
-            Show inactive
-          </label>
-        </div>
+            <label className="flex items-center gap-2 text-[13px] text-slate-600 cursor-pointer select-none shrink-0">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-slate-900/25"
+              />
+              Show inactive
+            </label>
+          </div>
 
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-100">
-              <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Name</th>
-              <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Status</th>
-              <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase text-right">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="px-6 py-10 text-center text-[13px] text-slate-400">
-                  No items found.
-                </td>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Name</th>
+                <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Status</th>
+                <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase text-right">
+                  Actions
+                </th>
               </tr>
-            ) : (
-              filtered.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/50">
-                  <td className="px-6 py-3">
-                    {optionId === "brands" ? (
-                      <BrandDisplay value={row.name} className="text-[13px] font-bold text-slate-900" />
-                    ) : (
-                      <p className="text-[13px] font-bold text-slate-900">{row.name}</p>
-                    )}
-                    {row.description ? (
-                      <p className="text-[12px] text-slate-500 mt-0.5">{row.description}</p>
-                    ) : null}
-                  </td>
-                  <td className="px-6 py-3">
-                    <StatusBadge active={row.active !== false} />
-                  </td>
-                  <td className="px-6 py-3 text-right">
-                    <TableRowActions>
-                      <TableIconAction
-                        title="Edit item"
-                        onClick={() => openEdit(row)}
-                        icon={Pencil}
-                        variant="edit"
-                      />
-                      <TableIconAction
-                        title="Delete item"
-                        onClick={() =>
-                          setConfirmAction({
-                            type: "delete",
-                            id: row.id,
-                            name: row.name,
-                          })
-                        }
-                        icon={Trash2}
-                        variant="delete"
-                      />
-                    </TableRowActions>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-10 text-center text-[13px] text-slate-400">
+                    No items found.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filtered.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50/50">
+                    <td className="px-6 py-3">
+                      {optionId === "brands" ? (
+                        <BrandDisplay value={row.name} className="text-[13px] font-bold text-slate-900" />
+                      ) : (
+                        <p className="text-[13px] font-bold text-slate-900">{row.name}</p>
+                      )}
+                      {row.description ? (
+                        <p className="text-[12px] text-slate-500 mt-0.5">{row.description}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-6 py-3">
+                      <StatusBadge active={row.active !== false} />
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      <TableRowActions>
+                        <TableIconAction
+                          title="Edit item"
+                          onClick={() => openEdit(row)}
+                          icon={Pencil}
+                          variant="edit"
+                        />
+                        <TableIconAction
+                          title="Delete item"
+                          onClick={() =>
+                            setConfirmAction({
+                              type: "delete",
+                              id: row.id,
+                              name: row.name,
+                            })
+                          }
+                          icon={Trash2}
+                          variant="delete"
+                        />
+                      </TableRowActions>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
 
-        <div className="px-6 py-3 border-t border-slate-100 text-[12px] text-slate-500 flex gap-4">
-          <span>
-            <strong className="text-slate-700">{activeCount}</strong> active
-          </span>
-          <span>
-            <strong className="text-slate-700">{items.length}</strong> total
-          </span>
+          <div className="px-6 py-3 border-t border-slate-100 text-[12px] text-slate-500 flex gap-4">
+            <span>
+              <strong className="text-slate-700">{activeCount}</strong> active
+            </span>
+            <span>
+              <strong className="text-slate-700">{items.length}</strong> total
+            </span>
+          </div>
         </div>
-      </div>
+      </SectionLoadState>
 
       <AddModal
         isOpen={modalOpen}
@@ -303,12 +463,17 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
       {confirmModalProps && (
         <ConfirmationModal
           isOpen={Boolean(confirmAction)}
-          onClose={() => setConfirmAction(null)}
+          onClose={() => {
+            if (saving) return;
+            setConfirmAction(null);
+          }}
           onConfirm={handleConfirmAction}
           title={confirmModalProps.title}
           message={confirmModalProps.message}
-          confirmText={confirmModalProps.confirmText}
+          confirmText={saving ? "Saving…" : confirmModalProps.confirmText}
           isDanger={confirmModalProps.isDanger}
+          closeOnConfirm={false}
+          confirmLoading={saving}
         />
       )}
     </div>

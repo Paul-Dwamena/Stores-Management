@@ -13,8 +13,9 @@ import StoreSelect from "./StoreSelect";
 import InventoryUnitFields from "./InventoryUnitFields";
 import { sendDeliveryOtp } from "../../../../services/inventoryService";
 import {
-  buildInventoryUnitNotes,
+  buildReceiveStockPayload,
   normalizeInventoryUnit,
+  resolveItemBaseUnit,
   validateInventoryUnitFields,
 } from "../utils/inventoryUnitOptions";
 
@@ -181,11 +182,8 @@ export default function ReceiveIntoStoreModal({
       return;
     }
 
-    setPendingReceive({
-      quantity,
+    setPendingReceive(buildReceiveStockPayload(form, {
       unitCost,
-      unitOfMeasure: normalizeInventoryUnit(form.unitOfMeasure),
-      unitsPerPack: form.unitsPerPack,
       location: form.location.trim(),
       supplierId: form.supplierId,
       waybillNumber: form.waybillNumber.trim(),
@@ -195,11 +193,7 @@ export default function ReceiveIntoStoreModal({
       supplierPhone: form.supplierPhone.trim(),
       supplierEmail: form.supplierEmail.trim(),
       condition: form.condition,
-      notes: buildInventoryUnitNotes({
-        unitOfMeasure: form.unitOfMeasure,
-        unitsPerPack: form.unitsPerPack,
-      }),
-    });
+    }, { itemUnit: item?.unit }));
   };
 
   const handleConfirmReceive = async () => {
@@ -258,6 +252,7 @@ export default function ReceiveIntoStoreModal({
               <InventoryUnitFields
                 idPrefix="ssr"
                 quantity={form.quantity}
+                baseUnit={resolveItemBaseUnit(item?.unit)}
                 unitOfMeasure={form.unitOfMeasure}
                 unitsPerPack={form.unitsPerPack}
                 onUnitChange={(value) => {

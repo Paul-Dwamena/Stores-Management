@@ -26,7 +26,7 @@ import {
 } from "../../../services/inventoryService";
 import { getInventoryStats } from "../../../services/statsService";
 import { createItem, updateItem, updateItemPhoto } from "../../../services/itemsService";
-import { buildInventoryUnitNotes, inventoryUnitApiValue } from "./utils/inventoryUnitOptions";
+import { buildInventoryUnitNotes, resolveItemBaseUnit } from "./utils/inventoryUnitOptions";
 import {
   AccessoryDetailModal,
   NewInventoryItemModal,
@@ -121,7 +121,12 @@ export default function InventoryList({
     deliveredByPhone: payload.deliveredByPhone,
     deliveredByEmail: payload.deliveredByEmail,
     waybillNumber: payload.waybillNumber,
-    notes: payload.notes || buildInventoryUnitNotes(payload),
+    notes: payload.notes || buildInventoryUnitNotes({
+      quantity: payload.quantity,
+      unitOfMeasure: payload.unitOfMeasure,
+      unitsPerPack: payload.unitsPerPack,
+      baseUnit: payload.baseUnit || resolveItemBaseUnit(payload.unit),
+    }),
   });
 
   const filtered = useMemo(() => {
@@ -307,7 +312,7 @@ export default function InventoryList({
       const created = await createItem({
         name: payload.name.trim(),
         brand: payload.brand.trim(),
-        unit: inventoryUnitApiValue(payload.unitOfMeasure || payload.unit) || "pcs",
+        unit: payload.unit || "pcs",
         description: payload.description?.trim() || null,
         photo: payload.photoFile || null,
       });

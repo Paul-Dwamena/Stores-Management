@@ -3,6 +3,10 @@ import {
   getDropdownOptionBySlug,
 } from "../../pages/setups/dropdownOptions/dropdownOptionCatalog";
 import {
+  getCachedCatalogOptions,
+  isApiBackedCatalogOption,
+} from "../../services/catalogOptionsCache";
+import {
   isManagedDropdownOption,
   listManagedDropdownItems,
 } from "./dropdownOptionsStore";
@@ -37,6 +41,10 @@ export function getDropdownOptionSourceChoices() {
  */
 export function resolveDropdownOptionChoices(optionId) {
   if (!optionId) return [];
+
+  if (isApiBackedCatalogOption(optionId)) {
+    return fromNamedRows(getCachedCatalogOptions(optionId));
+  }
 
   if (isManagedDropdownOption(optionId)) {
     return fromNamedRows(listManagedDropdownItems(optionId));

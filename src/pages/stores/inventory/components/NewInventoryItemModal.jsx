@@ -11,7 +11,7 @@ import MoneyInputField from "../../../../components/common/fields/MoneyInputFiel
 import ChoiceOption from "../../../../components/common/fields/ChoiceOption";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { getAccessoryBrandOptions } from "../../../../mockdata/stores/accessories";
+import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
@@ -35,9 +35,9 @@ import StoreSelect from "./StoreSelect";
 import InventoryUnitFields from "./InventoryUnitFields";
 import { sendDeliveryOtp } from "../../../../services/inventoryService";
 import {
-  buildInventoryUnitNotes,
-  inventoryUnitApiValue,
+  buildReceiveStockPayload,
   normalizeInventoryUnit,
+  resolveItemBaseUnit,
   validateInventoryUnitFields,
 } from "../utils/inventoryUnitOptions";
 
@@ -75,6 +75,7 @@ const INITIAL_ACCESSORY = {
   name: "",
   brand: "",
   description: "",
+  baseUnit: "piece",
   unitOfMeasure: "",
   unitsPerPack: "",
   quantity: "",
@@ -383,19 +384,8 @@ function validateStockFields(form, errors) {
   if (!form.location?.trim()) errors.location = "Select a store location.";
 }
 
-function withInventoryUnitPayload(form, payload) {
-  const unitOfMeasure = normalizeInventoryUnit(form.unitOfMeasure);
-  return {
-    ...payload,
-    unitOfMeasure,
-    unitsPerPack: form.unitsPerPack,
-    unit: inventoryUnitApiValue(unitOfMeasure),
-    notes: buildInventoryUnitNotes({
-      unitOfMeasure,
-      unitsPerPack: form.unitsPerPack,
-      notes: form.notes,
-    }),
-  };
+function withInventoryUnitPayload(form, payload, { itemUnit } = {}) {
+  return buildReceiveStockPayload(form, payload, { itemUnit });
 }
 
 export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkSave }) {
@@ -422,6 +412,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const brandOptions = useBrandSelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -686,8 +677,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setRegisteredForm((prev) => ({
       ...prev,
       itemId: item.id,
-      unitOfMeasure: normalizeInventoryUnit(item.unit) || prev.unitOfMeasure,
-      unitsPerPack: normalizeInventoryUnit(item.unit) === "pieces" ? "" : prev.unitsPerPack,
       unitPrice:
         prev.unitPrice
         || (item.unitCost != null ? String(item.unitCost) : ""),
@@ -759,7 +748,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         supplierPhone: registeredForm.supplierPhone,
         supplierEmail: registeredForm.supplierEmail,
         condition: registeredForm.condition,
-      }),
+      }, { itemUnit: selectedRegisteredItem?.unit }),
     });
   };
 
@@ -768,6 +757,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     if (!accessoryForm.name.trim()) nextErrors.name = "Enter an item name.";
     if (!accessoryForm.brand.trim()) nextErrors.brand = "Select a brand.";
     validateStockFields(accessoryForm, nextErrors);
+    validateInventoryUnitFields(accessoryForm, nextErrors, { baseUnitRequired: true });
     validateSupplyingDetails(accessoryForm, nextErrors);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -1120,6 +1110,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                   <InventoryUnitFields
                     idPrefix="reg"
                     quantity={registeredForm.quantity}
+                    baseUnit={resolveItemBaseUnit(selectedRegisteredItem?.unit)}
                     unitOfMeasure={registeredForm.unitOfMeasure}
                     unitsPerPack={registeredForm.unitsPerPack}
                     onUnitChange={(value) => {
@@ -1194,7 +1185,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       )}
                     >
                       <option value="">Select brand…</option>
-                      {getAccessoryBrandOptions().map((option) => (
+                      {brandOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -1252,8 +1243,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                   <InventoryUnitFields
                     idPrefix="newAcc"
                     quantity={accessoryForm.quantity}
+                    baseUnit={accessoryForm.baseUnit}
+                    baseUnitEditable
                     unitOfMeasure={accessoryForm.unitOfMeasure}
                     unitsPerPack={accessoryForm.unitsPerPack}
+                    onBaseUnitChange={(value) => {
+                      setAccessoryForm((prev) => ({ ...prev, baseUnit: value }));
+                      clearError("baseUnit");
+                    }}
                     onUnitChange={(value) => {
                       setAccessoryForm((prev) => ({
                         ...prev,

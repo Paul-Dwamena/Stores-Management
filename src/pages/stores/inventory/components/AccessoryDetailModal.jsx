@@ -25,6 +25,10 @@ import ReceiveIntoStoreModal from "./ReceiveIntoStoreModal";
 import EditInventoryItemModal from "./EditInventoryItemModal";
 import ItemStoreStockModal from "./ItemStoreStockModal";
 import { ItemPhotoThumb } from "./ItemPhotoField";
+import {
+  baseUnitLabel,
+  resolveItemBaseUnit,
+} from "../utils/inventoryUnitOptions";
 
 function StatusPill({ status }) {
   return (
@@ -631,11 +635,15 @@ export default function AccessoryDetailModal({
                       </DetailRow>
                     </>
                   )}
-                  <DetailRow label="Unit">{displayValue(item.unit)}</DetailRow>
+                  <DetailRow label="Base unit">
+                    {baseUnitLabel(resolveItemBaseUnit(item.unit))}
+                  </DetailRow>
                   <DetailRow label="Description">
                     <DescriptionDisplay value={item.description} />
                   </DetailRow>
-                  <DetailRow label="Total quantity">{item.quantity}</DetailRow>
+                  <DetailRow label="Total quantity">
+                    <span>{item.quantity}</span>
+                  </DetailRow>
                   <DetailRow label="Average unit cost">
                     {formatInventoryMoney(averageUnitCost)}
                   </DetailRow>

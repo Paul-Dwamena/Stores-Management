@@ -7,7 +7,13 @@ import RequestDetailsModal, {
   AccordionSection,
   DetailRow,
 } from "../../../../components/common/details/RequestDetailsModal";
+import { toast } from "../../../../components/common/ToastNotification";
 import { formatApiDateTime } from "../../../../utils/apiResponseHelpers";
+import {
+  OTP_TYPE,
+  sendDispatcherConfirmationOtp,
+} from "../../../../services/transfersService";
+import DispatcherOtpSection from "./DispatcherOtpSection";
 
 function lineKey(line, index) {
   return `${line.itemId || line.itemCode || "item"}:${index}`;
@@ -84,11 +90,21 @@ export default function ReceiveTransferToStoreModal({
 }) {
   const [detailLine, setDetailLine] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setDetailLine(null);
       setConfirmOpen(false);
+      setDetailsConfirmed(false);
+      setOtpSent(false);
+      setOtp("");
+      setOtpVerified(false);
+      setOtpSending(false);
     }
   }, [isOpen]);
 
@@ -102,6 +118,59 @@ export default function ReceiveTransferToStoreModal({
   if (!isOpen || !transfer) return null;
 
   const lines = transfer.lines || [];
+  const dispatcherName = transfer.dispatcher || "";
+  const dispatcherPhone = String(transfer.dispatcherPhone || "").trim();
+  const dispatcherReady = Boolean(dispatcherPhone);
+
+  const handleSendOtp = async () => {
+    if (!detailsConfirmed) {
+      toast.warning("Confirm details first before sending the OTP.");
+      return;
+    }
+    if (!dispatcherPhone) {
+      toast.warning("This transfer’s dispatcher needs a phone number before an OTP can be sent.");
+      return;
+    }
+    setOtpSending(true);
+    try {
+      await sendDispatcherConfirmationOtp(dispatcherPhone, OTP_TYPE.TRANSFER_DELIVERY);
+      setOtpSent(true);
+      setOtp("");
+      setOtpVerified(false);
+      toast.success(
+        `OTP sent to ${dispatcherName || "dispatcher"} on ${dispatcherPhone}.`,
+      );
+    } catch (error) {
+      toast.error(error.message ?? "Could not send OTP.");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleConfirmDetails = () => {
+    if (!lines.length) {
+      toast.warning("No items to receive on this transfer.");
+      return;
+    }
+    if (!dispatcherReady) {
+      toast.warning("This transfer’s dispatcher needs a phone number before receiving.");
+      return;
+    }
+    setDetailsConfirmed(true);
+    toast.success("Details confirmed. Send and confirm the OTP to finish.");
+  };
+
+  const handlePrimaryAction = () => {
+    if (!detailsConfirmed) {
+      handleConfirmDetails();
+      return;
+    }
+    if (!otpVerified) {
+      toast.warning("Confirm the dispatcher OTP before receiving to store.");
+      return;
+    }
+    setConfirmOpen(true);
+  };
 
   return (
     <>
@@ -118,6 +187,7 @@ export default function ReceiveTransferToStoreModal({
                 <h2 className="text-2xl font-extrabold text-slate-900">Receive to store</h2>
                 <p className="text-[12px] text-slate-500 font-medium mt-1">
                   {transfer.transferNumber} · {transfer.fromStore}
+                  {dispatcherName ? ` · Dispatcher: ${dispatcherName}` : ""}
                 </p>
               </div>
               <button
@@ -130,7 +200,7 @@ export default function ReceiveTransferToStoreModal({
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto p-4 sm:p-6">
+            <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4">
               <div className="overflow-x-auto rounded-lg border border-slate-100">
                 <table className="w-full text-left min-w-[720px]">
                   <thead>
@@ -179,14 +249,37 @@ export default function ReceiveTransferToStoreModal({
                   </tbody>
                 </table>
               </div>
+
+              <DispatcherOtpSection
+                dispatcherId={transfer.dispatcherId}
+                dispatcherName={dispatcherName}
+                dispatcherPhone={dispatcherPhone}
+                otpSent={otpSent}
+                otp={otp}
+                otpVerified={otpVerified}
+                onSendOtp={handleSendOtp}
+                sendLoading={otpSending}
+                sendDisabled={!dispatcherReady}
+                onOtpChange={(value) => {
+                  setOtp(value);
+                  setOtpVerified(false);
+                }}
+                onVerifiedChange={setOtpVerified}
+                itemCount={lines.length || undefined}
+                detailsConfirmed={detailsConfirmed}
+                purpose="delivery"
+              />
             </div>
 
             <div className="flex justify-end gap-3 p-4 sm:p-6 border-t border-slate-100">
               <Button variant="ghost" className="border border-slate-200" onClick={onClose} disabled={saving}>
                 Cancel
               </Button>
-              <Button onClick={() => setConfirmOpen(true)} disabled={saving}>
-                Receive to store
+              <Button
+                onClick={handlePrimaryAction}
+                disabled={saving || (detailsConfirmed && !otpVerified)}
+              >
+                {detailsConfirmed ? "Receive to store" : "Confirm details"}
               </Button>
             </div>
           </div>

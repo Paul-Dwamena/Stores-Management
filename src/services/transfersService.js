@@ -272,10 +272,21 @@ export const acceptTransfer = async (transferId) => {
   }
 };
 
-export const sendDispatcherConfirmationOtp = async (phone) => {
+export const OTP_TYPE = {
+  TRANSFER_PICKUP: "TRANSFER_PICKUP",
+  TRANSFER_DELIVERY: "TRANSFER_DELIVERY",
+  STOCK_DELIVERY: "STOCK_DELIVERY",
+  ISSUE_PICKUP: "ISSUE_PICKUP",
+};
+
+export const sendDispatcherConfirmationOtp = async (
+  phone,
+  otpType = OTP_TYPE.TRANSFER_PICKUP,
+) => {
   try {
     const { data } = await api.post("/supply-requests/confirmation/send-otp", {
       phone: String(phone || "").trim(),
+      otp_type: String(otpType || "").trim(),
     });
     return data;
   } catch (err) {

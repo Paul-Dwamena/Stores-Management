@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Boxes, PackagePlus } from "lucide-react";
+import { AlertCircle, Boxes, PackagePlus, Search } from "lucide-react";
 import AddModal from "../../../../components/common/AddModal";
 import SectionLoadState from "../../../../components/common/SectionLoadState";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import Button from "../../../../components/common/base/Button";
-import CheckboxMultiSelect from "../../../../components/common/fields/CheckboxMultiSelect";
 import { ConfiguredCustomFields } from "../../../../components/common/ConfiguredFormSections";
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
@@ -107,6 +106,7 @@ export function getRequisitionStoreAllocations(requisition) {
         storeId: row.storeId ?? null,
         quantity: row.quantity == null || row.quantity === "" ? null : Number(row.quantity),
         quantityIssued: Number(row.quantityIssued) || 0,
+        quantityRejected: Number(row.quantityRejected) || 0,
       }));
   }
   return getRequisitionIssuingStores(requisition).map((location) => ({
@@ -114,6 +114,7 @@ export function getRequisitionStoreAllocations(requisition) {
     storeId: null,
     quantity: null,
     quantityIssued: 0,
+    quantityRejected: 0,
   }));
 }
 
@@ -130,11 +131,13 @@ export function getRequisitionStoreIssueLines(requisition) {
   return allocations.map((row) => {
     const quantity = Number(row.quantity) || 0;
     const quantityIssued = Number(row.quantityIssued) || 0;
+    const quantityRejected = Number(row.quantityRejected) || 0;
     return {
       ...row,
       quantity,
       quantityIssued,
-      remaining: Math.max(0, quantity - quantityIssued),
+      quantityRejected,
+      remaining: Math.max(0, quantity - quantityIssued - quantityRejected),
     };
   });
 }
@@ -247,6 +250,7 @@ export default function RaiseSupplyRequestModal({
   const [quantityRequested, setQuantityRequested] = useState("");
   const [selectedLocations, setSelectedLocations] = useState([]);
   const [quantitiesByLocation, setQuantitiesByLocation] = useState({});
+  const [storeSearchQuery, setStoreSearchQuery] = useState("");
   const [comment, setComment] = useState("");
   const [customValues, setCustomValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -272,16 +276,20 @@ export default function RaiseSupplyRequestModal({
     return getStockLocationsForRequisition(requisition);
   }, [storeOptions, requisition]);
 
-  const locationOptions = useMemo(
-    () =>
-      stockLocations.map((row) => ({
-        value: row.location,
-        label: formatStoreLocation(row.name || row.location),
-        description:
-          row.quantity == null ? "Store" : `Available Stock: ${row.quantity}`,
-      })),
-    [stockLocations],
+  const selectedLocationSet = useMemo(
+    () => new Set(selectedLocations.map(String)),
+    [selectedLocations],
   );
+
+  const filteredStockLocations = useMemo(() => {
+    const q = storeSearchQuery.trim().toLowerCase();
+    if (!q) return stockLocations;
+    return stockLocations.filter((row) => {
+      const name = formatStoreLocation(row.name || row.location).toLowerCase();
+      const id = String(row.location || "").toLowerCase();
+      return name.includes(q) || id.includes(q);
+    });
+  }, [stockLocations, storeSearchQuery]);
 
   const totalStock = useMemo(
     () =>
@@ -346,6 +354,7 @@ export default function RaiseSupplyRequestModal({
     }
     setComment(requisition.comment || "");
     setCustomValues({});
+    setStoreSearchQuery("");
     setErrors({});
     setConfirmOpen(false);
     setRejectOpen(false);
@@ -366,6 +375,14 @@ export default function RaiseSupplyRequestModal({
       storeLocations: undefined,
       storeQuantities: undefined,
     }));
+  };
+
+  const toggleStoreLocation = (location) => {
+    const key = String(location);
+    const next = selectedLocationSet.has(key)
+      ? selectedLocations.filter((value) => String(value) !== key)
+      : [...selectedLocations, key];
+    handleLocationsChange(next);
   };
 
   const handleLocationQuantityChange = (location, value) => {
@@ -489,7 +506,10 @@ export default function RaiseSupplyRequestModal({
           errorTitle="Couldn’t load this request"
         >
         <div className="space-y-4">
-          <RequisitionRequestSummary requisition={requisition} />
+          <RequisitionRequestSummary
+            requisition={requisition}
+            quantityFields={["requested"]}
+          />
 
           {!busy && raiseBlockReason === "unregistered" ? (
             <div className="space-y-4">
@@ -527,7 +547,7 @@ export default function RaiseSupplyRequestModal({
                     </tr>
                     <tr>
                       <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                        Quantity requested
+                        Quantity Requested
                       </th>
                       <td className="px-3 py-2 text-[12px] font-semibold text-slate-900 tabular-nums">
                         {requisition?.quantityRequested ?? requisition?.quantity ?? "—"}
@@ -628,21 +648,61 @@ export default function RaiseSupplyRequestModal({
             </div>
           ) : (
             <div className="space-y-3">
-              <CheckboxMultiSelect
-                id="raiseSupplyStoreLocations"
-                label="Store locations"
-                required
-                placeholder="Select store locations…"
-                searchable
-                searchPlaceholder="Search store locations…"
-                options={locationOptions}
-                value={selectedLocations}
-                onChange={handleLocationsChange}
-                error={errors.storeLocations}
-                formatSelectionLabel={(count) =>
-                  count === 1 ? "1 location selected" : `${count} locations selected`
-                }
-              />
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  {requiredFieldLabel("Store locations", true)}
+                </p>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={storeSearchQuery}
+                    onChange={(e) => setStoreSearchQuery(e.target.value)}
+                    placeholder="Search store locations…"
+                    className={cn(fieldClassName, "pl-8 bg-white")}
+                  />
+                </div>
+                <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-50">
+                  {filteredStockLocations.length === 0 ? (
+                    <p className="px-3 py-4 text-[12px] text-slate-400">
+                      No matching store locations.
+                    </p>
+                  ) : (
+                    filteredStockLocations.map((row) => {
+                      const selected = selectedLocationSet.has(String(row.location));
+                      return (
+                        <label
+                          key={row.location}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors",
+                            selected ? "bg-slate-50" : "hover:bg-slate-50",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleStoreLocation(row.location)}
+                            className="rounded border-slate-300 text-primary focus:ring-slate-900/25 shrink-0"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[12px] font-semibold text-slate-800">
+                              <StoreLocationDisplay value={row.name || row.location} />
+                            </span>
+                            <span className="block text-[11px] text-slate-500 mt-0.5">
+                              {row.quantity == null
+                                ? "Available Stock : —"
+                                : `Available Stock : ${row.quantity}`}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                {errors.storeLocations ? (
+                  <p className="text-[10px] text-rose-600">{errors.storeLocations}</p>
+                ) : null}
+              </div>
 
               {selectedLocations.length > 0 ? (
                 <div className="space-y-2">

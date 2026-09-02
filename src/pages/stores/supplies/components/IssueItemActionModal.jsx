@@ -79,6 +79,7 @@ export default function IssueItemActionModal({
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
   const [errors, setErrors] = useState({});
   const [rejectMode, setRejectMode] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -155,12 +156,21 @@ export default function IssueItemActionModal({
     setOtpSent(Boolean(requisition?.pendingOtp));
     setOtp("");
     setOtpVerified(false);
+    setOtpSending(false);
+    setDetailsConfirmed(false);
     setErrors({});
     setRejectMode(null);
     setConfirmOpen(false);
     setReceiverEditorOpen(false);
     setCustomValues({});
   }, [isOpen, requisition, preferredStore, isPartialRemaining, stockLocations]);
+
+  const resetOtpState = () => {
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+    setDetailsConfirmed(false);
+  };
 
   const receiverPeople = receivers;
   const hasLiveReceivers = Array.isArray(receiverPeople);
@@ -219,6 +229,10 @@ export default function IssueItemActionModal({
   };
 
   const handleSendOtp = async () => {
+    if (!detailsConfirmed) {
+      toast.warning("Confirm details first before sending the OTP.");
+      return;
+    }
     if (!validateIssuanceDetails()) return;
     if (!selectedReceiver?.phone?.trim()) {
       toast.warning("The selected receiver needs a phone number before an OTP can be sent.");
@@ -247,8 +261,17 @@ export default function IssueItemActionModal({
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirmDetails = () => {
     if (!validateIssuanceDetails()) return;
+    setDetailsConfirmed(true);
+    toast.success("Details confirmed. Send and confirm the OTP to finish.");
+  };
+
+  const handleConfirm = () => {
+    if (!detailsConfirmed) {
+      handleConfirmDetails();
+      return;
+    }
     if (!otpSent) {
       toast.warning("Send an OTP to the receiver first.");
       return;
@@ -285,12 +308,12 @@ export default function IssueItemActionModal({
         subtitle={
           isPartialRemaining
             ? `This request is partially supplied. Issue up to ${remainingQuantity} remaining, or reject the remainder.`
-            : "Issue from one store at a time. Select the receiver, send an OTP, then confirm."
+            : "Issue from one store at a time. Confirm details first, then verify the receiver OTP."
         }
         dialogClassName="max-w-5xl"
-        saveLabel="Confirm issue"
+        saveLabel={detailsConfirmed ? "Confirm issue" : "Confirm details"}
         saveVariant="primary"
-        saveDisabled={busy || !otpVerified || storeIssuanceComplete}
+        saveDisabled={busy || storeIssuanceComplete || (detailsConfirmed && !otpVerified)}
         hideCancelButton
         secondaryAction={{ label: "Cancel", onClick: onClose }}
         footerActions={
@@ -350,9 +373,7 @@ export default function IssueItemActionModal({
                               ? String(getStoreIssueRemaining(requisition, nextStore) || "")
                               : "";
                           });
-                          setOtpSent(false);
-                          setOtp("");
-                          setOtpVerified(false);
+                          resetOtpState();
                           setErrors((prev) => {
                             const next = { ...prev };
                             delete next.issueStore;
@@ -414,9 +435,7 @@ export default function IssueItemActionModal({
                           disabled={storeIssuanceComplete}
                           onChange={(event) => {
                             setQuantityToIssue(event.target.value);
-                            setOtpSent(false);
-                            setOtp("");
-                            setOtpVerified(false);
+                            resetOtpState();
                             setErrors((prev) => {
                               if (!prev.quantityToIssue) return prev;
                               const next = { ...prev };
@@ -460,9 +479,7 @@ export default function IssueItemActionModal({
             items={hasLiveReceivers ? receiverPeople : undefined}
             onChange={(nextValue) => {
               setSuppliedTo(nextValue);
-              setOtpSent(false);
-              setOtp("");
-              setOtpVerified(false);
+              resetOtpState();
               setErrors((prev) => {
                 if (!prev.suppliedTo) return prev;
                 const next = { ...prev };
@@ -495,6 +512,7 @@ export default function IssueItemActionModal({
               setOtpVerified(false);
             }}
             onVerifiedChange={setOtpVerified}
+            detailsConfirmed={detailsConfirmed}
           />
           <ConfiguredCustomFields
             sections={sections}
@@ -538,9 +556,7 @@ export default function IssueItemActionModal({
         onCreated={(created) => {
           onReceiverCreated?.(created);
           setSuppliedTo(created?.id != null ? String(created.id) : "");
-          setOtpSent(false);
-          setOtp("");
-          setOtpVerified(false);
+          resetOtpState();
           setErrors((prev) => {
             if (!prev.suppliedTo) return prev;
             const next = { ...prev };

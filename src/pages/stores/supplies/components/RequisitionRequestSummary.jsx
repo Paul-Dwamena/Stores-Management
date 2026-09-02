@@ -30,7 +30,7 @@ export function StoreAllocationsTable({ allocations = [] }) {
               Store
             </th>
             <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-              Quantity requested
+              Quantity to Supply
             </th>
             {allocations.some((row) => Number(row.quantityIssued) > 0) ? (
               <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
@@ -61,9 +61,12 @@ export function StoreAllocationsTable({ allocations = [] }) {
   );
 }
 
+const DEFAULT_QUANTITY_FIELDS = ["requested", "toSupply", "supplied", "remaining"];
+
 export default function RequisitionRequestSummary({
   requisition,
   title = "Request details",
+  quantityFields = DEFAULT_QUANTITY_FIELDS,
 }) {
   const [open, setOpen] = useState(true);
 
@@ -92,9 +95,31 @@ export default function RequisitionRequestSummary({
     && String(description).trim().toLowerCase() !== String(name || "").trim().toLowerCase();
   const issuingStores = getRequisitionIssuingStores(requisition);
   const storeAllocations = getRequisitionStoreIssueLines(requisition);
-  const totalRequested = Number(requisition.quantityRequested ?? requisition.quantity) || 0;
-  const quantitySupplied = Number(requisition.quantitySupplied) || 0;
-  const showSupplyProgress = quantitySupplied > 0 && totalRequested > 0;
+  const quantityRequested = requisition.quantityRequested ?? requisition.quantity ?? null;
+  const quantityToSupply =
+    requisition.quantityToSupply
+    ?? requisition.totalQuantityRequested
+    ?? null;
+  const quantitySupplied =
+    requisition.quantitySupplied != null && requisition.quantitySupplied !== ""
+      ? Number(requisition.quantitySupplied) || 0
+      : null;
+  const quantityRejected =
+    requisition.quantityRejected != null && requisition.quantityRejected !== ""
+      ? Number(requisition.quantityRejected) || 0
+      : null;
+  const quantityRemaining =
+    requisition.quantityRemaining != null && requisition.quantityRemaining !== ""
+      ? Number(requisition.quantityRemaining) || 0
+      : quantityToSupply != null && quantitySupplied != null
+        ? Math.max(0, Number(quantityToSupply) - quantitySupplied - (quantityRejected || 0))
+        : getRequisitionRemainingQuantity(requisition) || null;
+  const showQuantity = (key) => quantityFields.includes(key);
+  const isRejected = supplyStatusKey(requisition.status) === "REJECTED";
+  const showRejectedQuantity =
+    isRejected && (quantityRejected != null || showQuantity("rejected"));
+  const progressBase = Number(quantityToSupply ?? quantityRequested) || 0;
+  const showSupplyProgress = Number(quantitySupplied) > 0 && progressBase > 0;
   const hasStoreIssuance = storeAllocations.some((row) => Number(row.quantityIssued) > 0);
 
   return (
@@ -109,16 +134,31 @@ export default function RequisitionRequestSummary({
           <DescriptionDisplay value={description} />
         </DetailRow>
       ) : null}
-      <DetailRow label="Quantity requested">
-        {String(requisition.quantityRequested ?? requisition.quantity ?? "—")}
-      </DetailRow>
-      {requisition.quantitySupplied != null && Number(requisition.quantitySupplied) > 0 ? (
-        <DetailRow label="Quantity supplied">{String(requisition.quantitySupplied)}</DetailRow>
+      {showQuantity("requested") ? (
+        <DetailRow label="Quantity Requested">
+          {quantityRequested == null || quantityRequested === "" ? "—" : String(quantityRequested)}
+        </DetailRow>
       ) : null}
-      {supplyStatusKey(requisition.status) === "PARTIALLY_SUPPLIED"
-        || getRequisitionRemainingQuantity(requisition) > 0 ? (
-        <DetailRow label="Quantity remaining">
-          {String(getRequisitionRemainingQuantity(requisition))}
+      {showQuantity("toSupply") ? (
+        <DetailRow label="Quantity to Supply">
+          {quantityToSupply == null || quantityToSupply === "" ? "—" : String(quantityToSupply)}
+        </DetailRow>
+      ) : null}
+      {showQuantity("supplied") ? (
+        <DetailRow label="Quantity Supplied">
+          {quantitySupplied == null ? "—" : String(quantitySupplied)}
+        </DetailRow>
+      ) : null}
+      {showRejectedQuantity ? (
+        <DetailRow label="Quantity Rejected">
+          {quantityRejected == null ? "—" : String(quantityRejected)}
+        </DetailRow>
+      ) : null}
+      {showQuantity("remaining") ? (
+        <DetailRow label="Remaining to Supply">
+          {quantityRemaining == null || quantityRemaining === ""
+            ? "—"
+            : String(quantityRemaining)}
         </DetailRow>
       ) : null}
       {requisition.justification ? (
@@ -143,7 +183,7 @@ export default function RequisitionRequestSummary({
         </DetailRow>
       ) : null}
       {storeAllocations.length > 0 ? (
-        <DetailRow label="Stores & quantity requested">
+        <DetailRow label="Stores & quantity to supply">
           <ul className="space-y-1.5">
             {storeAllocations.map((row) => {
               const supplied = Number(row.quantityIssued) || 0;
@@ -160,7 +200,7 @@ export default function RequisitionRequestSummary({
                   <span className="tabular-nums text-slate-500">
                     {supplied > 0 || hasStoreIssuance
                       ? `${supplied} Supplied; ${remaining} Remaining.`
-                      : `${row.quantity ?? "—"} requested`}
+                      : `${row.quantity ?? "—"} to supply`}
                   </span>
                 </li>
               );
@@ -197,7 +237,7 @@ export default function RequisitionRequestSummary({
           <SupplyStatusBadge status={requisition.status} />
           {showSupplyProgress ? (
             <span className="text-[12px] font-medium text-slate-500">
-              {quantitySupplied} supplied out of {totalRequested}
+              {quantitySupplied} supplied out of {progressBase}
             </span>
           ) : null}
         </span>

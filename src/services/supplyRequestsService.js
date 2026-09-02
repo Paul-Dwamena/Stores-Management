@@ -21,6 +21,17 @@ const PENDING_QUEUE_STATUSES = new Set([
 const sumQuantityIssued = (items = []) =>
   items.reduce((sum, item) => sum + (Number(item.quantityIssued) || 0), 0);
 
+const sumQuantityRejected = (items = []) =>
+  items.reduce((sum, item) => sum + (Number(item.quantityRejected) || 0), 0);
+
+const remainingToSupply = (toSupply, supplied, rejected) => {
+  if (toSupply == null || toSupply === "") return null;
+  return Math.max(
+    0,
+    Number(toSupply) - (Number(supplied) || 0) - (Number(rejected) || 0),
+  );
+};
+
 const summarizeItemNames = (items = []) => {
   const names = [...new Set(items.map((item) => item.itemName).filter(Boolean))];
   if (names.length === 0) return items[0]?.itemName || "";
@@ -63,6 +74,7 @@ const toSupplyItem = (row) => ({
   storeCode: row.store?.code || "",
   quantityRequested: row.quantity_requested,
   quantityIssued: Number(row.quantity_issued) || 0,
+  quantityRejected: Number(row.quantity_rejected) || 0,
   status: statusKey(row.status),
 });
 
@@ -70,6 +82,7 @@ export const toSupplyRequest = (row) => {
   const items = (row.items || []).map(toSupplyItem);
   const totalQuantityRequested = row.total_quantity_requested;
   const quantitySupplied = sumQuantityIssued(items);
+  const quantityRejected = sumQuantityRejected(items);
 
   return {
     id: row.id,
@@ -86,7 +99,12 @@ export const toSupplyRequest = (row) => {
     updatedAt: row.updated_at,
     items,
     quantitySupplied,
-    quantityRemaining: Math.max(0, Number(totalQuantityRequested) - quantitySupplied),
+    quantityRejected,
+    quantityRemaining: remainingToSupply(
+      totalQuantityRequested,
+      quantitySupplied,
+      quantityRejected,
+    ),
     queue: PENDING_QUEUE_STATUSES.has(statusKey(row.status)) ? "pending" : "history",
   };
 };
@@ -95,13 +113,15 @@ export const toRequisitionFromSupplyRequest = (request) => {
   if (!request) return null;
   const items = request.items || [];
   const first = items[0] || {};
-  const totalRequested = request.totalQuantityRequested ?? request.quantityRequested;
+  const quantityToSupply = request.totalQuantityRequested ?? request.quantityToSupply ?? null;
   const quantitySupplied =
     request.quantitySupplied != null ? request.quantitySupplied : sumQuantityIssued(items);
+  const quantityRejected =
+    request.quantityRejected != null ? request.quantityRejected : sumQuantityRejected(items);
   const quantityRemaining =
     request.quantityRemaining != null
       ? request.quantityRemaining
-      : Math.max(0, Number(totalRequested) - quantitySupplied);
+      : remainingToSupply(quantityToSupply, quantitySupplied, quantityRejected);
 
   return {
     ...request,
@@ -110,9 +130,12 @@ export const toRequisitionFromSupplyRequest = (request) => {
     itemCode: first.itemCode,
     itemName: summarizeItemNames(items),
     description: first.description,
-    quantity: totalRequested,
-    quantityRequested: totalRequested,
+    quantity: quantityToSupply,
+    // Original customer qty when attached; otherwise null (callers resolve from general request).
+    quantityRequested: request.originalQuantityRequested ?? request.quantityRequested ?? null,
+    quantityToSupply,
     quantitySupplied,
+    quantityRejected,
     quantityRemaining,
     requestedBy: request.requesterName,
     rejectionComment: request.rejectionReason || request.rejectionComment || null,
@@ -123,6 +146,7 @@ export const toRequisitionFromSupplyRequest = (request) => {
       supplyRequestItemId: item.supplyRequestItemId ?? item.id,
       quantity: item.quantityRequested,
       quantityIssued: Number(item.quantityIssued) || 0,
+      quantityRejected: Number(item.quantityRejected) || 0,
     })),
   };
 };
@@ -247,10 +271,18 @@ export const registerItemForRequest = async (generalRequestItemId, payload) => {
   }
 };
 
-export const sendSupplyConfirmationOtp = async (phone) => {
+export const OTP_TYPE = {
+  TRANSFER_PICKUP: "TRANSFER_PICKUP",
+  TRANSFER_DELIVERY: "TRANSFER_DELIVERY",
+  STOCK_DELIVERY: "STOCK_DELIVERY",
+  ISSUE_PICKUP: "ISSUE_PICKUP",
+};
+
+export const sendSupplyConfirmationOtp = async (phone, otpType = OTP_TYPE.ISSUE_PICKUP) => {
   try {
     const { data } = await api.post("/supply-requests/confirmation/send-otp", {
       phone: String(phone || "").trim(),
+      otp_type: String(otpType || "").trim(),
     });
     return data;
   } catch (err) {

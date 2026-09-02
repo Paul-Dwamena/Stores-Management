@@ -113,7 +113,10 @@ export default function ApprovalRequestActionModal({
           errorTitle="Couldn’t load this request"
         >
         <div className="space-y-4">
-          <RequisitionRequestSummary requisition={requisition} />
+          <RequisitionRequestSummary
+            requisition={requisition}
+            quantityFields={["requested", "toSupply"]}
+          />
           <ShowConfiguredField visibleKeys={visibleKeys} fieldKey="requestComment">
             <ReadOnlyField
               label="Request comment"

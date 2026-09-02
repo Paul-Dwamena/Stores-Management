@@ -23,6 +23,8 @@ function resolveDispatcher(dispatcherId, dispatchers = []) {
 export default function DispatcherOtpSection({
   dispatcherId,
   dispatchers = [],
+  dispatcherName = "",
+  dispatcherPhone = "",
   otpSent,
   otp,
   otpVerified,
@@ -33,6 +35,8 @@ export default function DispatcherOtpSection({
   sendLoading = false,
   itemCount,
   required = true,
+  detailsConfirmed = false,
+  purpose = "pickup",
 }) {
   const [otpError, setOtpError] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -40,15 +44,33 @@ export default function DispatcherOtpSection({
     () => resolveDispatcher(dispatcherId, dispatchers),
     [dispatcherId, dispatchers],
   );
-  const name = dispatcher?.name || String(dispatcherId || "").trim() || "the selected dispatcher";
-  const phone = dispatcher?.phone?.trim() || "";
+  const name =
+    dispatcher?.name
+    || String(dispatcherName || "").trim()
+    || String(dispatcherId || "").trim()
+    || "the selected dispatcher";
+  const phone = dispatcher?.phone?.trim() || String(dispatcherPhone || "").trim() || "";
   const itemLabel = Number.isFinite(itemCount)
     ? ` for the ${itemCount} selected item${itemCount === 1 ? "" : "s"}`
     : "";
+  const isDelivery = purpose === "delivery";
+  const actionLabel = isDelivery ? "Receive to store" : "Request approval";
+  const verificationTitle = isDelivery
+    ? "Dispatcher delivery verification"
+    : "Dispatcher verification";
+  const lockedHint = isDelivery
+    ? "Confirm the transfer items first. OTP verification unlocks afterwards as the final step before receiving to store."
+    : "Confirm store, items, and dispatcher details first. OTP verification unlocks afterwards as the final step before requesting approval.";
+  const confirmedHint = isDelivery
+    ? "You can now receive to store."
+    : "You can now request approval.";
+  const pendingHint = isDelivery
+    ? "Confirm the code they receive before booking items into store."
+    : "Confirm the code they receive before requesting approval.";
 
   useEffect(() => {
     setOtpError("");
-  }, [otpSent, dispatcherId]);
+  }, [otpSent, dispatcherId, dispatcherName, dispatcherPhone]);
 
   const handleConfirmOtp = async () => {
     if (!/^\d{6}$/.test(otp.trim())) {
@@ -81,6 +103,15 @@ export default function DispatcherOtpSection({
     }
   };
 
+  if (!detailsConfirmed) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2">
+        <p className="text-[12px] font-bold text-slate-800">OTP confirmation</p>
+        <p className="text-[12px] text-slate-500">{lockedHint}</p>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -96,7 +127,7 @@ export default function DispatcherOtpSection({
         <p className="text-[12px] font-bold text-slate-800">
           {otpVerified
             ? "OTP confirmed"
-            : requiredFieldLabel("Dispatcher verification", true)}
+            : requiredFieldLabel(verificationTitle, true)}
         </p>
         <p className="text-[12px] text-slate-500 mt-1">
           {otpVerified ? (
@@ -110,7 +141,7 @@ export default function DispatcherOtpSection({
                   <span className="font-semibold text-slate-700">{phone}</span>
                 </>
               ) : null}
-              {itemLabel}. You can now request approval.
+              {itemLabel}. {confirmedHint}
             </>
           ) : otpSent ? (
             <>
@@ -136,7 +167,7 @@ export default function DispatcherOtpSection({
                   <span className="font-semibold text-slate-700">{phone}</span>
                 </>
               ) : null}
-              {itemLabel}. Confirm the code they receive before requesting approval.
+              {itemLabel}. {pendingHint}
             </>
           )}
         </p>
@@ -174,7 +205,7 @@ export default function DispatcherOtpSection({
               {sendLoading ? "Sending…" : "Send OTP"}
             </Button>
             <p className="text-[11px] font-medium text-slate-400">
-              Send and confirm the OTP to enable Request approval
+              Send and confirm the OTP to enable {actionLabel}
             </p>
           </div>
         )

@@ -10,7 +10,7 @@ import TableIconAction from "../../../../components/common/tableActions/TableIco
 import TableRowActions from "../../../../components/common/tableActions/TableRowActions";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { formatInventoryMoney, sendDeliveryOtp } from "../../../../services/inventoryService";
+import { formatInventoryMoney, sendDeliveryOtp, OTP_TYPE } from "../../../../services/inventoryService";
 import { formatMoneyAmount } from "../../../../utils/displayFormatters";
 import { useBrandSelectOptions, useCategorySelectOptions } from "../../../../hooks/useCatalogOptions";
 import { catalogOptionLabel } from "../../../../utils/catalogRefHelpers";
@@ -997,6 +997,7 @@ export default function BulkInventoryReceiptModal({
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
   const [stores, setStores] = useState([]);
   const { options: brandOptions } = useBrandSelectOptions(isOpen);
 
@@ -1033,7 +1034,15 @@ export default function BulkInventoryReceiptModal({
     setOtp("");
     setOtpVerified(false);
     setOtpSending(false);
+    setDetailsConfirmed(false);
   }, [isOpen, inventoryType, forcedMode]);
+
+  const resetOtpState = () => {
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+    setDetailsConfirmed(false);
+  };
 
   const storeNameById = useMemo(
     () => new Map(stores.map((store) => [String(store.id), store.name])),
@@ -1110,27 +1119,26 @@ export default function BulkInventoryReceiptModal({
         current.map((row) => (row.clientId === editor.line.clientId ? editor.line : row)),
       );
       closeEditor();
+      resetOtpState();
       toast.success("Item updated.");
       return;
     }
     setLines((current) => [...current, editor.line]);
     setEditor({ type: "add", line: createLine(inventoryType, mode) });
     setEditorErrors({});
+    resetOtpState();
     toast.success("Item added.");
   };
 
   const removeLine = (clientId) => {
     setLines((current) => current.filter((row) => row.clientId !== clientId));
+    resetOtpState();
     if (editor?.line.clientId === clientId) closeEditor();
   };
 
   const setSharedField = (key, value) => {
     setShared((current) => ({ ...current, [key]: value }));
-    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(key)) {
-      setOtpSent(false);
-      setOtp("");
-      setOtpVerified(false);
-    }
+    resetOtpState();
     setErrors((current) => {
       const nextShared = { ...current.shared };
       delete nextShared[key];
@@ -1147,6 +1155,10 @@ export default function BulkInventoryReceiptModal({
     && Boolean(shared.deliveredByEmail.trim());
 
   const handleSendDeliveryOtp = async () => {
+    if (!detailsConfirmed) {
+      toast.warning("Confirm details first before sending the OTP.");
+      return;
+    }
     if (!shared.deliveredByName.trim()) {
       toast.warning("Enter the delivery person’s full name first.");
       return;
@@ -1165,7 +1177,7 @@ export default function BulkInventoryReceiptModal({
     }
     setOtpSending(true);
     try {
-      await sendDeliveryOtp(shared.deliveredByPhone.trim());
+      await sendDeliveryOtp(shared.deliveredByPhone.trim(), OTP_TYPE.STOCK_DELIVERY);
       setOtp("");
       setOtpVerified(false);
       setOtpSent(true);
@@ -1205,7 +1217,28 @@ export default function BulkInventoryReceiptModal({
     return Object.keys(sharedErrors).length === 0 && Object.keys(lineErrors).length === 0;
   };
 
+  const handleConfirmDetails = () => {
+    if (editorOpen) {
+      toast.warning("Add or close the item in the side panel first.");
+      return;
+    }
+    if (lines.length === 0) {
+      toast.warning("Add at least one item to receive.");
+      return;
+    }
+    if (!validate()) {
+      toast.warning("Complete the required supply and item fields.");
+      return;
+    }
+    setDetailsConfirmed(true);
+    toast.success("Details confirmed. Send and confirm the OTP to finish.");
+  };
+
   const prepareSave = () => {
+    if (!detailsConfirmed) {
+      handleConfirmDetails();
+      return;
+    }
     if (editorOpen) {
       toast.warning("Add or close the item in the side panel first.");
       return;
@@ -1290,11 +1323,11 @@ export default function BulkInventoryReceiptModal({
             : `Create several new ${typeLabel} under one supply.`
         }
         saveLabel={
-          mode === "existing"
-            ? `Receive ${lines.length} item${lines.length === 1 ? "" : "s"}`
+          !detailsConfirmed
+            ? "Confirm details"
             : `Receive ${lines.length} item${lines.length === 1 ? "" : "s"}`
         }
-        saveDisabled={!otpVerified}
+        saveDisabled={detailsConfirmed && !otpVerified}
         contentClassName="!p-0 overflow-hidden flex flex-col min-h-0"
       >
         <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -1329,6 +1362,7 @@ export default function BulkInventoryReceiptModal({
               onVerifiedChange={setOtpVerified}
               sendDisabled={!deliveryContactReady}
               sendLoading={otpSending}
+              detailsConfirmed={detailsConfirmed}
             />
           </div>
 

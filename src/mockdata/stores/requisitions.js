@@ -83,7 +83,11 @@ export function getRequisitionRemainingQuantity(row) {
   if (row.quantityRemaining != null && row.quantityRemaining !== "") {
     return Math.max(0, Number(row.quantityRemaining) || 0);
   }
-  return Math.max(0, getRequestedQuantity(row) - Number(row.quantitySupplied || 0));
+  const base = Number(row.quantityToSupply ?? row.quantityRequested ?? row.quantity ?? 0) || 0;
+  return Math.max(
+    0,
+    base - Number(row.quantitySupplied || 0) - Number(row.quantityRejected || 0),
+  );
 }
 
 export function getNormalizedStoreAllocations(row) {
@@ -95,6 +99,7 @@ export function getNormalizedStoreAllocations(row) {
         location: item.location,
         quantity: Number(item.quantity) || 0,
         quantityIssued: Number(item.quantityIssued) || 0,
+        quantityRejected: Number(item.quantityRejected) || 0,
       }));
   }
   const stores = Array.isArray(row.storeLocations) && row.storeLocations.length

@@ -6,6 +6,13 @@ const toGeneralStats = (row = {}) => ({
   lowOutOfStock: Number(row.low_out_of_stock) || 0,
   openSupplies: Number(row.open_supplies) || 0,
   openTransfers: Number(row.open_transfers) || 0,
+  itemCategories: Number(row.item_categories) || 0,
+  categoriesInStock: Number(row.categories_in_stock) || 0,
+  itemsInStock: Number(row.items_in_stock) || 0,
+  unitsReceived: Number(row.units_received) || 0,
+  unitsSupplied: Number(row.units_supplied) || 0,
+  unitsInStock: Number(row.units_in_stock) || 0,
+  storeTransfers: Number(row.store_transfers) || 0,
 });
 
 const toStockByStore = (row = {}) => ({
@@ -13,6 +20,19 @@ const toStockByStore = (row = {}) => ({
   label: row.store_name || "Unassigned",
   value: Number(row.total_quantity) || 0,
   skuCount: Number(row.sku_count) || 0,
+});
+
+const toCategoriesInStockByStore = (row = {}) => ({
+  storeId: row.store_id,
+  label: row.store_name || "Unassigned",
+  value: Number(row.categories_in_stock) || 0,
+});
+
+const toReceivedSuppliedByStore = (row = {}) => ({
+  storeId: row.store_id,
+  label: row.store_name || "Unassigned",
+  unitsReceived: Number(row.units_received) || 0,
+  unitsSupplied: Number(row.units_supplied) || 0,
 });
 
 const statusKey = (status) =>
@@ -56,12 +76,25 @@ const toLowStockItem = (row = {}) => ({
   minStock: row.min_stock ?? null,
 });
 
-export const getDashboardStats = async () => {
+export const getDashboardStats = async ({ dateFrom, dateTo, storeId } = {}) => {
   try {
-    const { data } = await api.get("/stats/dashboard");
+    const params = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    if (storeId !== undefined && storeId !== null && storeId !== "" && storeId !== "ALL") {
+      params.store_id = Number(storeId);
+    }
+
+    const { data } = await api.get("/stats/dashboard", { params });
     return {
       general: toGeneralStats(data?.general),
       stockByStore: (data?.stock_by_store || []).map(toStockByStore),
+      categoriesInStockByStore: (data?.categories_in_stock_by_store || []).map(
+        toCategoriesInStockByStore,
+      ),
+      receivedSuppliedByStore: (data?.received_supplied_by_store || []).map(
+        toReceivedSuppliedByStore,
+      ),
       supplyStatus: mergeSupplyStatus(data?.supply_status),
       lowStockItems: (data?.low_stock_items || []).map(toLowStockItem),
     };

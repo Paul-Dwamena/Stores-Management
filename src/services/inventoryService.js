@@ -302,10 +302,15 @@ export const updateStoreItemLocation = async (storeId, itemId, { shelf, position
   }
 };
 
-export const sendDeliveryOtp = async (phone) => {
+export const OTP_TYPE = {
+  STOCK_DELIVERY: "STOCK_DELIVERY",
+};
+
+export const sendDeliveryOtp = async (phone, otpType = OTP_TYPE.STOCK_DELIVERY) => {
   try {
     const { data } = await api.post("/inventory/stock/delivery/send-otp", {
       phone: String(phone || "").trim(),
+      otp_type: String(otpType || "").trim(),
     });
     return data;
   } catch (err) {

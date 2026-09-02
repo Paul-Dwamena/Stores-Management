@@ -19,7 +19,10 @@ import { listStores } from "../../../../services/storesService";
 import { listInventoryItems } from "../../../../services/inventoryService";
 import { listUsers } from "../../../../services/usersService";
 import { listRoles, findDispatcherRole } from "../../../../services/rolesService";
-import { sendDispatcherConfirmationOtp } from "../../../../services/transfersService";
+import {
+  OTP_TYPE,
+  sendDispatcherConfirmationOtp,
+} from "../../../../services/transfersService";
 import { ItemPhotoThumb } from "../../inventory/components/ItemPhotoField";
 import DispatcherPicker from "./DispatcherPicker";
 import DispatcherOtpSection from "./DispatcherOtpSection";
@@ -57,6 +60,7 @@ export default function NewInterStoreTransferModal({
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
   const [addDispatcherOpen, setAddDispatcherOpen] = useState(false);
   const [customValues, setCustomValues] = useState({});
   const [errors, setErrors] = useState({});
@@ -138,6 +142,7 @@ export default function NewInterStoreTransferModal({
     setOtp("");
     setOtpVerified(false);
     setOtpSending(false);
+    setDetailsConfirmed(false);
     setAddDispatcherOpen(false);
     setCustomValues({});
     setErrors({});
@@ -210,9 +215,14 @@ export default function NewInterStoreTransferModal({
     setOtpSent(false);
     setOtp("");
     setOtpVerified(false);
+    setDetailsConfirmed(false);
   };
 
   const handleSendOtp = async () => {
+    if (!detailsConfirmed) {
+      toast.warning("Confirm details first before sending the OTP.");
+      return;
+    }
     if (!dispatcherId) {
       setErrors((prev) => ({ ...prev, dispatcher: "Select the person dispatching first." }));
       toast.warning("Select the person dispatching first.");
@@ -224,7 +234,10 @@ export default function NewInterStoreTransferModal({
     }
     setOtpSending(true);
     try {
-      await sendDispatcherConfirmationOtp(selectedDispatcher.phone.trim());
+      await sendDispatcherConfirmationOtp(
+        selectedDispatcher.phone.trim(),
+        OTP_TYPE.TRANSFER_PICKUP,
+      );
       setOtpSent(true);
       setOtp("");
       setOtpVerified(false);
@@ -243,6 +256,7 @@ export default function NewInterStoreTransferModal({
     }
     setLines([]);
     setSearchQuery("");
+    resetDispatcherOtp();
     setErrors((prev) => {
       if (!prev.fromStore && !prev.toStore && !prev.lines) return prev;
       const next = { ...prev };
@@ -255,6 +269,7 @@ export default function NewInterStoreTransferModal({
 
   const handleToStoreChange = (value) => {
     setToStoreId(value);
+    resetDispatcherOtp();
     setErrors((prev) => {
       if (!prev.toStore) return prev;
       const next = { ...prev };
@@ -281,6 +296,7 @@ export default function NewInterStoreTransferModal({
         },
       ];
     });
+    resetDispatcherOtp();
     setErrors((prev) => {
       if (!prev.lines) return prev;
       const next = { ...prev };
@@ -293,6 +309,7 @@ export default function NewInterStoreTransferModal({
     setLines((current) =>
       current.map((line) => (lineKey(line) === key ? { ...line, ...patch } : line)),
     );
+    resetDispatcherOtp();
     setErrors((prev) => {
       if (!prev[key]) return prev;
       const next = { ...prev };
@@ -301,7 +318,7 @@ export default function NewInterStoreTransferModal({
     });
   };
 
-  const handleSave = () => {
+  const validateTransferDetails = () => {
     const nextErrors = {};
     if (!fromStoreId) nextErrors.fromStore = "Select the sending store first.";
     if (!toStoreId) nextErrors.toStore = "Select the receiving store.";
@@ -310,7 +327,6 @@ export default function NewInterStoreTransferModal({
     }
     if (!lines.length) nextErrors.lines = "Select at least one item from this store.";
     if (!dispatcherId) nextErrors.dispatcher = "Select the person dispatching.";
-    else if (!otpVerified) nextErrors.dispatcher = "Verify the OTP sent to the dispatcher first.";
 
     lines.forEach((line) => {
       const key = lineKey(line);
@@ -326,7 +342,27 @@ export default function NewInterStoreTransferModal({
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
-      toast.warning("Complete the transfer lines, dispatcher, and OTP before requesting approval.");
+      toast.warning("Complete the transfer details before confirming.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleConfirmDetails = () => {
+    if (!validateTransferDetails()) return;
+    setDetailsConfirmed(true);
+    toast.success("Details confirmed. Send and confirm the OTP to finish.");
+  };
+
+  const handleSave = () => {
+    if (!detailsConfirmed) {
+      handleConfirmDetails();
+      return;
+    }
+    if (!validateTransferDetails()) return;
+    if (!otpVerified) {
+      setErrors((prev) => ({ ...prev, dispatcher: "Verify the OTP sent to the dispatcher first." }));
+      toast.warning("Confirm the OTP sent to the dispatcher first.");
       return;
     }
 
@@ -360,10 +396,10 @@ export default function NewInterStoreTransferModal({
         onClose={onClose}
         onSave={handleSave}
         title="New inter-store transfer"
-        subtitle="Choose the sending and receiving stores, select items, confirm the dispatcher with OTP, then request approval."
+        subtitle="Choose stores and items, confirm details, then verify the dispatcher OTP to request approval."
         dialogClassName="max-w-5xl"
-        saveLabel="Request approval"
-        saveDisabled={loading || saving || Boolean(loadError) || !otpVerified}
+        saveLabel={detailsConfirmed ? "Request approval" : "Confirm details"}
+        saveDisabled={loading || saving || Boolean(loadError) || (detailsConfirmed && !otpVerified)}
       >
         <SectionLoadState
           loading={loading}
@@ -642,8 +678,13 @@ export default function NewInterStoreTransferModal({
               }}
               onVerifiedChange={setOtpVerified}
               itemCount={lines.length || undefined}
+              detailsConfirmed={detailsConfirmed}
             />
-            {!otpVerified && !errors.dispatcher ? (
+            {!detailsConfirmed ? (
+              <p className="text-[11px] text-slate-500">
+                Confirm transfer details first. OTP verification unlocks as the final step.
+              </p>
+            ) : !otpVerified && !errors.dispatcher ? (
               <p className="text-[11px] text-amber-700">
                 Request approval stays disabled until the dispatcher confirms the OTP.
               </p>

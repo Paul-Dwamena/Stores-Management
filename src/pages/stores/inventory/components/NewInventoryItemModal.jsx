@@ -17,7 +17,7 @@ import {
   getVehiclePartModelOptions,
   getVehiclePartYearOptions,
 } from "../../../../mockdata/stores/vehiclePartsInventory";
-import { formatInventoryMoney } from "../../../../services/inventoryService";
+import { formatInventoryMoney, sendDeliveryOtp, OTP_TYPE } from "../../../../services/inventoryService";
 import { formatMoneyAmount } from "../../../../utils/displayFormatters";
 import { listItems } from "../../../../services/itemsService";
 import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
@@ -33,7 +33,6 @@ import AddSupplierModal from "./AddSupplierModal";
 import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
 import InventoryUnitFields from "./InventoryUnitFields";
-import { sendDeliveryOtp } from "../../../../services/inventoryService";
 import {
   buildReceiveStockPayload,
   calcInventoryPurchaseTotal,
@@ -412,6 +411,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
   const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
   const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(isOpen);
 
@@ -436,9 +436,17 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setOtp("");
     setOtpVerified(false);
     setOtpSending(false);
+    setDetailsConfirmed(false);
     setCatalogTick((tick) => tick + 1);
     setSupplierTick((tick) => tick + 1);
   }, [isOpen]);
+
+  const resetOtpState = () => {
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+    setDetailsConfirmed(false);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -604,11 +612,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       field === "supplierId" ? applySupplierContact(prev, value, supplier) : { ...prev, [field]: value },
     );
     clearError(field);
-    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(field)) {
-      setOtpSent(false);
-      setOtp("");
-      setOtpVerified(false);
-    }
+    resetOtpState();
   };
 
   const handleVehicleChange = (field) => (event) => {
@@ -626,11 +630,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       return { ...prev, [field]: value };
     });
     clearError(field);
-    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(field)) {
-      setOtpSent(false);
-      setOtp("");
-      setOtpVerified(false);
-    }
+    resetOtpState();
     if (field === "make") {
       clearError("model");
       clearError("year");
@@ -645,11 +645,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       field === "supplierId" ? applySupplierContact(prev, value, event.supplier) : { ...prev, [field]: value },
     );
     clearError(field);
-    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(field)) {
-      setOtpSent(false);
-      setOtp("");
-      setOtpVerified(false);
-    }
+    resetOtpState();
   };
 
   const handleRegisteredVehicleFilterChange = (field) => (event) => {
@@ -708,12 +704,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     }));
     setItemSearch("");
     clearError("itemId");
+    resetOtpState();
   };
 
   const switchRegistrationMode = (nextMode) => {
     if (nextMode === registrationMode) return;
     setRegistrationMode(nextMode);
     setErrors({});
+    resetOtpState();
   };
 
   const continueFromSetup = () => {
@@ -735,6 +733,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setOtpSent(false);
     setOtp("");
     setOtpVerified(false);
+    setDetailsConfirmed(false);
     setItemType("accessory");
     setAccessoryForm((prev) => ({
       ...prev,
@@ -883,18 +882,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     }
   };
 
-  const handleFormSave = () => {
-    if (!otpVerified) {
-      toast.warning("Confirm the delivery OTP before receiving stock.");
-      return;
-    }
-    if (registrationMode === "registered") {
-      submitRegistered();
-      return;
-    }
-    submitAccessory();
-  };
-
   const isRegistered = registrationMode === "registered";
   const activeSupplyForm = isRegistered ? registeredForm : accessoryForm;
   const deliveryContactReady =
@@ -902,7 +889,35 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     && Boolean(activeSupplyForm.deliveredByPhone?.trim())
     && Boolean(activeSupplyForm.deliveredByEmail?.trim());
 
+  const validateFormDetails = () => {
+    const nextErrors = {};
+    if (registrationMode === "registered") {
+      if (!registeredForm.itemId || !selectedRegisteredItem) {
+        nextErrors.itemId = "Search and select a registered item.";
+      }
+      validateStockFields(registeredForm, nextErrors);
+      validateSupplyingDetails(registeredForm, nextErrors);
+    } else {
+      if (!accessoryForm.name.trim()) nextErrors.name = "Enter an item name.";
+      if (!accessoryForm.brand.trim()) nextErrors.brand = "Select a brand.";
+      if (!accessoryForm.category.trim()) nextErrors.category = "Select a category.";
+      validateStockFields(accessoryForm, nextErrors);
+      validateInventoryUnitFields(accessoryForm, nextErrors, { baseUnitRequired: true });
+      validateSupplyingDetails(accessoryForm, nextErrors);
+    }
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      toast.warning("Fix the highlighted fields before confirming details.");
+      return false;
+    }
+    return true;
+  };
+
   const handleSendDeliveryOtp = async () => {
+    if (!detailsConfirmed) {
+      toast.warning("Confirm details first before sending the OTP.");
+      return;
+    }
     if (!activeSupplyForm.deliveredByName?.trim()) {
       toast.warning("Enter the delivery person’s full name first.");
       return;
@@ -921,7 +936,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     }
     setOtpSending(true);
     try {
-      await sendDeliveryOtp(activeSupplyForm.deliveredByPhone.trim());
+      await sendDeliveryOtp(activeSupplyForm.deliveredByPhone.trim(), OTP_TYPE.STOCK_DELIVERY);
       setOtp("");
       setOtpVerified(false);
       setOtpSent(true);
@@ -933,6 +948,28 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     } finally {
       setOtpSending(false);
     }
+  };
+
+  const handleConfirmDetails = () => {
+    if (!validateFormDetails()) return;
+    setDetailsConfirmed(true);
+    toast.success("Details confirmed. Send and confirm the OTP to finish.");
+  };
+
+  const handleFormSave = () => {
+    if (!detailsConfirmed) {
+      handleConfirmDetails();
+      return;
+    }
+    if (!otpVerified) {
+      toast.warning("Confirm the delivery OTP before receiving stock.");
+      return;
+    }
+    if (registrationMode === "registered") {
+      submitRegistered();
+      return;
+    }
+    submitAccessory();
   };
 
   const isSetupStep = step === "setup";
@@ -961,11 +998,13 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         saveLabel={
           isSetupStep
             ? "Continue"
-            : isRegistered
-              ? "Receive stock"
-              : "Save item"
+            : !detailsConfirmed
+              ? "Confirm details"
+              : isRegistered
+                ? "Receive stock"
+                : "Save item"
         }
-        saveDisabled={isFormStep && !otpVerified}
+        saveDisabled={isFormStep && detailsConfirmed && !otpVerified}
         dialogClassName={isSetupStep ? "max-w-lg" : "max-w-3xl"}
         contentClassName="space-y-4"
         secondaryAction={
@@ -975,6 +1014,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                 onClick: () => {
                   setStep("setup");
                   setErrors({});
+                  resetOtpState();
                 },
               }
             : undefined
@@ -1380,6 +1420,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
               onVerifiedChange={setOtpVerified}
               sendDisabled={!deliveryContactReady}
               sendLoading={otpSending}
+              detailsConfirmed={detailsConfirmed}
             />
           </div>
         )}

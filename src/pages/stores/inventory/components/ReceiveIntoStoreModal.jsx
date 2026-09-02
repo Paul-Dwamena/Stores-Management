@@ -11,7 +11,7 @@ import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
 import InventoryUnitFields from "./InventoryUnitFields";
-import { sendDeliveryOtp } from "../../../../services/inventoryService";
+import { sendDeliveryOtp, OTP_TYPE } from "../../../../services/inventoryService";
 import {
   buildReceiveStockPayload,
   normalizeInventoryUnit,
@@ -64,6 +64,7 @@ export default function ReceiveIntoStoreModal({
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function ReceiveIntoStoreModal({
     setOtp("");
     setOtpVerified(false);
     setOtpSending(false);
+    setDetailsConfirmed(false);
     setSaving(false);
   }, [isOpen, item?.id]);
 
@@ -86,6 +88,11 @@ export default function ReceiveIntoStoreModal({
     setOtpSent(false);
     setOtp("");
     setOtpVerified(false);
+  };
+
+  const invalidateDetails = () => {
+    if (detailsConfirmed) setDetailsConfirmed(false);
+    resetOtp();
   };
 
   const setField = (key, value, supplier = null) => {
@@ -98,9 +105,7 @@ export default function ReceiveIntoStoreModal({
         supplierEmail: supplier?.email || "",
       };
     });
-    if (["deliveredByName", "deliveredByPhone", "deliveredByEmail"].includes(key)) {
-      resetOtp();
-    }
+    invalidateDetails();
     setErrors((prev) => {
       if (!prev[key]) return prev;
       const next = { ...prev };
@@ -115,6 +120,10 @@ export default function ReceiveIntoStoreModal({
     && Boolean(form.deliveredByEmail.trim());
 
   const handleSendOtp = async () => {
+    if (!detailsConfirmed) {
+      toast.warning("Confirm details first before sending the OTP.");
+      return;
+    }
     if (!form.deliveredByName.trim()) {
       toast.warning("Enter the delivery person’s full name first.");
       return;
@@ -133,7 +142,7 @@ export default function ReceiveIntoStoreModal({
     }
     setOtpSending(true);
     try {
-      await sendDeliveryOtp(form.deliveredByPhone.trim());
+      await sendDeliveryOtp(form.deliveredByPhone.trim(), OTP_TYPE.STOCK_DELIVERY);
       setOtp("");
       setOtpVerified(false);
       setOtpSent(true);
@@ -147,7 +156,7 @@ export default function ReceiveIntoStoreModal({
     }
   };
 
-  const handleSave = () => {
+  const validateDetails = () => {
     const nextErrors = {};
     const quantity = Number(form.quantity);
     const unitCost = Number(form.unitCost);
@@ -174,14 +183,30 @@ export default function ReceiveIntoStoreModal({
     validateInventoryUnitFields(form, nextErrors);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
-      toast.warning("Complete the required fields before receiving stock.");
+      toast.warning("Complete the required fields before confirming details.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleConfirmDetails = () => {
+    if (!validateDetails()) return;
+    setDetailsConfirmed(true);
+    toast.success("Details confirmed. Send and confirm the OTP to finish.");
+  };
+
+  const handleSave = () => {
+    if (!detailsConfirmed) {
+      handleConfirmDetails();
       return;
     }
+    if (!validateDetails()) return;
     if (!otpVerified) {
       toast.warning("Confirm the delivery OTP before receiving stock.");
       return;
     }
 
+    const unitCost = Number(form.unitCost);
     setPendingReceive(buildReceiveStockPayload(form, {
       unitCost,
       location: form.location.trim(),
@@ -221,8 +246,8 @@ export default function ReceiveIntoStoreModal({
             ? `Receive stock for ${item.itemCode} — ${item.name}.`
             : "Receive stock into a store."
         }
-        saveLabel="Receive stock"
-        saveDisabled={!otpVerified}
+        saveLabel={detailsConfirmed ? "Receive stock" : "Confirm details"}
+        saveDisabled={detailsConfirmed && !otpVerified}
         dialogClassName="max-w-2xl"
         panelClassName="max-w-2xl"
       >
@@ -379,6 +404,7 @@ export default function ReceiveIntoStoreModal({
             onVerifiedChange={setOtpVerified}
             sendDisabled={!deliveryContactReady}
             sendLoading={otpSending}
+            detailsConfirmed={detailsConfirmed}
           />
         </div>
       </AddModal>

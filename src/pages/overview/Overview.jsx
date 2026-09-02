@@ -1,11 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, ClipboardList, Package, Truck } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowLeftRight,
+  ArrowRight,
+  Layers,
+  Package,
+  PackageCheck,
+  RotateCcw,
+  Tags,
+  Warehouse,
+} from "lucide-react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -16,18 +27,144 @@ import {
 import PageHeader from "../../components/common/PageHeader";
 import SummaryStatCard from "../../components/common/SummaryStatCard";
 import SectionLoadState from "../../components/common/SectionLoadState";
+import Button from "../../components/common/base/Button";
 import { ItemNameDisplay } from "../../components/common/display/FormattedDisplay";
 import { cn } from "../../utils/cn";
 import { formatApiDateTime } from "../../utils/apiResponseHelpers";
 import { formatStoreLocation } from "../../utils/displayFormatters";
 import { getDashboardStats } from "../../services/statsService";
+import { listStores } from "../../services/storesService";
 import { listSupplyRequests } from "../../services/supplyRequestsService";
 import { SupplyStatusBadge } from "../stores/supplies/utils/SupplyStatusBadge";
 import { supplyStatusChartColor } from "../stores/supplies/utils/supplyStatus";
 
 const STORE_BAR_COLORS = ["#0a0a0a", "#404040", "#737373", "#b91c1c", "#991b1b"];
+const RECEIVED_BAR_COLOR = "#0f766e";
+const SUPPLIED_BAR_COLOR = "#b91c1c";
 
 const OVERVIEW_TABLE_LIMIT = 5;
+
+const filterLabelClassName =
+  "text-[11px] font-medium text-slate-500 tracking-wider shrink-0";
+
+const filterControlClassName =
+  "h-9 px-3 bg-white border border-slate-200 rounded-lg text-[12px] font-medium text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed";
+
+const dateInputClassName =
+  "min-w-0 w-[7.25rem] h-full bg-transparent text-[12px] font-medium text-slate-700 outline-none cursor-pointer";
+
+function openDatePicker(event) {
+  const input = event.currentTarget;
+  try {
+    input.showPicker?.();
+  } catch {
+    /* Unsupported browsers fall back to native focus behaviour. */
+  }
+}
+
+function matchesDateRange(createdAt, dateFrom, dateTo) {
+  if (!dateFrom && !dateTo) return true;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  if (dateFrom) {
+    const from = new Date(dateFrom);
+    from.setHours(0, 0, 0, 0);
+    if (created < from) return false;
+  }
+  if (dateTo) {
+    const to = new Date(dateTo);
+    to.setHours(23, 59, 59, 999);
+    if (created > to) return false;
+  }
+  return true;
+}
+
+function matchesStoreFilter(request, storeId) {
+  if (!storeId || storeId === "ALL") return true;
+  const selected = Number(storeId);
+  if (!Number.isFinite(selected)) return true;
+  return (request.items || []).some((item) => Number(item.storeId) === selected);
+}
+
+function OverviewFilters({
+  dateFrom,
+  dateTo,
+  storeId,
+  stores,
+  storesLoading,
+  onFromChange,
+  onToChange,
+  onStoreChange,
+  onReset,
+}) {
+  const hasActiveFilters = Boolean(dateFrom || dateTo || (storeId && storeId !== "ALL"));
+
+  return (
+    <div className="flex w-full sm:w-auto flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={filterLabelClassName}>Date</span>
+        <div className={cn(filterControlClassName, "inline-flex w-auto items-center gap-1.5 px-2.5")}>
+          <input
+            id="overviewDateFrom"
+            type="date"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={onFromChange}
+            onClick={openDatePicker}
+            onFocus={openDatePicker}
+            className={dateInputClassName}
+            aria-label="From date"
+          />
+          <span className="text-[11px] text-slate-300 shrink-0">–</span>
+          <input
+            id="overviewDateTo"
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={onToChange}
+            onClick={openDatePicker}
+            onFocus={openDatePicker}
+            className={dateInputClassName}
+            aria-label="To date"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 min-w-0">
+        <label htmlFor="overviewStoreFilter" className={filterLabelClassName}>
+          Location
+        </label>
+        <select
+          id="overviewStoreFilter"
+          value={storeId}
+          onChange={onStoreChange}
+          disabled={storesLoading}
+          className={cn(filterControlClassName, "min-w-[11rem] max-w-[16rem]")}
+        >
+          <option value="ALL">{storesLoading ? "Loading stores…" : "All locations"}</option>
+          {stores.map((store) => (
+            <option key={store.id} value={String(store.id)}>
+              {formatStoreLocation(store.name)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={onReset}
+        disabled={!hasActiveFilters}
+        className="h-9"
+        aria-label="Clear filters"
+      >
+        <RotateCcw size={14} />
+        Clear filters
+      </Button>
+    </div>
+  );
+}
 
 const CHART_TOOLTIP_STYLE = {
   borderRadius: "6px",
@@ -62,10 +199,8 @@ function EmptyState({ children }) {
   );
 }
 
-function ColumnChart({ items, emptyLabel }) {
-  if (!items.length) return <EmptyState>{emptyLabel}</EmptyState>;
-
-  const data = items.map((item, index) => {
+function storeChartRows(items) {
+  return items.map((item, index) => {
     const storeLabel = formatStoreLocation(item.label);
     const shortName = formatStoreLocation(
       String(item.label || "")
@@ -75,11 +210,19 @@ function ColumnChart({ items, emptyLabel }) {
     return {
       name: shortName,
       store: storeLabel,
-      units: item.value,
+      value: item.value,
       skuCount: item.skuCount,
+      unitsReceived: item.unitsReceived,
+      unitsSupplied: item.unitsSupplied,
       color: STORE_BAR_COLORS[index % STORE_BAR_COLORS.length],
     };
   });
+}
+
+function ColumnChart({ items, emptyLabel, valueLabel = "units", showSkuCount = false }) {
+  if (!items.length) return <EmptyState>{emptyLabel}</EmptyState>;
+
+  const data = storeChartRows(items);
 
   return (
     <div className="h-[210px]">
@@ -95,17 +238,51 @@ function ColumnChart({ items, emptyLabel }) {
             formatter={(value, _name, props) => {
               const skuCount = props.payload.skuCount;
               const suffix =
-                Number.isFinite(skuCount) && skuCount > 0
+                showSkuCount && Number.isFinite(skuCount) && skuCount > 0
                   ? ` · ${skuCount} SKU${skuCount === 1 ? "" : "s"}`
                   : "";
-              return [`${value} units${suffix}`, props.payload.store];
+              return [`${value} ${valueLabel}${suffix}`, props.payload.store];
             }}
           />
-          <Bar dataKey="units" radius={[4, 4, 0, 0]} barSize={36}>
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={36}>
             {data.map((entry) => (
               <Cell key={entry.store} fill={entry.color} />
             ))}
           </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function ReceivedSuppliedChart({ items, emptyLabel }) {
+  if (!items.length) return <EmptyState>{emptyLabel}</EmptyState>;
+
+  const data = storeChartRows(items);
+
+  return (
+    <div className="h-[210px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 10 }} allowDecimals={false} />
+          <Tooltip
+            cursor={{ fill: "#f8fafc" }}
+            contentStyle={CHART_TOOLTIP_STYLE}
+            wrapperStyle={{ zIndex: 30 }}
+            labelFormatter={(_label, payload) => payload?.[0]?.payload?.store || _label}
+            formatter={(value, name) => [`${value} units`, name]}
+          />
+          <Legend
+            verticalAlign="top"
+            height={28}
+            iconType="circle"
+            iconSize={8}
+            wrapperStyle={{ fontSize: 11, color: "#64748b" }}
+          />
+          <Bar dataKey="unitsReceived" name="Received" fill={RECEIVED_BAR_COLOR} radius={[4, 4, 0, 0]} barSize={18} />
+          <Bar dataKey="unitsSupplied" name="Supplied" fill={SUPPLIED_BAR_COLOR} radius={[4, 4, 0, 0]} barSize={18} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -201,8 +378,17 @@ const EMPTY_DASHBOARD = {
     lowOutOfStock: 0,
     openSupplies: 0,
     openTransfers: 0,
+    itemCategories: 0,
+    categoriesInStock: 0,
+    itemsInStock: 0,
+    unitsReceived: 0,
+    unitsSupplied: 0,
+    unitsInStock: 0,
+    storeTransfers: 0,
   },
   stockByStore: [],
+  categoriesInStockByStore: [],
+  receivedSuppliedByStore: [],
   supplyStatus: [],
   lowStockItems: [],
 };
@@ -212,35 +398,76 @@ export default function Overview() {
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const reload = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [stats, supplies] = await Promise.all([
-        getDashboardStats(),
-        listSupplyRequests().catch(() => []),
-      ]);
-      setDashboard(stats);
-      setPendingApprovals(
-        supplies
-          .filter((row) => row.queue === "pending")
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-      );
-    } catch (err) {
-      setError(err.message || "Unable to load dashboard stats.");
-      setDashboard(EMPTY_DASHBOARD);
-      setPendingApprovals([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [storeId, setStoreId] = useState("ALL");
+  const [stores, setStores] = useState([]);
+  const [storesLoading, setStoresLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    reload();
+    let cancelled = false;
+    setStoresLoading(true);
+    listStores()
+      .then((rows) => {
+        if (!cancelled) {
+          setStores(rows.filter((store) => store.isActive !== false));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStores([]);
+      })
+      .finally(() => {
+        if (!cancelled) setStoresLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const { general, stockByStore, supplyStatus, lowStockItems } = dashboard;
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    Promise.all([
+      getDashboardStats({ dateFrom, dateTo, storeId }),
+      listSupplyRequests().catch(() => []),
+    ])
+      .then(([stats, supplies]) => {
+        if (cancelled) return;
+        setDashboard(stats);
+        setPendingApprovals(
+          supplies
+            .filter((row) => row.queue === "pending")
+            .filter((row) => matchesDateRange(row.createdAt, dateFrom, dateTo))
+            .filter((row) => matchesStoreFilter(row, storeId))
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message || "Unable to load dashboard stats.");
+        setDashboard(EMPTY_DASHBOARD);
+        setPendingApprovals([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFrom, dateTo, storeId, refreshKey]);
+
+  const {
+    general,
+    stockByStore,
+    categoriesInStockByStore,
+    receivedSuppliedByStore,
+    supplyStatus,
+    lowStockItems,
+  } = dashboard;
 
   const suppliesByStatus = supplyStatus.map((item) => ({
     label: item.label,
@@ -249,32 +476,75 @@ export default function Overview() {
   }));
 
   const stockChartItems = [...stockByStore].sort((a, b) => b.value - a.value);
+  const categoriesChartItems = [...categoriesInStockByStore].sort((a, b) => b.value - a.value);
+  const receivedSuppliedChartItems = [...receivedSuppliedByStore].sort(
+    (a, b) => (b.unitsReceived + b.unitsSupplied) - (a.unitsReceived + a.unitsSupplied),
+  );
 
   return (
     <div className="space-y-6 pb-8">
       <PageHeader
         title="Overview"
         description="Accessory inventory, open supplies, and pending store approvals."
-      />
+      >
+        <OverviewFilters
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          storeId={storeId}
+          stores={stores}
+          storesLoading={storesLoading}
+          onFromChange={(event) => setDateFrom(event.target.value)}
+          onToChange={(event) => setDateTo(event.target.value)}
+          onStoreChange={(event) => setStoreId(event.target.value)}
+          onReset={() => {
+            setDateFrom("");
+            setDateTo("");
+            setStoreId("ALL");
+          }}
+        />
+      </PageHeader>
 
       <SectionLoadState
         loading={loading}
         error={error}
-        onRetry={reload}
+        onRetry={() => setRefreshKey((key) => key + 1)}
         loadingLabel="Loading dashboard…"
         errorTitle="Couldn't load dashboard"
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <SummaryStatCard title="Accessory SKUs" value={general.numberOfItems} icon={Package} tone="teal" />
-            <SummaryStatCard title="Low / out of stock" value={general.lowOutOfStock} icon={AlertTriangle} tone="amber" />
-            <SummaryStatCard title="Open supplies" value={general.openSupplies} icon={ClipboardList} tone="sky" />
-            <SummaryStatCard title="Open transfers" value={general.openTransfers} icon={Truck} tone="rose" />
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+            <SummaryStatCard title="Item categories" value={general.itemCategories} icon={Tags} tone="navy" />
+            <SummaryStatCard title="Categories in stock" value={general.categoriesInStock} icon={Layers} tone="indigo" />
+            <SummaryStatCard title="Items in stock" value={general.itemsInStock} icon={Package} tone="teal" />
+            <SummaryStatCard title="Units received" value={general.unitsReceived} icon={ArrowDownToLine} tone="sky" />
+            <SummaryStatCard title="Units supplied" value={general.unitsSupplied} icon={PackageCheck} tone="amber" />
+            <SummaryStatCard title="Units in stock" value={general.unitsInStock} icon={Warehouse} tone="forest" />
+            <SummaryStatCard title="Store transfers" value={general.storeTransfers} icon={ArrowLeftRight} tone="rose" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ChartCard title="Stock by store" to="/stores?sub=inventory" linkLabel="View inventory">
-              <ColumnChart items={stockChartItems} emptyLabel="No store stock to chart yet." />
+              <ColumnChart
+                items={stockChartItems}
+                emptyLabel="No store stock to chart yet."
+                valueLabel="units"
+                showSkuCount
+              />
+            </ChartCard>
+
+            <ChartCard title="Item categories in stock by store" to="/stores?sub=inventory" linkLabel="View inventory">
+              <ColumnChart
+                items={categoriesChartItems}
+                emptyLabel="No category stock to chart yet."
+                valueLabel="categories"
+              />
+            </ChartCard>
+
+            <ChartCard title="Units received & supplied by store" to="/stores?sub=inventory" linkLabel="View inventory">
+              <ReceivedSuppliedChart
+                items={receivedSuppliedChartItems}
+                emptyLabel="No received or supplied units to chart yet."
+              />
             </ChartCard>
 
             <ChartCard title="Supplies by status" to="/stores?sub=supplies" linkLabel="View supplies">

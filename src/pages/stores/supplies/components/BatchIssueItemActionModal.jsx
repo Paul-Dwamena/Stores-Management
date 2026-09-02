@@ -109,6 +109,7 @@ export default function BatchIssueItemActionModal({
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
   const [errors, setErrors] = useState({});
   const [rejectMode, setRejectMode] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -160,6 +161,7 @@ export default function BatchIssueItemActionModal({
     setOtpSent(false);
     setOtp("");
     setOtpVerified(false);
+    setDetailsConfirmed(false);
     setErrors({});
     setRejectMode(null);
     setConfirmOpen(false);
@@ -168,6 +170,13 @@ export default function BatchIssueItemActionModal({
     setVisibleIds(items.map((row) => row.id));
     prevItemIdsKeyRef.current = itemIdsKey;
   }, [isOpen, itemIdsKey]);
+
+  const resetOtpState = () => {
+    setOtpSent(false);
+    setOtp("");
+    setOtpVerified(false);
+    setDetailsConfirmed(false);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -183,9 +192,7 @@ export default function BatchIssueItemActionModal({
     });
 
     if (prevKey) {
-      setOtpSent(false);
-      setOtp("");
-      setOtpVerified(false);
+      resetOtpState();
       setConfirmOpen(false);
     }
     prevItemIdsKeyRef.current = itemIdsKey;
@@ -194,9 +201,7 @@ export default function BatchIssueItemActionModal({
   const removeRow = (id) => {
     setVisibleIds((prev) => prev.filter((rowId) => rowId !== id));
     setCheckedIds((prev) => prev.filter((rowId) => rowId !== id));
-    setOtpSent(false);
-    setOtp("");
-    setOtpVerified(false);
+    resetOtpState();
     setErrors((current) => {
       const next = { ...current };
       delete next.checked;
@@ -210,16 +215,12 @@ export default function BatchIssueItemActionModal({
       if (checked) return prev.includes(id) ? prev : [...prev, id];
       return prev.filter((rowId) => rowId !== id);
     });
-    setOtpSent(false);
-    setOtp("");
-    setOtpVerified(false);
+    resetOtpState();
   };
 
   const toggleAll = (checked) => {
     setCheckedIds(checked ? issuableItems.map((row) => row.id) : []);
-    setOtpSent(false);
-    setOtp("");
-    setOtpVerified(false);
+    resetOtpState();
   };
 
   const validateIssuanceDetails = () => {
@@ -243,6 +244,10 @@ export default function BatchIssueItemActionModal({
   };
 
   const handleSendOtp = () => {
+    if (!detailsConfirmed) {
+      toast.warning("Confirm details first before sending the OTP.");
+      return;
+    }
     if (!validateIssuanceDetails()) return;
     try {
       onSendOtp?.(checkedItems.map((row) => row.id), {
@@ -266,8 +271,17 @@ export default function BatchIssueItemActionModal({
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirmDetails = () => {
     if (!validateIssuanceDetails()) return;
+    setDetailsConfirmed(true);
+    toast.success("Details confirmed. Send and confirm the OTP to finish.");
+  };
+
+  const handleConfirm = () => {
+    if (!detailsConfirmed) {
+      handleConfirmDetails();
+      return;
+    }
     if (!otpSent) {
       toast.warning("Send an OTP to the receiver first.");
       return;
@@ -313,9 +327,9 @@ export default function BatchIssueItemActionModal({
             : "Issue selected items from the same store. Remove a row to leave it out of this batch."
         }
         dialogClassName="max-w-7xl"
-        saveLabel="Confirm issue"
+        saveLabel={detailsConfirmed ? "Confirm issue" : "Confirm details"}
         saveVariant="primary"
-        saveDisabled={!otpVerified}
+        saveDisabled={detailsConfirmed && !otpVerified}
         hideCancelButton
         secondaryAction={{ label: "Done", onClick: onClose }}
         footerActions={
@@ -337,9 +351,7 @@ export default function BatchIssueItemActionModal({
               required={false}
               onChange={(nextValue) => {
                 setSuppliedTo(nextValue);
-                setOtpSent(false);
-                setOtp("");
-                setOtpVerified(false);
+                resetOtpState();
                 setErrors((prev) => {
                   if (!prev.suppliedTo) return prev;
                   const next = { ...prev };
@@ -507,6 +519,7 @@ export default function BatchIssueItemActionModal({
               onVerifiedChange={setOtpVerified}
               sendDisabled={issuableItems.length === 0 || checkedItems.length === 0}
               itemCount={checkedItems.length}
+              detailsConfirmed={detailsConfirmed}
             />
           </div>
         </div>
@@ -527,9 +540,7 @@ export default function BatchIssueItemActionModal({
         onClose={() => setReceiverEditorOpen(false)}
         onCreated={(created) => {
           setSuppliedTo(created.name);
-          setOtpSent(false);
-          setOtp("");
-          setOtpVerified(false);
+          resetOtpState();
           setErrors((prev) => {
             if (!prev.suppliedTo) return prev;
             const next = { ...prev };

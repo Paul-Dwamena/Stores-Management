@@ -30,6 +30,7 @@ export default function IssueOtpSection({
   itemCount,
   required = true,
   receivers = [],
+  detailsConfirmed = false,
 }) {
   const [otpError, setOtpError] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -77,6 +78,18 @@ export default function IssueOtpSection({
       setVerifying(false);
     }
   };
+
+  if (!detailsConfirmed) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2">
+        <p className="text-[12px] font-bold text-slate-800">OTP confirmation</p>
+        <p className="text-[12px] text-slate-500">
+          Confirm all issuance details first. OTP verification unlocks afterwards as the final
+          step before issuing.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

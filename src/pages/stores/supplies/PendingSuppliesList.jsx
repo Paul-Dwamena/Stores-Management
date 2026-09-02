@@ -33,6 +33,7 @@ import {
   rejectPendingIssuance,
   getSupplyRequest,
   sendSupplyConfirmationOtp,
+  OTP_TYPE,
   toRequisitionFromSupplyRequest,
 } from "../../../services/supplyRequestsService";
 import { getSuppliesStats } from "../../../services/statsService";
@@ -307,12 +308,33 @@ export default function PendingSuppliesList({ embedded = false }) {
         const listed = await listSupplyRequests();
         return listed.find((row) => String(row.id) === String(supplyId)) || null;
       })
-      .then((request) => {
+      .then(async (request) => {
         if (!request) {
           toast.error("Could not open that supply request.");
           return;
         }
-        setActiveRow(toRequisitionFromSupplyRequest(request));
+        const generalRequests = await listGeneralRequests().catch(() => []);
+        const quantities = buildGeneralItemQuantities(generalRequests, []);
+        const mapped = toRequisitionFromSupplyRequest(request);
+        const quantityToSupply =
+          mapped.totalQuantityRequested ?? mapped.quantityToSupply ?? null;
+        const quantitySupplied = Number(mapped.quantitySupplied) || 0;
+        const quantityRejected = Number(mapped.quantityRejected) || 0;
+        setActiveRow({
+          ...mapped,
+          source: "supply_request",
+          quantityRequested:
+            resolveOriginalQuantityRequested(request, quantities)
+            ?? mapped.quantityRequested,
+          quantityToSupply,
+          quantitySupplied,
+          quantityRejected,
+          quantityRemaining:
+            mapped.quantityRemaining
+            ?? (quantityToSupply == null
+              ? null
+              : Math.max(0, Number(quantityToSupply) - quantitySupplied - quantityRejected)),
+        });
       })
       .catch((err) => {
         toast.error(err.message || "Could not open that supply request.");
@@ -328,16 +350,30 @@ export default function PendingSuppliesList({ embedded = false }) {
         source: "pending_line",
         quantityRequested,
         quantityToSupply: null,
+        quantitySupplied: null,
+        quantityRejected: null,
+        quantityRemaining: null,
       };
     });
     const raised = supplyRows.map((request) => {
       const requisition = toRequisitionFromSupplyRequest(request);
+      const quantityToSupply = request.totalQuantityRequested ?? null;
+      const quantitySupplied = Number(request.quantitySupplied) || 0;
+      const quantityRejected = Number(request.quantityRejected) || 0;
+      const quantityRemaining =
+        requisition.quantityRemaining
+        ?? (quantityToSupply == null
+          ? null
+          : Math.max(0, Number(quantityToSupply) - quantitySupplied - quantityRejected));
       return {
         ...requisition,
         listKey: `supply-${request.id}`,
         source: "supply_request",
         quantityRequested: resolveOriginalQuantityRequested(request, generalItemQuantities),
-        quantityToSupply: request.totalQuantityRequested ?? null,
+        quantityToSupply,
+        quantitySupplied,
+        quantityRejected,
+        quantityRemaining,
       };
     });
     return sortNewestFirst([...pending, ...raised], "createdAt");
@@ -481,7 +517,7 @@ export default function PendingSuppliesList({ embedded = false }) {
       await openRow({ ...activeRow, itemId: inventoryItem.id });
     }
   };
-  const colSpan = 10 + (showBulkSelection ? 1 : 0);
+  const colSpan = 13 + (showBulkSelection ? 1 : 0);
 
   const toggleRowSelected = (listKey) => {
     setSelectedIds((prev) =>
@@ -520,10 +556,29 @@ export default function PendingSuppliesList({ embedded = false }) {
     try {
       if (row.source === "supply_request" && row.id) {
         const detail = await getSupplyRequest(row.id);
+        const mapped = toRequisitionFromSupplyRequest(detail);
+        const quantityToSupply =
+          mapped.totalQuantityRequested ?? mapped.quantityToSupply ?? null;
+        const quantitySupplied = Number(mapped.quantitySupplied) || 0;
+        const quantityRejected = Number(mapped.quantityRejected) || 0;
+        const quantityRemaining =
+          mapped.quantityRemaining
+          ?? (quantityToSupply == null
+            ? null
+            : Math.max(0, Number(quantityToSupply) - quantitySupplied - quantityRejected));
         workingRow = {
-          ...toRequisitionFromSupplyRequest(detail),
+          ...mapped,
           listKey: row.listKey,
           source: row.source,
+          // Keep original customer qty from the list when available.
+          quantityRequested:
+            row.quantityRequested
+            ?? resolveOriginalQuantityRequested(detail, generalItemQuantities)
+            ?? mapped.quantityRequested,
+          quantityToSupply,
+          quantitySupplied,
+          quantityRejected,
+          quantityRemaining,
         };
         setActiveRow(workingRow);
       }
@@ -626,7 +681,7 @@ export default function PendingSuppliesList({ embedded = false }) {
     if (!phone) {
       throw new Error("The selected receiver needs a phone number before an OTP can be sent.");
     }
-    await sendSupplyConfirmationOtp(phone);
+    await sendSupplyConfirmationOtp(phone, OTP_TYPE.ISSUE_PICKUP);
   };
 
   const handleConfirmIssue = async (payload) => {
@@ -894,10 +949,19 @@ export default function PendingSuppliesList({ embedded = false }) {
                   Description
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                  Customer request
+                  Quantity Requested
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                   Quantity to Supply
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                  Quantity Supplied
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                  Quantity Rejected
+                </th>
+                <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                  Remaining to Supply
                 </th>
                 <th className="px-6 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                   Date requested
@@ -968,6 +1032,15 @@ export default function PendingSuppliesList({ embedded = false }) {
                     </td>
                     <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
                       {row.quantityToSupply ?? "—"}
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                      {row.quantitySupplied ?? "—"}
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                      {row.quantityRejected ?? "—"}
+                    </td>
+                    <td className="px-6 py-3.5 text-[12px] font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                      {row.quantityRemaining ?? "—"}
                     </td>
                     <td className="px-6 py-3.5 text-[12px] text-slate-600 whitespace-nowrap">
                       {formatApiDateTime(row.createdAt)}

@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertTriangle,
   ArrowDownToLine,
   ArrowLeftRight,
   ArrowRight,
+  ClipboardList,
   Layers,
   Package,
   PackageCheck,
   RotateCcw,
   Tags,
+  Truck,
   Warehouse,
 } from "lucide-react";
 import {
@@ -100,10 +103,15 @@ function OverviewFilters({
   const hasActiveFilters = Boolean(dateFrom || dateTo || (storeId && storeId !== "ALL"));
 
   return (
-    <div className="flex w-full sm:w-auto flex-wrap items-center gap-x-4 gap-y-2">
-      <div className="flex items-center gap-2 min-w-0">
+    <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <span className={filterLabelClassName}>Date</span>
-        <div className={cn(filterControlClassName, "inline-flex w-auto items-center gap-1.5 px-2.5")}>
+        <div
+          className={cn(
+            filterControlClassName,
+            "inline-flex max-w-full min-w-0 flex-wrap items-center gap-1.5 px-2.5",
+          )}
+        >
           <input
             id="overviewDateFrom"
             type="date"
@@ -130,7 +138,7 @@ function OverviewFilters({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex min-w-0 items-center gap-2">
         <label htmlFor="overviewStoreFilter" className={filterLabelClassName}>
           Location
         </label>
@@ -139,7 +147,7 @@ function OverviewFilters({
           value={storeId}
           onChange={onStoreChange}
           disabled={storesLoading}
-          className={cn(filterControlClassName, "min-w-[11rem] max-w-[16rem]")}
+          className={cn(filterControlClassName, "min-w-0 w-[min(100%,16rem)] sm:min-w-[11rem]")}
         >
           <option value="ALL">{storesLoading ? "Loading stores…" : "All locations"}</option>
           {stores.map((store) => (
@@ -486,6 +494,7 @@ export default function Overview() {
       <PageHeader
         title="Overview"
         description="Accessory inventory, open supplies, and pending store approvals."
+        className="mb-3 flex-col sm:flex-col lg:flex-row lg:items-center"
       >
         <OverviewFilters
           dateFrom={dateFrom}
@@ -512,7 +521,7 @@ export default function Overview() {
         errorTitle="Couldn't load dashboard"
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
             <SummaryStatCard title="Item categories" value={general.itemCategories} icon={Tags} tone="navy" />
             <SummaryStatCard title="Categories in stock" value={general.categoriesInStock} icon={Layers} tone="indigo" />
             <SummaryStatCard title="Items in stock" value={general.itemsInStock} icon={Package} tone="teal" />
@@ -520,6 +529,10 @@ export default function Overview() {
             <SummaryStatCard title="Units supplied" value={general.unitsSupplied} icon={PackageCheck} tone="amber" />
             <SummaryStatCard title="Units in stock" value={general.unitsInStock} icon={Warehouse} tone="forest" />
             <SummaryStatCard title="Store transfers" value={general.storeTransfers} icon={ArrowLeftRight} tone="rose" />
+            <SummaryStatCard title="Accessory SKUs" value={general.numberOfItems} icon={Package} tone="slate" />
+            <SummaryStatCard title="Low / out of stock" value={general.lowOutOfStock} icon={AlertTriangle} tone="orange" />
+            <SummaryStatCard title="Open supplies" value={general.openSupplies} icon={ClipboardList} tone="violet" />
+            <SummaryStatCard title="Open transfers" value={general.openTransfers} icon={Truck} tone="moss" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

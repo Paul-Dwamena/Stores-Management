@@ -16,23 +16,23 @@ const PageHeader = ({ title, description, children, icon: Icon, className }) => 
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 min-w-0",
+        "flex flex-col flex-wrap sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 min-w-0",
         className ?? "mb-3",
       )}
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-full sm:basis-auto">
         <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
           {Icon && <Icon size={22} className="text-slate-400 shrink-0" />}
-          <span className="truncate">{title}</span>
+          <span className="break-words">{title}</span>
         </h1>
         {description && (
-          <p className="text-[12px] text-slate-500 font-medium max-w-3xl mt-1">
+          <p className="text-[12px] text-slate-500 font-medium max-w-3xl mt-1 break-words">
             {description}
           </p>
         )}
       </div>
       {children && (
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full min-w-0 basis-full sm:basis-auto sm:w-auto sm:max-w-full">
           {children}
         </div>
       )}

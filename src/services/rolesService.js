@@ -37,11 +37,23 @@ export const isDispatcherRoleName = (name) => {
 export const findDispatcherRole = (roles = []) =>
   roles.find((role) => isDispatcherRoleName(role?.name) || isDispatcherRoleName(role?.label));
 
-const PROTECTED_ROLE_NAMES = new Set(["SUPER_ADMIN", "STAFF", "STORE_MANAGER"]);
+const BUILTIN_ROLE_NAMES = new Set(["SUPER_ADMIN", "STAFF", "STORE_MANAGER"]);
 
-export const isProtectedRole = (role) => {
-  const name = String(role?.name || "").toUpperCase();
-  if (PROTECTED_ROLE_NAMES.has(name)) return true;
+const roleNameKey = (role) =>
+  String(role?.name || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+/** Only Super Admin permissions are locked in the UI. */
+export const isSuperAdminSystemRole = (role) => roleNameKey(role) === "SUPER_ADMIN";
+
+/**
+ * Built-in / system roles (name cannot be changed; Super Admin also cannot
+ * edit permissions or be deleted).
+ */
+export const isBuiltInRole = (role) => {
+  if (BUILTIN_ROLE_NAMES.has(roleNameKey(role))) return true;
   return (
     isReceiverRoleName(role?.name)
     || isReceiverRoleName(role?.label)
@@ -49,6 +61,9 @@ export const isProtectedRole = (role) => {
     || isDispatcherRoleName(role?.label)
   );
 };
+
+/** @deprecated Prefer isSuperAdminSystemRole / isBuiltInRole. */
+export const isProtectedRole = isSuperAdminSystemRole;
 
 const toPermission = (row) => ({
   id: row.id,

@@ -3,7 +3,7 @@ import ReactDOM from "react-dom";
 import { Shield, X, Info } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import SectionLoadState from "../../../../components/common/SectionLoadState";
-import { isProtectedRole } from "../../../../services/rolesService";
+import { isBuiltInRole, isSuperAdminSystemRole } from "../../../../services/rolesService";
 import PermissionMatrixTable from "./PermissionMatrixTable";
 
 export default function ViewRoleModal({
@@ -32,6 +32,8 @@ export default function ViewRoleModal({
   if (!isOpen || !role) return null;
 
   const permissionCount = role.permissionCount ?? role.permissions?.length ?? 0;
+  const isSuperAdmin = isSuperAdminSystemRole(role);
+  const isSystem = isBuiltInRole(role);
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4">
@@ -55,12 +57,17 @@ export default function ViewRoleModal({
             </p>
             <p className="mt-2 text-[11px] font-bold text-amber-600">
               {permissionCount} permissions assigned
-              {isProtectedRole(role) ? " · System role" : ""}
+              {isSystem ? " · System role" : ""}
             </p>
-            {isProtectedRole(role) ? (
+            {isSuperAdmin ? (
               <div className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-md border border-sky-100 bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-700">
                 <Info size={12} className="shrink-0 text-sky-500" />
-                <span>System roles cannot be edited or deleted.</span>
+                <span>Super Admin permissions cannot be edited or deleted.</span>
+              </div>
+            ) : isSystem ? (
+              <div className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-md border border-sky-100 bg-sky-50 px-2 py-1 text-[10px] font-medium text-sky-700">
+                <Info size={12} className="shrink-0 text-sky-500" />
+                <span>System role name is locked; permissions can be edited.</span>
               </div>
             ) : null}
           </div>

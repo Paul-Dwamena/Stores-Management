@@ -9,7 +9,8 @@ import {
   updateRole,
   deleteRole,
   listPermissions,
-  isProtectedRole,
+  isBuiltInRole,
+  isSuperAdminSystemRole,
 } from "../../services/rolesService";
 import { formatApiDateTime, sortNewestFirst } from "../../utils/apiResponseHelpers";
 import CatalogTable from "./components/CatalogTable";
@@ -109,7 +110,7 @@ export default function RolesPermissionsList() {
   };
 
   const openEdit = async (row) => {
-    if (!row || isProtectedRole(row)) return;
+    if (!row || isSuperAdminSystemRole(row)) return;
     setEditTarget(row);
     setFormError(null);
     setFormOpen(true);
@@ -135,17 +136,22 @@ export default function RolesPermissionsList() {
 
   const handleSave = async (form) => {
     if (editing) {
-      if (isProtectedRole(editing)) return;
+      if (isSuperAdminSystemRole(editing)) return;
       try {
+        const nameLocked = isBuiltInRole(editing);
         const saved = await updateRole(editing.id, {
-          name: form.name.trim(),
+          name: nameLocked ? editing.name : form.name.trim(),
           description: form.description.trim(),
           permission_ids: (form.permission_ids || []).map(Number),
         });
         toast.success("Role updated.");
 
         const merged = mergeRole(
-          { ...editing, description: form.description.trim(), name: form.name.trim() },
+          {
+            ...editing,
+            description: form.description.trim(),
+            name: nameLocked ? editing.name : form.name.trim(),
+          },
           saved,
         );
         setRoles((current) =>
@@ -208,7 +214,7 @@ export default function RolesPermissionsList() {
                 {row.name && row.label !== row.name ? (
                   <p className="text-[11px] text-slate-400">{row.name}</p>
                 ) : null}
-                {isProtectedRole(row) ? (
+                {isBuiltInRole(row) ? (
                   <p className="text-[11px] text-slate-400">System role</p>
                 ) : null}
               </div>
@@ -243,8 +249,8 @@ export default function RolesPermissionsList() {
         loading={viewLoading}
         error={viewError}
         onRetry={() => viewing && openView(viewing)}
-        onEdit={viewing && canEdit && !isProtectedRole(viewing) ? () => openEdit(viewing) : undefined}
-        onDelete={viewing && canDelete && !isProtectedRole(viewing) ? () => setDeleteTarget(viewing) : undefined}
+        onEdit={viewing && canEdit && !isSuperAdminSystemRole(viewing) ? () => openEdit(viewing) : undefined}
+        onDelete={viewing && canDelete && !isBuiltInRole(viewing) ? () => setDeleteTarget(viewing) : undefined}
       />
 
       <RoleFormModal
@@ -255,6 +261,7 @@ export default function RolesPermissionsList() {
         existingRoles={roles}
         catalog={catalog}
         canReadPermissions={canReadPermissions}
+        nameLocked={Boolean(editing && isBuiltInRole(editing))}
         loading={formLoading}
         error={formError}
         onRetry={() => editTarget && openEdit(editTarget)}
@@ -267,7 +274,7 @@ export default function RolesPermissionsList() {
           setDeleteTarget(null);
         }}
         onConfirm={async () => {
-          if (!deleteTarget || isProtectedRole(deleteTarget) || deleteLoading) return;
+          if (!deleteTarget || isBuiltInRole(deleteTarget) || deleteLoading) return;
           setDeleteLoading(true);
           try {
             await deleteRole(deleteTarget.id);

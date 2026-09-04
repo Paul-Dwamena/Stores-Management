@@ -22,6 +22,7 @@ export default function RoleFormModal({
   existingRoles = [],
   catalog = [],
   canReadPermissions = true,
+  nameLocked = false,
   loading = false,
   error = null,
   onRetry,
@@ -53,6 +54,7 @@ export default function RoleFormModal({
   }, [isOpen, editingRole]);
 
   const handleChange = (field) => (event) => {
+    if (field === "name" && nameLocked) return;
     setForm((current) => ({ ...current, [field]: event.target.value }));
     setErrors((current) => clearRoleFieldError(current, field));
   };
@@ -130,7 +132,11 @@ export default function RoleFormModal({
                 onChange={handleChange("name")}
                 placeholder="e.g. Store Manager"
                 error={errors.name}
+                readOnly={nameLocked}
+                disabled={nameLocked}
+                className={nameLocked ? "bg-slate-100 text-slate-500 cursor-not-allowed" : undefined}
               />
+              
               <InputField
                 label="Description"
                 id="roleDescription"

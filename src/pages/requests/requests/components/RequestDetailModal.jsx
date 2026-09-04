@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Info } from "lucide-react";
 import RequestDetailsModal, {
   AccordionSection,
   DetailRow,
@@ -12,6 +13,8 @@ import {
   DescriptionDisplay,
   ItemNameDisplay,
 } from "../../../../components/common/display/FormattedDisplay";
+import { usePermission } from "../../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../../permissions/accessMap";
 
 export default function RequestDetailModal({
   isOpen,
@@ -23,6 +26,8 @@ export default function RequestDetailModal({
   loading = false,
   onDelete,
 }) {
+  const { can } = usePermission();
+  const canReadIssuances = can(RESOURCES.issuances, ACTIONS.read);
   const [openSections, setOpenSections] = useState({
     information: true,
     details: true,
@@ -58,7 +63,7 @@ export default function RequestDetailModal({
       identifier={request?.requestNumber}
       dialogClassName="max-w-4xl"
       footerRight={
-        loading || !request ? null : (
+        loading || !request || !onDelete ? null : (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="danger" size="modal" onClick={onDelete}>
               Delete
@@ -154,11 +159,21 @@ export default function RequestDetailModal({
           </AccordionSection>
 
           <AccordionSection
-            title={`Issuance history${issuances.length ? ` (${issuances.length})` : ""}`}
+            title={`Issuance history${canReadIssuances && issuances.length ? ` (${issuances.length})` : ""}`}
             open={openSections.issuances}
             onToggle={() => toggle("issuances")}
           >
-            {issuances.length === 0 ? (
+            {!canReadIssuances ? (
+              <div className="flex min-h-[72px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6">
+                <span
+                  className="inline-flex items-center gap-1.5 text-[13px] font-medium italic text-slate-400"
+                  title="You don't have permission to view issuances"
+                >
+                  <Info size={14} className="shrink-0" aria-hidden="true" />
+                  Access denied
+                </span>
+              </div>
+            ) : issuances.length === 0 ? (
               <p className="text-[13px] text-slate-400">No issuances recorded for this request yet.</p>
             ) : (
               <div className="overflow-x-auto rounded border border-slate-200">

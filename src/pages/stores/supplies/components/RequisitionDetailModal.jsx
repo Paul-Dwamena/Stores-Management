@@ -61,7 +61,7 @@ export default function RequisitionDetailModal({
           </SectionLoadState>
         </div>
         <div className="px-4 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end rounded-b-2xl">
-          <Button onClick={onClose} variant="ghost" size="modal">
+          <Button onClick={onClose} variant="outline" size="modal">
             Close
           </Button>
         </div>

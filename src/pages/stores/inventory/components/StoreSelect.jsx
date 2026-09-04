@@ -1,20 +1,41 @@
 import React, { useEffect, useState } from "react";
-import { cn } from "../../../../utils/cn";
+import ConfiguredSearchSelectField from "../../../../components/common/fields/ConfiguredSearchSelectField";
 import { listStores } from "../../../../services/storesService";
 import { formatStoreLocation } from "../../../../utils/displayFormatters";
+import { usePermission } from "../../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../../permissions/accessMap";
 
 export default function StoreSelect({
-  id,
+  id = "store-search",
   value,
   onChange,
   error,
-  className,
   label = "Store location",
+  placeholder = "Search store…",
+  required = true,
+  /** Optional preloaded/filtered stores; skips fetch when provided. */
+  stores: storesProp,
+  formKey = "storeId",
+  disabled = false,
 }) {
+  const { can } = usePermission();
+  const canReadStores = can(RESOURCES.stores, ACTIONS.read);
   const [stores, setStores] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(storesProp == null);
 
   useEffect(() => {
+    if (storesProp != null) {
+      setStores(storesProp);
+      setLoading(false);
+      return undefined;
+    }
+
+    if (!canReadStores) {
+      setStores([]);
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
     setLoading(true);
 
@@ -34,42 +55,34 @@ export default function StoreSelect({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [storesProp, canReadStores]);
+
+  const denied = !canReadStores;
+  const options = denied
+    ? []
+    : stores.map((store) => ({
+        value: String(store.id),
+        label: formatStoreLocation(store.name),
+      }));
 
   return (
-    <div className="space-y-1.5">
-      {label ? (
-        <label
-          htmlFor={id}
-          className={cn(
-            "text-[10px] font-bold uppercase tracking-wider",
-            error ? "text-red-500" : "text-slate-500",
-          )}
-        >
-          {label}
-        </label>
-      ) : null}
-      <select
-        id={id}
-        value={value ?? ""}
-        onChange={(event) => onChange?.(event.target.value)}
-        disabled={loading}
-        className={cn(
-          "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] uppercase outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed",
-          error && "border-red-500 bg-red-50",
-          className,
-        )}
-      >
-        <option value="">
-          {loading ? "Loading stores…" : "Select store location…"}
-        </option>
-        {stores.map((store) => (
-          <option key={store.id} value={String(store.id)}>
-            {formatStoreLocation(store.name)}
-          </option>
-        ))}
-      </select>
-      {error ? <p className="text-[10px] font-medium text-red-500">{error}</p> : null}
-    </div>
+    <ConfiguredSearchSelectField
+      id={id}
+      field={{
+        key: formKey,
+        title: label,
+        placeholder: denied ? "Access denied" : placeholder,
+        options,
+      }}
+      values={{ [formKey]: value == null ? "" : String(value) }}
+      error={error}
+      loading={loading && !denied}
+      disabled={disabled || denied}
+      onChange={(_key, next) => {
+        if (denied || disabled) return;
+        onChange?.(next ?? "");
+      }}
+      required={required}
+    />
   );
 }

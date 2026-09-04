@@ -26,6 +26,8 @@ import {
 } from "./utils/requestHelpers";
 import NewRequestModal from "./components/NewRequestModal";
 import RequestDetailModal from "./components/RequestDetailModal";
+import { usePermission } from "../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../permissions/accessMap";
 
 const QUICK_TIPS = [
   "Use Request from Stores when you need accessories issued from inventory.",
@@ -56,6 +58,10 @@ function StatusChangeChain({ history, currentStatus }) {
 }
 
 export default function RequestsList() {
+  const { can } = usePermission();
+  const canAdd = can(RESOURCES.generalRequests, ACTIONS.create);
+  const canDelete = can(RESOURCES.generalRequests, ACTIONS.delete);
+  const canReadIssuances = can(RESOURCES.issuances, ACTIONS.read);
   const [requests, setRequests] = useState([]);
   const [users, setUsers] = useState([]);
   const [tableLoading, setTableLoading] = useState(true);
@@ -152,7 +158,9 @@ export default function RequestsList() {
     try {
       const [request, issuances] = await Promise.all([
         getGeneralRequest(row.id),
-        listIssuancesByGeneralRequest(row.id).catch(() => []),
+        canReadIssuances
+          ? listIssuancesByGeneralRequest(row.id).catch(() => [])
+          : Promise.resolve([]),
       ]);
       setViewing(request);
       setViewIssuances(issuances);
@@ -249,10 +257,12 @@ export default function RequestsList() {
                 {filtered.length} request{filtered.length === 1 ? "" : "s"} found
               </p>
             </div>
-            <Button onClick={openAdd}>
-              <Plus size={16} />
-              New Request
-            </Button>
+            {canAdd ? (
+              <Button onClick={openAdd}>
+                <Plus size={16} />
+                New Request
+              </Button>
+            ) : null}
           </div>
 
           <div className="space-y-3">
@@ -353,14 +363,17 @@ export default function RequestsList() {
         users={users}
         requesterName={requesterName(viewing)}
         loading={viewLoading}
-        onDelete={() =>
-          setConfirm({
-            title: "Delete request?",
-            message: `${viewing?.requestNumber} will be deleted.`,
-            confirmText: "Delete",
-            isDanger: true,
-            run: () => runDelete(viewing),
-          })
+        onDelete={
+          canDelete
+            ? () =>
+                setConfirm({
+                  title: "Delete request?",
+                  message: `${viewing?.requestNumber} will be deleted.`,
+                  confirmText: "Delete",
+                  isDanger: true,
+                  run: () => runDelete(viewing),
+                })
+            : undefined
         }
       />
 

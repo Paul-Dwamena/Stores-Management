@@ -9,7 +9,8 @@ import { cn } from "../../../../utils/cn";
 import { registerItemForRequest } from "../../../../services/supplyRequestsService";
 import { updateItemPhoto } from "../../../../services/itemsService";
 import ItemPhotoField from "../../inventory/components/ItemPhotoField";
-import { useBrandSelectOptions, useCategorySelectOptions } from "../../../../hooks/useCatalogOptions";
+import BrandSelect from "../../inventory/components/BrandSelect";
+import CategorySelect from "../../inventory/components/CategorySelect";
 
 const UNIT_OPTIONS = [
   { value: "carton", label: "Carton" },
@@ -42,8 +43,6 @@ export default function RegisterItemFromRequestModal({
   const [errors, setErrors] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
-  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(isOpen);
 
   const generalRequestItemId =
     requisition?.generalRequestItemId ?? requisition?.id ?? null;
@@ -162,46 +161,20 @@ export default function RegisterItemFromRequestModal({
               onChange={setField("name")}
               error={errors.name}
             />
-            <div className="space-y-1.5">
-              <Label htmlFor="register-item-brand">Brand</Label>
-              <select
-                id="register-item-brand"
-                value={form.brand}
-                onChange={setField("brand")}
-                disabled={brandsLoading}
-                className={cn(
-                  fieldClassName,
-                  brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
-                )}
-              >
-                <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
-                {brandOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="register-item-category">Category</Label>
-              <select
-                id="register-item-category"
-                value={form.category}
-                onChange={setField("category")}
-                disabled={categoriesLoading}
-                className={cn(
-                  fieldClassName,
-                  categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
-                )}
-              >
-                <option value="">{categoriesLoading ? "Loading categories…" : "Select category…"}</option>
-                {categoryOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <BrandSelect
+              id="register-item-brand"
+              formKey="brand"
+              value={form.brand}
+              onChange={(next) => setField("brand")(next)}
+              enabled={isOpen}
+            />
+            <CategorySelect
+              id="register-item-category"
+              formKey="category"
+              value={form.category}
+              onChange={(next) => setField("category")(next)}
+              enabled={isOpen}
+            />
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="register-item-unit">Unit</Label>
               <select

@@ -11,6 +11,7 @@ export default function ViewRoleModal({
   onClose,
   role,
   catalog = [],
+  canReadPermissions = true,
   onEdit,
   onDelete,
   loading = false,
@@ -73,18 +74,30 @@ export default function ViewRoleModal({
         </div>
 
         <div className="relative min-h-[180px] flex-1 overflow-auto px-4 py-4 sm:px-6 sm:py-6">
-          <SectionLoadState
+            <SectionLoadState
             loading={loading}
             error={error}
             onRetry={onRetry}
             loadingLabel="Loading role…"
             errorTitle="Couldn’t load role details"
           >
-            <PermissionMatrixTable
-              catalog={catalog}
-              selectedIds={(role.permissions || []).map((permission) => permission.id)}
-              readOnly
-            />
+            {canReadPermissions ? (
+              <PermissionMatrixTable
+                catalog={catalog}
+                selectedIds={(role.permissions || []).map((permission) => permission.id)}
+                readOnly
+              />
+            ) : (
+              <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8">
+                <span
+                  className="inline-flex items-center gap-1.5 text-[13px] font-medium italic text-slate-400"
+                  title="You don't have permission to view permissions"
+                >
+                  <Info size={14} className="shrink-0" aria-hidden="true" />
+                  Access denied
+                </span>
+              </div>
+            )}
           </SectionLoadState>
         </div>
 

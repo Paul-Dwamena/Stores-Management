@@ -15,8 +15,17 @@ import { formatApiDateTime, sortNewestFirst } from "../../utils/apiResponseHelpe
 import CatalogTable from "./components/CatalogTable";
 import RoleFormModal from "./roles/components/RoleFormModal";
 import ViewRoleModal from "./roles/components/ViewRoleModal";
+import { usePermission } from "../../hooks/usePermission";
+import { useAuth } from "../../context/useAuth";
+import { ACTIONS, RESOURCES } from "../../permissions/accessMap";
 
 export default function RolesPermissionsList() {
+  const { can } = usePermission();
+  const { user, refreshPermissions } = useAuth();
+  const canAdd = can(RESOURCES.roles, ACTIONS.create);
+  const canEdit = can(RESOURCES.roles, ACTIONS.update);
+  const canDelete = can(RESOURCES.roles, ACTIONS.delete);
+  const canReadPermissions = can(RESOURCES.permissions, ACTIONS.read);
   const [roles, setRoles] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -39,26 +48,38 @@ export default function RolesPermissionsList() {
     createdAt: row?.createdAt ?? detail?.createdAt,
   });
 
-  const reload = async () => {
-    setTableLoading(true);
-    setTableError(null);
-    try {
-      setRoles(sortNewestFirst(await listRoles()));
-    } catch (err) {
-      setTableError(err.message || "Unable to load roles.");
-    } finally {
-      setTableLoading(false);
+  const reload = async ({ refreshCatalog = false, quiet = false } = {}) => {
+    if (!quiet) {
+      setTableLoading(true);
+      setTableError(null);
     }
     try {
-      setCatalog(await listPermissions());
-    } catch {
-      /* permission catalog is optional for the list view */
+      const rolesPromise = listRoles();
+      const catalogPromise =
+        refreshCatalog || !catalog.length
+          ? canReadPermissions
+            ? listPermissions().catch(() => [])
+            : Promise.resolve([])
+          : Promise.resolve(catalog);
+
+      const [nextRoles, nextCatalog] = await Promise.all([rolesPromise, catalogPromise]);
+      setRoles(sortNewestFirst(nextRoles));
+      if (refreshCatalog || !catalog.length) {
+        setCatalog(nextCatalog);
+      }
+      if (quiet) setTableError(null);
+    } catch (err) {
+      if (!quiet) {
+        setTableError(err.message || "Unable to load roles.");
+      }
+    } finally {
+      if (!quiet) setTableLoading(false);
     }
   };
 
   useEffect(() => {
-    reload();
-  }, []);
+    reload({ refreshCatalog: true });
+  }, [canReadPermissions]);
 
   const closeForm = () => {
     setFormOpen(false);
@@ -90,9 +111,18 @@ export default function RolesPermissionsList() {
   const openEdit = async (row) => {
     if (!row || isProtectedRole(row)) return;
     setEditTarget(row);
-    setFormLoading(true);
     setFormError(null);
     setFormOpen(true);
+
+    // View (and some list payloads) may already include permissions — skip a repeat GET.
+    if (Array.isArray(row.permissions)) {
+      setEditing(row);
+      setFormLoading(false);
+      return;
+    }
+
+    setEditing(null);
+    setFormLoading(true);
     try {
       const detail = await getRole(row.id);
       setEditing(mergeRole(row, detail));
@@ -113,9 +143,28 @@ export default function RolesPermissionsList() {
           permission_ids: (form.permission_ids || []).map(Number),
         });
         toast.success("Role updated.");
-        reload();
+
+        const merged = mergeRole(
+          { ...editing, description: form.description.trim(), name: form.name.trim() },
+          saved,
+        );
+        setRoles((current) =>
+          sortNewestFirst(
+            current.map((role) => (Number(role.id) === Number(editing.id) ? {
+              ...role,
+              ...merged,
+              permissionCount: merged.permissions?.length ?? merged.permissionCount ?? role.permissionCount,
+            } : role)),
+          ),
+        );
         if (viewing?.id === editing.id) {
-          setViewing(mergeRole({ ...editing, description: form.description.trim() }, saved));
+          setViewing(merged);
+        }
+
+        // Refresh list / session in the background so the modal can close immediately.
+        void reload({ quiet: true });
+        if (Number(user?.roleId) === Number(editing.id)) {
+          void refreshPermissions({ quiet: true });
         }
       } catch (error) {
         toast.error(error.message ?? "Could not save role.");
@@ -130,7 +179,7 @@ export default function RolesPermissionsList() {
         description: form.description.trim(),
       });
       toast.success("Role created.");
-      reload();
+      void reload({ quiet: true });
     } catch (error) {
       toast.error(error.message ?? "Could not save role.");
       throw error;
@@ -145,7 +194,7 @@ export default function RolesPermissionsList() {
         searchPlaceholder="Search by role name or description..."
         emptyLabel="No roles yet."
         addLabel="Create Role"
-        onAdd={openAdd}
+        onAdd={canAdd ? openAdd : undefined}
         loading={tableLoading}
         error={tableError}
         onRetry={reload}
@@ -190,11 +239,12 @@ export default function RolesPermissionsList() {
         }}
         role={viewing}
         catalog={catalog}
+        canReadPermissions={canReadPermissions}
         loading={viewLoading}
         error={viewError}
         onRetry={() => viewing && openView(viewing)}
-        onEdit={viewing && !isProtectedRole(viewing) ? () => openEdit(viewing) : undefined}
-        onDelete={viewing && !isProtectedRole(viewing) ? () => setDeleteTarget(viewing) : undefined}
+        onEdit={viewing && canEdit && !isProtectedRole(viewing) ? () => openEdit(viewing) : undefined}
+        onDelete={viewing && canDelete && !isProtectedRole(viewing) ? () => setDeleteTarget(viewing) : undefined}
       />
 
       <RoleFormModal
@@ -204,6 +254,7 @@ export default function RolesPermissionsList() {
         editingRole={editing}
         existingRoles={roles}
         catalog={catalog}
+        canReadPermissions={canReadPermissions}
         loading={formLoading}
         error={formError}
         onRetry={() => editTarget && openEdit(editTarget)}

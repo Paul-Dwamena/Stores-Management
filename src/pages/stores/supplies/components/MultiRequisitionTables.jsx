@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, Replace, Search, Trash2 } from "lucide-react";
+import { ChevronDown, Info, Plus, Replace, Search, Trash2 } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import InputField from "../../../../components/common/fields/InputField";
 import { toast } from "../../../../components/common/ToastNotification";
@@ -108,6 +108,7 @@ export function MultiAccessoryRequisitionTable({
   onRemoveLine,
   onChangeQuantity,
   itemNoun = "accessories",
+  catalogAccessDenied = false,
 }) {
   const [tab, setTab] = useState("catalog");
   const [search, setSearch] = useState("");
@@ -326,19 +327,41 @@ export function MultiAccessoryRequisitionTable({
                         Search {itemNoun}
                       </label>
                       <div className="relative">
-                        <Search
-                          size={14}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
+                        {catalogAccessDenied ? (
+                          <Info
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Search
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                          />
+                        )}
                         <input
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
+                          value={catalogAccessDenied ? "" : search}
+                          onChange={(e) => {
+                            if (catalogAccessDenied) return;
+                            setSearch(e.target.value);
+                          }}
+                          disabled={catalogAccessDenied}
                           className={cn(
                             fieldClassName,
                             "pl-9 h-[38px]",
                             formErrors.selectedAccessoryId && "border-red-500 bg-red-50",
+                            catalogAccessDenied && "bg-slate-100 text-slate-500 cursor-not-allowed italic",
                           )}
-                          placeholder="Search by code, name, or brand…"
+                          placeholder={
+                            catalogAccessDenied
+                              ? "Access denied"
+                              : "Search by code, name, or brand…"
+                          }
+                          title={
+                            catalogAccessDenied
+                              ? "You don't have permission to view items"
+                              : undefined
+                          }
                         />
                       </div>
                       {formErrors.selectedAccessoryId ? (
@@ -347,6 +370,7 @@ export function MultiAccessoryRequisitionTable({
                         </p>
                       ) : null}
                     </div>
+                    {catalogAccessDenied ? null : (
                     <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-50">
                       {filteredAccessories.length === 0 ? (
                         <p className="px-4 py-6 text-center text-[12px] text-slate-400">
@@ -382,6 +406,7 @@ export function MultiAccessoryRequisitionTable({
                         ))
                       )}
                     </div>
+                    )}
                   </>
                 )}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

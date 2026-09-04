@@ -317,7 +317,7 @@ export default function IssueItemActionModal({
         hideCancelButton
         secondaryAction={{ label: "Cancel", onClick: onClose }}
         footerActions={
-          busy ? null : (
+          busy || !onReject ? null : (
             <Button variant="danger" size="modal" onClick={() => setRejectMode("entire")}>
               Reject
             </Button>
@@ -489,11 +489,7 @@ export default function IssueItemActionModal({
             }}
             error={errors.suppliedTo}
             selectClassName={fieldClassName}
-            onAddClick={
-              hasLiveReceivers
-                ? () => setReceiverEditorOpen(true)
-                : undefined
-            }
+            onAddClick={() => setReceiverEditorOpen(true)}
             addButtonLabel="Add receiver"
           />
           </ShowConfiguredField>

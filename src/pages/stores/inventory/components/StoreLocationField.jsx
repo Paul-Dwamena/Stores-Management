@@ -1,75 +1,23 @@
-import React, { useState } from "react";
-import { Plus } from "lucide-react";
-import { cn } from "../../../../utils/cn";
-import { getStoreLocationOptions } from "../../../../mockdata/stores";
-import { formatStoreLocation } from "../../../../utils/displayFormatters";
-import StoreFormModal from "../../../setups/components/StoreFormModal";
+import React from "react";
+import StoreSelect from "./StoreSelect";
 
-const defaultSelectClassName =
-  "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
-
+/** @deprecated Prefer importing StoreSelect directly. */
 export default function StoreLocationField({
-  id,
+  id = "store-location",
   value,
   onChange,
   error,
   label = "Store location",
   required = true,
-  selectClassName,
 }) {
-  const [addOpen, setAddOpen] = useState(false);
-  const locations = getStoreLocationOptions();
-
-  const setValue = (next) => {
-    onChange?.(next);
-  };
-
   return (
-    <>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <label
-            htmlFor={id}
-            className={cn(
-              "text-[10px] font-bold uppercase tracking-wider",
-              error ? "text-red-500" : "text-slate-500",
-            )}
-          >
-            {label}
-            {required ? <span className="normal-case text-red-500"> *</span> : null}
-          </label>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover"
-          >
-            <Plus size={12} />
-            Add store
-          </button>
-        </div>
-        <select
-          id={id}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          className={cn(selectClassName || defaultSelectClassName, "uppercase", error && "border-red-500 bg-red-50")}
-        >
-          <option value="">Select store location…</option>
-          {locations.map((location) => (
-            <option key={location} value={location}>
-              {formatStoreLocation(location)}
-            </option>
-          ))}
-        </select>
-        {error ? <p className="text-[10px] font-medium text-red-500">{error}</p> : null}
-      </div>
-      <StoreFormModal
-        isOpen={addOpen}
-        onClose={() => setAddOpen(false)}
-        overlayClassName="!z-[10001]"
-        onSaved={(created) => {
-          setValue(created?.label || created?.name || "");
-        }}
-      />
-    </>
+    <StoreSelect
+      id={id}
+      value={value}
+      onChange={(next) => onChange?.({ target: { value: next } })}
+      error={error}
+      label={label}
+      required={required}
+    />
   );
 }

@@ -13,6 +13,8 @@ import { formatApiDateTime, sortNewestFirst } from "../../utils/apiResponseHelpe
 import CatalogTable, { StatusBadge } from "./components/CatalogTable";
 import CatalogDetailModal from "./components/CatalogDetailModal";
 import CatalogFormModal from "./components/CatalogFormModal";
+import { usePermission } from "../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../permissions/accessMap";
 
 const EMPTY_FORM = {
   name: "",
@@ -28,6 +30,12 @@ const isStoreManagerRole = (role) =>
   String(role?.name || "").toUpperCase() === "STORE_MANAGER";
 
 export default function StoreManagementList() {
+  const { can } = usePermission();
+  const canAdd = can(RESOURCES.stores, ACTIONS.create);
+  const canEdit = can(RESOURCES.stores, ACTIONS.update);
+  const canReadUsers = can(RESOURCES.users, ACTIONS.read);
+  const canReadRoles = can(RESOURCES.roles, ACTIONS.read);
+  const canPickManagers = canReadUsers && canReadRoles;
   const [rows, setRows] = useState([]);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -83,18 +91,26 @@ export default function StoreManagementList() {
       setTableLoading(false);
     }
     try {
-      const [userRows, roleRows] = await Promise.all([listUsers(), listRoles()]);
-      setUsers(userRows);
-      setRoles(roleRows);
-      setStoreManagerRoleId(roleRows.find(isStoreManagerRole)?.id ?? null);
+      if (!canPickManagers) {
+        setUsers([]);
+        setRoles([]);
+        setStoreManagerRoleId(null);
+      } else {
+        const [userRows, roleRows] = await Promise.all([listUsers(), listRoles()]);
+        setUsers(userRows);
+        setRoles(roleRows);
+        setStoreManagerRoleId(roleRows.find(isStoreManagerRole)?.id ?? null);
+      }
     } catch {
-      /* manager options are optional for the list view */
+      setUsers([]);
+      setRoles([]);
+      setStoreManagerRoleId(null);
     }
   };
 
   useEffect(() => {
     reload();
-  }, []);
+  }, [canPickManagers]);
 
   const openAdd = () => {
     setEditing(null);
@@ -147,10 +163,13 @@ export default function StoreManagementList() {
         key: "manager_id",
         label: "Store manager (Optional)",
         type: "search-select",
-        placeholder: storeManagerOptions.length
-          ? "Search store managers…"
-          : "No store managers available",
-        options: storeManagerOptions,
+        placeholder: !canPickManagers
+          ? "Access denied"
+          : storeManagerOptions.length
+            ? "Search store managers…"
+            : "No store managers available",
+        options: canPickManagers ? storeManagerOptions : [],
+        disabled: !canPickManagers,
       },
       {
         key: "is_active",
@@ -162,7 +181,7 @@ export default function StoreManagementList() {
         description: "Inactive stores are hidden from inventory, supplies, and transfers.",
       },
     ],
-    [storeManagerOptions, editing],
+    [storeManagerOptions, editing, canPickManagers],
   );
 
   const handleSave = async (form) => {
@@ -198,25 +217,6 @@ export default function StoreManagementList() {
     }
   };
 
-  const toggleStoreStatus = async () => {
-    if (!viewing) return;
-    try {
-      const saved = await updateStore(viewing.id, {
-        name: viewing.name,
-        address: viewing.address || null,
-        city: viewing.city || null,
-        region: viewing.region || null,
-        manager_id: viewing.manager?.id ?? null,
-        is_active: !viewing.isActive,
-      });
-      toast.success(saved.isActive ? "Store activated." : "Store deactivated.");
-      setViewing(saved);
-      reload();
-    } catch (err) {
-      toast.error(err.message || "Unable to update store status.");
-    }
-  };
-
   return (
     <>
       <CatalogTable
@@ -225,7 +225,7 @@ export default function StoreManagementList() {
         searchPlaceholder="Search stores..."
         emptyLabel="No stores yet."
         addLabel="Add store"
-        onAdd={openAdd}
+        onAdd={canAdd ? openAdd : undefined}
         loading={tableLoading}
         error={tableError}
         onRetry={reload}
@@ -277,8 +277,7 @@ export default function StoreManagementList() {
           { label: "Status", value: viewing?.status },
         ]}
         editLabel="Edit store"
-        onEdit={() => openEdit(viewing)}
-        onToggleStatus={toggleStoreStatus}
+        onEdit={canEdit ? () => openEdit(viewing) : undefined}
         loading={viewLoading}
         error={viewError}
         onRetry={() => viewing && openView(viewing)}

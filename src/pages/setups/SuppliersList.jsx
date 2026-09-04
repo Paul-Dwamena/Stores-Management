@@ -6,10 +6,15 @@ import { formatApiDateTime, sortNewestFirst } from "../../utils/apiResponseHelpe
 import CatalogTable, { StatusBadge } from "./components/CatalogTable";
 import CatalogDetailModal from "./components/CatalogDetailModal";
 import CatalogFormModal from "./components/CatalogFormModal";
+import { usePermission } from "../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../permissions/accessMap";
 
 const EMPTY_FORM = { name: "", phone: "", email: "", address: "", is_active: true };
 
 export default function SuppliersList() {
+  const { can } = usePermission();
+  const canAdd = can(RESOURCES.suppliers, ACTIONS.create);
+  const canEdit = can(RESOURCES.suppliers, ACTIONS.update);
   const [rows, setRows] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -136,24 +141,6 @@ export default function SuppliersList() {
     }
   };
 
-  const toggleSupplierStatus = async () => {
-    if (!viewing) return;
-    try {
-      const saved = await updateSupplier(viewing.id, {
-        name: viewing.name,
-        phone: viewing.phone || null,
-        email: viewing.email || null,
-        address: viewing.address || null,
-        is_active: !viewing.isActive,
-      });
-      toast.success(saved.isActive ? "Supplier activated." : "Supplier deactivated.");
-      setViewing(saved);
-      reload();
-    } catch (err) {
-      toast.error(err.message || "Unable to update supplier status.");
-    }
-  };
-
   return (
     <>
       <CatalogTable
@@ -162,7 +149,7 @@ export default function SuppliersList() {
         searchPlaceholder="Search suppliers..."
         emptyLabel="No suppliers yet."
         addLabel="Add supplier"
-        onAdd={openAdd}
+        onAdd={canAdd ? openAdd : undefined}
         loading={tableLoading}
         error={tableError}
         onRetry={reload}
@@ -206,8 +193,7 @@ export default function SuppliersList() {
           { label: "Status", value: viewing?.status },
         ]}
         editLabel="Edit supplier"
-        onEdit={() => openEdit(viewing)}
-        onToggleStatus={toggleSupplierStatus}
+        onEdit={canEdit ? () => openEdit(viewing) : undefined}
         loading={viewLoading}
         error={viewError}
         onRetry={() => viewing && openView(viewing)}

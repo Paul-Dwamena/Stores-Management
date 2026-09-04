@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Info } from "lucide-react";
 import { cn } from "../../utils/cn";
 import PageHeader from "./PageHeader";
+import AccessDenied from "./AccessDenied";
 
 /**
  * Flat sidebar destinations that host in-page tabs (no second sidebar).
@@ -15,10 +16,15 @@ export default function TabbedPageHub({
   defaultTab,
   paramKey = "tab",
   headerActions = null,
+  emptyTitle = "Access denied",
+  emptyDescription = "You don't have permission to view this section.",
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const fallback = defaultTab || tabs[0]?.id;
-  const activeTab = searchParams.get(paramKey) || fallback;
+  const fallback = (defaultTab && tabs.some((tab) => tab.id === defaultTab)
+    ? defaultTab
+    : tabs[0]?.id);
+  const requested = searchParams.get(paramKey) || fallback;
+  const activeTab = tabs.some((tab) => tab.id === requested) ? requested : fallback;
 
   const setActiveTab = (tabId) => {
     const next = { ...Object.fromEntries(searchParams.entries()) };
@@ -32,6 +38,20 @@ export default function TabbedPageHub({
     next[paramKey] = tabId;
     setSearchParams(next);
   };
+
+  useEffect(() => {
+    if (!tabs.length || !activeTab) return;
+    const current = searchParams.get(paramKey);
+    if (!current || current === activeTab) return;
+    const next = { ...Object.fromEntries(searchParams.entries()) };
+    if (activeTab === fallback) delete next[paramKey];
+    else next[paramKey] = activeTab;
+    setSearchParams(next, { replace: true });
+  }, [activeTab, fallback, paramKey, searchParams, setSearchParams, tabs.length]);
+
+  if (!tabs.length) {
+    return <AccessDenied title={emptyTitle} description={emptyDescription} />;
+  }
 
   const active = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const TabIcon = active?.icon ?? Info;

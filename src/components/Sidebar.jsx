@@ -4,6 +4,8 @@ import { FiGrid, FiBox, FiX, FiSettings } from "react-icons/fi";
 import { CheckCircle, Inbox, ScrollText, SlidersHorizontal } from "lucide-react";
 import { cn } from "../utils/cn";
 import StoreLogo from "./common/StoreLogo";
+import { usePermission } from "../hooks/usePermission";
+import { findRouteAccess, isAccessAllowed } from "../permissions/accessMap";
 
 const mainNavItems = [
   { name: "Overview", icon: FiGrid, path: "/", exact: true },
@@ -17,6 +19,10 @@ const mainNavItems = [
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const location = useLocation();
+  const { can, canAny } = usePermission();
+  const visibleNavItems = mainNavItems.filter((item) =>
+    isAccessAllowed(findRouteAccess(item.path), can, canAny),
+  );
 
   const closeMobile = () => setSidebarOpen(false);
 
@@ -53,7 +59,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
         <nav className="flex-1 py-4 px-2 overflow-y-auto no-scrollbar">
           <div className="space-y-1">
-            {mainNavItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <NavLink
                 key={item.name}
                 to={item.path}

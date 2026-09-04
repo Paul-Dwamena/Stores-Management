@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import PageHeader from "../../../components/common/PageHeader";
 import BackToDropdownOptionsLink from "../components/BackToDropdownOptionsLink";
 import Button from "../../../components/common/base/Button";
@@ -11,12 +11,15 @@ import Label from "../../../components/common/base/Label";
 import ToggleField from "../../../components/common/fields/ToggleField";
 import SectionLoadState from "../../../components/common/SectionLoadState";
 import {
-  TableIconAction,
   TableRowActions,
+  TableViewAction,
 } from "../../../components/common/tableActions";
 import { toast } from "../../../components/common/ToastNotification";
 import { BrandDisplay } from "../../../components/common/display/FormattedDisplay";
 import { cn } from "../../../utils/cn";
+import { usePermission } from "../../../hooks/usePermission";
+import { ACTIONS, canDropdownOptionAction } from "../../../permissions/accessMap";
+import CatalogDetailModal from "../components/CatalogDetailModal";
 import {
   isApiBackedCatalogOption,
   refreshCatalogOptions,
@@ -133,6 +136,10 @@ async function deleteCatalogItem(optionId, id) {
 }
 
 export default function ManagedDropdownOptionList({ optionId, title }) {
+  const { can } = usePermission();
+  const canAdd = canDropdownOptionAction(can, optionId, ACTIONS.create);
+  const canEdit = canDropdownOptionAction(can, optionId, ACTIONS.update);
+  const canDelete = canDropdownOptionAction(can, optionId, ACTIONS.delete);
   const usesApi = isApiBackedCatalogOption(optionId);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(Boolean(usesApi));
@@ -141,6 +148,7 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
   const [showInactive, setShowInactive] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [confirmAction, setConfirmAction] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -189,12 +197,18 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
   }, [items, search, showInactive]);
 
   const openCreate = () => {
+    setViewing(null);
     setEditing(null);
     setForm(EMPTY_FORM);
     setModalOpen(true);
   };
 
+  const openView = (row) => {
+    setViewing(row);
+  };
+
   const openEdit = (row) => {
+    setViewing(null);
     setEditing(row);
     setForm({
       name: row.name,
@@ -202,6 +216,15 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
       active: row.active !== false,
     });
     setModalOpen(true);
+  };
+
+  const requestDelete = (row) => {
+    if (!row) return;
+    setConfirmAction({
+      type: "delete",
+      id: row.id,
+      name: row.name,
+    });
   };
 
   const requestSave = () => {
@@ -278,6 +301,7 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
 
       setConfirmAction(null);
       setEditing(null);
+      setViewing(null);
       setForm(EMPTY_FORM);
     } catch (error) {
       toast.error(error.message || "Could not save changes.");
@@ -319,9 +343,11 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
     <div className="space-y-6 pb-8">
       <BackToDropdownOptionsLink />
       <PageHeader title={title} description={`Manage ${title.toLowerCase()} setups.`}>
-        <Button onClick={openCreate} disabled={loading}>
-          <Plus size={16} /> Add item
-        </Button>
+        {canAdd ? (
+          <Button onClick={openCreate} disabled={loading}>
+            <Plus size={16} /> Add item
+          </Button>
+        ) : null}
       </PageHeader>
 
       <SectionLoadState
@@ -383,24 +409,7 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
                     </td>
                     <td className="px-6 py-3 text-right">
                       <TableRowActions>
-                        <TableIconAction
-                          title="Edit item"
-                          onClick={() => openEdit(row)}
-                          icon={Pencil}
-                          variant="edit"
-                        />
-                        <TableIconAction
-                          title="Delete item"
-                          onClick={() =>
-                            setConfirmAction({
-                              type: "delete",
-                              id: row.id,
-                              name: row.name,
-                            })
-                          }
-                          icon={Trash2}
-                          variant="delete"
-                        />
+                        <TableViewAction title="View item" onClick={() => openView(row)} />
                       </TableRowActions>
                     </td>
                   </tr>
@@ -419,6 +428,24 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
           </div>
         </div>
       </SectionLoadState>
+
+      <CatalogDetailModal
+        isOpen={Boolean(viewing) && !modalOpen && !confirmAction}
+        onClose={() => setViewing(null)}
+        title="Item details"
+        subtitle={`Details for this ${title.toLowerCase()} entry.`}
+        status={viewing?.active !== false ? "Active" : "Inactive"}
+        identifier={viewing?.name}
+        fields={[
+          { label: "Name", value: viewing?.name },
+          { label: "Description", value: viewing?.description || "—" },
+          { label: "Status", value: viewing?.active !== false ? "Active" : "Inactive" },
+        ]}
+        editLabel="Edit"
+        onEdit={canEdit && viewing ? () => openEdit(viewing) : undefined}
+        deleteLabel="Delete"
+        onDelete={canDelete && viewing ? () => requestDelete(viewing) : undefined}
+      />
 
       <AddModal
         isOpen={modalOpen}

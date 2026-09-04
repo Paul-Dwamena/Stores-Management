@@ -98,7 +98,7 @@ export default function ApprovalRequestActionModal({
         hideCancelButton
         secondaryAction={{ label: "Cancel", onClick: onClose }}
         footerActions={
-          busy ? null : (
+          busy || !onReject ? null : (
             <Button variant="danger" size="modal" onClick={() => setRejectOpen(true)}>
               Reject
             </Button>

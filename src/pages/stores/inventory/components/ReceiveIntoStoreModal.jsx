@@ -300,6 +300,8 @@ export default function ReceiveIntoStoreModal({
                 onChange={(next) => setField("location", next)}
                 error={errors.location}
                 label="Store location"
+                placeholder="Search store…"
+                required
               />
             </div>
             <SupplierPicker

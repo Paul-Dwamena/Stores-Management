@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Replace, Search } from "lucide-react";
+import { Info, Replace, Search } from "lucide-react";
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
@@ -16,6 +16,8 @@ import { ItemPhotoThumb } from "../../../stores/inventory/components/ItemPhotoFi
 import { ItemNameDisplay } from "../../../../components/common/display/FormattedDisplay";
 import { formatBrand } from "../../../../utils/displayFormatters";
 import { isPositiveInt, toGeneralRequestWriteBody, UNREGISTERED_ITEM_DESCRIPTION_HELPER, UNREGISTERED_ITEM_DESCRIPTION_PLACEHOLDER } from "../utils/requestHelpers";
+import { usePermission } from "../../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../../permissions/accessMap";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -127,6 +129,8 @@ function editingToMultiLines(editing, catalog) {
 }
 
 export default function NewRequestModal({ isOpen, onClose, onSaved, editing = null }) {
+  const { can } = usePermission();
+  const canReadItems = can(RESOURCES.items, ACTIONS.read);
   const isEdit = Boolean(editing);
   const [step, setStep] = useState("type");
   const [quantityMode, setQuantityMode] = useState("");
@@ -211,6 +215,12 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
     }
 
     const load = async () => {
+      if (!canReadItems) {
+        setCatalog([]);
+        if (editing) applyEditing(editing, []);
+        setCatalogReady(true);
+        return;
+      }
       try {
         const items = await listItems();
         setCatalog(items);
@@ -224,7 +234,7 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
       }
     };
     load();
-  }, [isOpen, editing]);
+  }, [isOpen, editing, canReadItems]);
 
   const filteredCatalog = useMemo(() => {
     const query = accessorySearch.trim().toLowerCase();
@@ -516,19 +526,33 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                         Search items
                       </label>
                       <div className="relative">
-                        <Search
-                          size={14}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
+                        {canReadItems ? (
+                          <Search
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                          />
+                        ) : (
+                          <Info
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            aria-hidden="true"
+                          />
+                        )}
                         <input
-                          value={accessorySearch}
-                          onChange={(event) => setAccessorySearch(event.target.value)}
+                          value={canReadItems ? accessorySearch : ""}
+                          onChange={(event) => {
+                            if (!canReadItems) return;
+                            setAccessorySearch(event.target.value);
+                          }}
+                          disabled={!canReadItems}
                           className={cn(
                             fieldClassName,
                             "pl-9",
                             errors.selectedAccessoryId && "border-red-500 bg-red-50",
+                            !canReadItems && "bg-slate-100 text-slate-500 cursor-not-allowed italic",
                           )}
-                          placeholder="Search by code, name, or brand…"
+                          placeholder={canReadItems ? "Search by code, name, or brand…" : "Access denied"}
+                          title={canReadItems ? undefined : "You don't have permission to view items"}
                         />
                       </div>
                       {errors.selectedAccessoryId ? (
@@ -537,6 +561,7 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                         </p>
                       ) : null}
                     </div>
+                    {canReadItems ? (
                     <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-50">
                       {filteredCatalog.length === 0 ? (
                         <p className="px-4 py-6 text-center text-[12px] text-slate-400">
@@ -570,6 +595,7 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
                         ))
                       )}
                     </div>
+                    ) : null}
                   </>
                 )}
                 <InputField
@@ -666,6 +692,7 @@ export default function NewRequestModal({ isOpen, onClose, onSaved, editing = nu
             <MultiAccessoryRequisitionTable
               lines={multiLines}
               accessories={catalog}
+              catalogAccessDenied={!canReadItems}
               errors={lineErrors}
               onAddItem={(item) => {
                 setMultiLines((prev) => [...prev, item]);

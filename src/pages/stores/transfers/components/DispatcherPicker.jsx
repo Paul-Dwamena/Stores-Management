@@ -1,6 +1,8 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import ConfiguredSearchSelectField from "../../../../components/common/fields/ConfiguredSearchSelectField";
+import { usePermission } from "../../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../../permissions/accessMap";
 
 function personLabel(person) {
   return person.name || person.email || "";
@@ -30,7 +32,11 @@ export default function DispatcherPicker({
   items = [],
   id = "dispatcher-search",
 }) {
-  const options = personOptions(items);
+  const { can } = usePermission();
+  const canReadUsers = can(RESOURCES.users, ACTIONS.read);
+  const canCreateUsers = can(RESOURCES.users, ACTIONS.create);
+  const denied = !canReadUsers;
+  const options = denied ? [] : personOptions(items);
 
   return (
     <ConfiguredSearchSelectField
@@ -38,15 +44,19 @@ export default function DispatcherPicker({
       field={{
         key: "dispatcher",
         title: label,
-        placeholder,
+        placeholder: denied ? "Access denied" : placeholder,
         options,
       }}
       values={{ dispatcher: value }}
       error={error}
-      onChange={(_key, next) => onChange?.(next ?? "")}
+      disabled={denied}
+      onChange={(_key, next) => {
+        if (denied) return;
+        onChange?.(next ?? "");
+      }}
       required={required}
       action={
-        onAddClick ? (
+        !denied && canCreateUsers && onAddClick ? (
           <button
             type="button"
             onClick={onAddClick}

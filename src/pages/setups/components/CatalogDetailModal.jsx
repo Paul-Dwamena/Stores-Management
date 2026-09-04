@@ -13,6 +13,8 @@ export default function CatalogDetailModal({
   fields = [],
   onEdit,
   editLabel = "Edit",
+  onDelete,
+  deleteLabel = "Delete",
   onToggleStatus,
   statusActionLabel,
   loading = false,
@@ -34,6 +36,11 @@ export default function CatalogDetailModal({
       footerRight={
         busy ? null : (
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {onDelete ? (
+            <Button variant="danger" size="modal" onClick={onDelete}>
+              {deleteLabel}
+            </Button>
+          ) : null}
           {onToggleStatus ? (
             <Button
               variant={isActive ? "danger" : "secondary"}

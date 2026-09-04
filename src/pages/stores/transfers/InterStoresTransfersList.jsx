@@ -45,6 +45,8 @@ import InterStoreTransferDetailsModal from "./components/InterStoreTransferDetai
 import NewInterStoreTransferModal from "./components/NewInterStoreTransferModal";
 import ReceiveTransferToStoreModal from "./components/ReceiveTransferToStoreModal";
 import TransferCommentModal from "./components/TransferCommentModal";
+import { usePermission } from "../../../hooks/usePermission";
+import { ACTIONS, RESOURCES, TRANSFER_MUTATE_ANY } from "../../../permissions/accessMap";
 
 const PAGE_SIZE = 10;
 
@@ -55,6 +57,9 @@ const filterSelectClassName =
   "px-3 py-1.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25";
 
 export default function InterStoresTransfersList({ embedded = false }) {
+  const { can, canAny } = usePermission();
+  const canAdd = can(RESOURCES.transfers, ACTIONS.create);
+  const canEdit = canAny(TRANSFER_MUTATE_ANY);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -386,10 +391,12 @@ export default function InterStoresTransfersList({ embedded = false }) {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-2 sm:px-4 bg-slate-50/30">
             <div className="min-w-0 flex-1" />
             <div className="flex flex-nowrap items-center gap-2 shrink-0 py-2 ml-auto">
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
-                <Plus size={16} />
-                New transfer
-              </Button>
+              {canAdd ? (
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus size={16} />
+                  New transfer
+                </Button>
+              ) : null}
             </div>
           </div>
 
@@ -557,12 +564,12 @@ export default function InterStoresTransfersList({ embedded = false }) {
         loadError={detailLoadError}
         onRetry={() => detailRow && openDetail(detailRow)}
         actionSaving={actionSaving}
-        onApprove={() => detailRow && setConfirmAction({ type: "approve", row: detailRow })}
-        onDispatch={() => detailRow && setConfirmAction({ type: "dispatch", row: detailRow })}
-        onReceive={() => detailRow && setReceiveRow(detailRow)}
-        onReject={() => detailRow && setCommentAction({ type: "reject", row: detailRow })}
-        onCancel={() => detailRow && setConfirmAction({ type: "cancel", row: detailRow })}
-        onMarkArrived={() => detailRow && setArriveRow(detailRow)}
+        onApprove={canEdit ? () => detailRow && setConfirmAction({ type: "approve", row: detailRow }) : undefined}
+        onDispatch={canEdit ? () => detailRow && setConfirmAction({ type: "dispatch", row: detailRow }) : undefined}
+        onReceive={canEdit ? () => detailRow && setReceiveRow(detailRow) : undefined}
+        onReject={canEdit ? () => detailRow && setCommentAction({ type: "reject", row: detailRow }) : undefined}
+        onCancel={canEdit ? () => detailRow && setConfirmAction({ type: "cancel", row: detailRow }) : undefined}
+        onMarkArrived={canEdit ? () => detailRow && setArriveRow(detailRow) : undefined}
       />
 
       <TransferCommentModal

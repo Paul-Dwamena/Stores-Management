@@ -114,12 +114,28 @@ export default function RequisitionRequestSummary({
       : quantityToSupply != null && quantitySupplied != null
         ? Math.max(0, Number(quantityToSupply) - quantitySupplied - (quantityRejected || 0))
         : getRequisitionRemainingQuantity(requisition) || null;
-  const showQuantity = (key) => quantityFields.includes(key);
+  const showQuantity = (key) => {
+    const status = supplyStatusKey(requisition.status);
+    if (
+      status === "PENDING_SUPPLY_REQUEST"
+      && (key === "toSupply" || key === "supplied" || key === "remaining")
+    ) {
+      return false;
+    }
+    if (
+      status === "PENDING_SUPPLY_APPROVAL"
+      && (key === "supplied" || key === "remaining")
+    ) {
+      return false;
+    }
+    return quantityFields.includes(key);
+  };
   const isRejected = supplyStatusKey(requisition.status) === "REJECTED";
   const showRejectedQuantity =
-    isRejected && (quantityRejected != null || showQuantity("rejected"));
+    isRejected && (quantityRejected != null || quantityFields.includes("rejected"));
   const progressBase = Number(quantityToSupply ?? quantityRequested) || 0;
-  const showSupplyProgress = Number(quantitySupplied) > 0 && progressBase > 0;
+  const showSupplyProgress =
+    showQuantity("supplied") && Number(quantitySupplied) > 0 && progressBase > 0;
   const hasStoreIssuance = storeAllocations.some((row) => Number(row.quantityIssued) > 0);
 
   return (

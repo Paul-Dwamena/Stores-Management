@@ -35,6 +35,8 @@ export default function ConfiguredSearchSelectField({
   required = false,
   action = null,
   loading = false,
+  disabled = false,
+  title,
 }) {
   const formKey = field.formKey || field.key;
   const value = values[formKey] ?? "";
@@ -165,14 +167,15 @@ export default function ConfiguredSearchSelectField({
             loading
               ? "Loading…"
               : options.length === 0
-                ? "No options available"
+                ? (field.placeholder?.trim() || "No options available")
                 : (field.placeholder?.trim() || "Search…")
           }
-          disabled={loading || options.length === 0}
+          disabled={disabled || loading || options.length === 0}
+          title={title}
           autoComplete="off"
           className={cn(inputClassName, error && "border-red-500 bg-red-50")}
         />
-        {value ? (
+        {value && !disabled ? (
           <button
             type="button"
             onClick={() => {

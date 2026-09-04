@@ -12,10 +12,29 @@ const toSession = ({ access_token, token_type, user }) => ({
   isActive: user.is_active,
   role: formatRoleName(user.role.name),
   roleId: user.role.id,
+  roleName: user.role.name,
   store: user.store,
+  permissions: [],
   token: access_token,
   tokenType: token_type,
 });
+
+/** Derive resource from dotted name when API omits resource (e.g. users.create). */
+export const toPermission = (row) => {
+  const name = String(row?.name || "").trim();
+  const action = row?.action || (name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "");
+  const resource =
+    row?.resource
+    || (name.includes(".") ? name.slice(0, name.lastIndexOf(".")) : "");
+
+  return {
+    id: row?.id,
+    name: name || undefined,
+    resource: resource || undefined,
+    action: action || undefined,
+    description: row?.description ?? null,
+  };
+};
 
 const toProfile = (data) => ({
   id: data.id,
@@ -27,6 +46,7 @@ const toProfile = (data) => ({
   isActive: data.is_active,
   roleId: data.role_id,
   createdAt: data.created_at,
+  permissions: (data.permissions || []).map(toPermission),
 });
 
 export const loginUser = async (email, password) => {

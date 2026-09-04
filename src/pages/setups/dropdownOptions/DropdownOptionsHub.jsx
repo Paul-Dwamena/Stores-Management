@@ -14,6 +14,8 @@ import {
   getAllDropdownOptions,
 } from "./dropdownOptionCatalog";
 import { loadAllDropdownOptionStats } from "./dropdownOptionStats";
+import { usePermission } from "../../../hooks/usePermission";
+import { canReadDropdownOption } from "../../../permissions/accessMap";
 
 function StatPill({ label, value, tone = "slate", className }) {
   const toneClass =
@@ -82,6 +84,7 @@ const EMPTY_FORM = { title: "", description: "" };
 
 export default function DropdownOptionsHub({ embedded = false }) {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [options, setOptions] = useState(() => getAllDropdownOptions());
   const [statsById, setStatsById] = useState({});
   const [loading, setLoading] = useState(true);
@@ -90,22 +93,27 @@ export default function DropdownOptionsHub({ embedded = false }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
 
+  const visibleOptions = useMemo(
+    () => options.filter((option) => canReadDropdownOption(can, option.id)),
+    [options, can],
+  );
+
   const filteredOptions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter(
+    if (!q) return visibleOptions;
+    return visibleOptions.filter(
       (option) =>
         option.title.toLowerCase().includes(q) ||
         (option.description || "").toLowerCase().includes(q),
     );
-  }, [options, searchQuery]);
+  }, [visibleOptions, searchQuery]);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       setLoading(true);
-      const stats = await loadAllDropdownOptionStats(options.map((option) => option.id));
+      const stats = await loadAllDropdownOptionStats(visibleOptions.map((option) => option.id));
       if (!cancelled) {
         setStatsById(stats);
         setLoading(false);
@@ -115,7 +123,7 @@ export default function DropdownOptionsHub({ embedded = false }) {
     return () => {
       cancelled = true;
     };
-  }, [options]);
+  }, [visibleOptions]);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
@@ -193,15 +201,19 @@ export default function DropdownOptionsHub({ embedded = false }) {
             <Search size={18} />
           </div>
           <p className="text-[13px] font-bold text-slate-800">
-            No dropdowns match &quot;{searchQuery.trim()}&quot;
+            {searchQuery.trim()
+              ? `No dropdowns match "${searchQuery.trim()}"`
+              : "No dropdown options available for your permissions."}
           </p>
-          <button
-            type="button"
-            onClick={() => setSearchQuery("")}
-            className="mt-4 text-[11px] font-bold text-primary hover:text-primary-hover transition-colors"
-          >
-            Clear search
-          </button>
+          {searchQuery.trim() ? (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="mt-4 text-[11px] font-bold text-primary hover:text-primary-hover transition-colors"
+            >
+              Clear search
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -49,3 +49,18 @@ export function getSupplyViewAction(status) {
   }
   return "view_details";
 }
+
+/**
+ * Same as getSupplyViewAction, but falls back to view-only details when the
+ * user lacks the matching mutate permission.
+ */
+export function resolveSupplyViewAction(
+  status,
+  { canRaise = true, canApprove = true, canReject = true, canIssue = true } = {},
+) {
+  const action = getSupplyViewAction(status);
+  if (action === "raise_supply_request" && !canRaise) return "view_details";
+  if (action === "approval_request" && !canApprove && !canReject) return "view_details";
+  if (action === "issue_item" && !canIssue) return "view_details";
+  return action;
+}

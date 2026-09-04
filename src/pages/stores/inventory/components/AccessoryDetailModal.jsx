@@ -582,20 +582,22 @@ export default function AccessoryDetailModal({
                   <Warehouse size={14} />
                   Store stock
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="primary"
-                  disabled={!detailReady}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setReceiveOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5"
-                >
-                  <Plus size={14} />
-                  Receive stock
-                </Button>
+                {onReceiveStock ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    disabled={!detailReady}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setReceiveOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <Plus size={14} />
+                    Receive stock
+                  </Button>
+                ) : null}
               </div>
             }
           >

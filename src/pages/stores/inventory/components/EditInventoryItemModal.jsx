@@ -6,6 +6,8 @@ import ToggleField from "../../../../components/common/fields/ToggleField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import ItemPhotoField from "./ItemPhotoField";
+import BrandSelect from "./BrandSelect";
+import CategorySelect from "./CategorySelect";
 import {
   useBrandSelectOptions,
   useCategorySelectOptions,
@@ -46,8 +48,8 @@ export default function EditInventoryItemModal({
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const baseUnitOptions = getBaseUnitOptions();
-  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
-  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(isOpen);
+  const { options: brandOptions } = useBrandSelectOptions(isOpen);
+  const { options: categoryOptions } = useCategorySelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen || !item) return;
@@ -170,40 +172,20 @@ export default function EditInventoryItemModal({
             onChange={setField("code")}
             placeholder="Optional code"
           />
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-item-brand">Brand</Label>
-            <select
-              id="edit-item-brand"
-              value={form.brandId}
-              onChange={setField("brandId")}
-              disabled={brandsLoading}
-              className={cn(fieldClassName, brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed")}
-            >
-              <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
-              {brandOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-item-category">Category</Label>
-            <select
-              id="edit-item-category"
-              value={form.categoryId}
-              onChange={setField("categoryId")}
-              disabled={categoriesLoading}
-              className={cn(fieldClassName, categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed")}
-            >
-              <option value="">{categoriesLoading ? "Loading categories…" : "Select category…"}</option>
-              {categoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <BrandSelect
+            id="edit-item-brand"
+            formKey="brandId"
+            value={form.brandId}
+            onChange={(next) => setField("brandId")(next)}
+            enabled={isOpen}
+          />
+          <CategorySelect
+            id="edit-item-category"
+            formKey="categoryId"
+            value={form.categoryId}
+            onChange={(next) => setField("categoryId")(next)}
+            enabled={isOpen}
+          />
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="edit-item-base-unit">Base unit</Label>
             <select

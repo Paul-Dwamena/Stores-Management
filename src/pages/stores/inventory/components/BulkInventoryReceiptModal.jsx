@@ -12,7 +12,7 @@ import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { formatInventoryMoney, sendDeliveryOtp, OTP_TYPE } from "../../../../services/inventoryService";
 import { formatMoneyAmount } from "../../../../utils/displayFormatters";
-import { useBrandSelectOptions, useCategorySelectOptions } from "../../../../hooks/useCatalogOptions";
+import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
 import { catalogOptionLabel } from "../../../../utils/catalogRefHelpers";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
@@ -29,6 +29,8 @@ import {
 import { formatBrand } from "../../../../utils/displayFormatters";
 import { listStores } from "../../../../services/storesService";
 import AddSupplierModal from "./AddSupplierModal";
+import BrandSelect from "./BrandSelect";
+import CategorySelect from "./CategorySelect";
 import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
@@ -334,7 +336,6 @@ function LocationSelect({ value, onChange, error }) {
       value={value}
       onChange={onChange}
       error={error}
-      className="mt-1 bg-white"
     />
   );
 }
@@ -755,8 +756,6 @@ function LineOverrideFields({ line, onChange }) {
 }
 
 function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
-  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(true);
-  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(true);
   const identifyBlock = (
     <div className="space-y-3">
       <ItemPhotoField
@@ -764,46 +763,24 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
         value={line.photo}
         onChange={(photo) => onChange("photo", photo)}
       />
-      <div>
-        <FieldLabel required error={Boolean(errors.brand)}>Brand</FieldLabel>
-        <select
-          value={line.brand}
-          onChange={(event) => onChange("brand", event.target.value)}
-          disabled={brandsLoading}
-          className={cn(
-            fieldClassName,
-            "mt-1",
-            errors.brand && "border-rose-500 bg-rose-50",
-            brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
-          )}
-        >
-          <option value="">{brandsLoading ? "Loading brands…" : "Select brand"}</option>
-          {brandOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-        <ErrorText>{errors.brand}</ErrorText>
-      </div>
-      <div>
-        <FieldLabel required error={Boolean(errors.category)}>Category</FieldLabel>
-        <select
-          value={line.category}
-          onChange={(event) => onChange("category", event.target.value)}
-          disabled={categoriesLoading}
-          className={cn(
-            fieldClassName,
-            "mt-1",
-            errors.category && "border-rose-500 bg-rose-50",
-            categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
-          )}
-        >
-          <option value="">{categoriesLoading ? "Loading categories…" : "Select category"}</option>
-          {categoryOptions.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-        <ErrorText>{errors.category}</ErrorText>
-      </div>
+      <BrandSelect
+        id={`bulk-acc-brand-${line.clientId}`}
+        formKey="brand"
+        label="Brand"
+        value={line.brand}
+        onChange={(next) => onChange("brand", next)}
+        error={errors.brand}
+        required
+      />
+      <CategorySelect
+        id={`bulk-acc-category-${line.clientId}`}
+        formKey="category"
+        label="Category"
+        value={line.category}
+        onChange={(next) => onChange("category", next)}
+        error={errors.category}
+        required
+      />
       <InputField
         label="Name"
         required

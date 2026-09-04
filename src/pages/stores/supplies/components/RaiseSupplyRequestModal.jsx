@@ -482,14 +482,14 @@ export default function RaiseSupplyRequestModal({
                   Reject
                 </Button>
               ) : null}
-              {raiseBlockReason === "unregistered" ? (
-                <Button size="modal" onClick={() => onRegisterItem?.()}>
+              {raiseBlockReason === "unregistered" && onRegisterItem ? (
+                <Button size="modal" onClick={() => onRegisterItem()}>
                   <PackagePlus size={16} />
                   Register item
                 </Button>
               ) : null}
-              {raiseBlockReason === "out_of_stock" ? (
-                <Button size="modal" onClick={() => onReceiveStock?.()}>
+              {raiseBlockReason === "out_of_stock" && onReceiveStock ? (
+                <Button size="modal" onClick={() => onReceiveStock()}>
                   <Boxes size={16} />
                   Receive stock
                 </Button>

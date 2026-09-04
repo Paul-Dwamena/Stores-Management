@@ -122,6 +122,7 @@ export default function CatalogFormModal({
                     onChange={(key, value) => setField(key, value)}
                     spanClass={span}
                     required={field.required}
+                    disabled={Boolean(field.disabled || field.readOnly)}
                   />
                 );
               }

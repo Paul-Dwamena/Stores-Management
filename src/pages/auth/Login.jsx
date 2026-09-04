@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { useAuth } from "../../context/useAuth";
+import { createPermissionChecker, isSuperAdminRole } from "../../permissions/permissionMatch";
+import { getFirstAllowedPath } from "../../permissions/accessMap";
 import StoreLogo from "../../components/common/StoreLogo";
 import { toast } from "../../components/common/ToastNotification";
 
@@ -19,8 +21,12 @@ const Login = () => {
     setLoading(true);
     try {
       const session = await login(email, password);
+      const { can, canAny } = createPermissionChecker(
+        session.permissions,
+        isSuperAdminRole(session.roleName || session.role),
+      );
       toast.success(`Welcome back, ${session.name}.`);
-      navigate("/");
+      navigate(getFirstAllowedPath(can, canAny), { replace: true });
     } catch (err) {
       setError(err?.message || "Unable to sign in.");
     } finally {

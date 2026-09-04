@@ -4,7 +4,7 @@ import InputField from "../../../../components/common/fields/InputField";
 import MoneyInputField from "../../../../components/common/fields/MoneyInputField";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
+import BrandSelect from "./BrandSelect";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -23,7 +23,6 @@ const INITIAL_FORM = {
 export default function AddAccessoryModal({ isOpen, onClose, onSave }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
-  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,31 +76,13 @@ export default function AddAccessoryModal({ isOpen, onClose, onSave }) {
           onChange={handleChange("itemCode")}
           placeholder="Auto-generated if blank"
         />
-        <div className="space-y-1.5">
-          <label
-            htmlFor="accessoryBrand"
-            className="text-[10px] font-bold uppercase tracking-wider text-slate-500"
-          >
-            Brand
-          </label>
-          <select
-            id="accessoryBrand"
-            value={form.brand}
-            onChange={handleChange("brand")}
-            disabled={brandsLoading}
-            className={cn(
-              fieldClassName,
-              brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
-            )}
-          >
-            <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
-            {brandOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <BrandSelect
+          id="accessoryBrand"
+          formKey="brand"
+          value={form.brand}
+          onChange={(next) => handleChange("brand")({ target: { value: next } })}
+          enabled={isOpen}
+        />
       </div>
       <InputField
         label="Name"

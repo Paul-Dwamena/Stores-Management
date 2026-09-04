@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Package,
   ClipboardList,
@@ -9,7 +9,10 @@ import { useSearchParams } from "react-router-dom";
 import { cn } from "../../utils/cn";
 import PageHeader from "../../components/common/PageHeader";
 import SummaryStatCard from "../../components/common/SummaryStatCard";
+import AccessDenied from "../../components/common/AccessDenied";
 import { getStoresGeneralStats } from "../../services/statsService";
+import { usePermission } from "../../hooks/usePermission";
+import { isStoresTabAllowed } from "../../permissions/accessMap";
 import { InventoryList } from "./inventory";
 import { PendingSuppliesList } from "./supplies";
 import { InterStoresTransfersList } from "./transfers";
@@ -39,11 +42,28 @@ function NestedTabButtons({ tabs, activeId, onChange }) {
 
 export default function StoresHub() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const storesSub = searchParams.get("sub") || "inventory";
+  const { can, canAny } = usePermission();
+  const allowedTabs = useMemo(
+    () => STORES_SUB_TABS.filter((tab) => isStoresTabAllowed(tab.id, can, canAny)),
+    [can, canAny],
+  );
+  const fallbackSub = allowedTabs[0]?.id || "inventory";
+  const requestedSub = searchParams.get("sub") || fallbackSub;
+  const storesSub = allowedTabs.some((tab) => tab.id === requestedSub)
+    ? requestedSub
+    : fallbackSub;
 
   const setStoresSub = (subId) => {
     setSearchParams({ sub: subId });
   };
+
+  useEffect(() => {
+    if (!allowedTabs.length) return;
+    const current = searchParams.get("sub");
+    if (current && current !== storesSub) {
+      setSearchParams({ sub: storesSub }, { replace: true });
+    }
+  }, [allowedTabs.length, searchParams, setSearchParams, storesSub]);
 
   const [hubAnalytics, setHubAnalytics] = useState([
     { label: "Accessory SKUs", value: 0, icon: Package, tone: "teal" },
@@ -75,6 +95,12 @@ export default function StoresHub() {
     };
   }, []);
 
+  if (!allowedTabs.length) {
+    return (
+      <AccessDenied description="You don't have permission to view inventory, supplies, or transfers." />
+    );
+  }
+
   return (
     <div className="space-y-4 pb-8">
       <PageHeader
@@ -98,7 +124,7 @@ export default function StoresHub() {
       <div className="space-y-4">
         <div className="pb-3 border-b border-slate-200">
           <NestedTabButtons
-            tabs={STORES_SUB_TABS}
+            tabs={allowedTabs}
             activeId={storesSub}
             onChange={setStoresSub}
           />

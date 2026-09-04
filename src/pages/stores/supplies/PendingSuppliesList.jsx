@@ -45,7 +45,7 @@ import ApprovalRequestActionModal from "./components/ApprovalRequestActionModal"
 import IssueItemActionModal from "./components/IssueItemActionModal";
 import RequisitionDetailModal from "./components/RequisitionDetailModal";
 import {
-  getSupplyViewAction,
+  resolveSupplyViewAction,
   supplyStatusKey,
 } from "./utils/supplyStatus";
 import { SupplyStatusBadge } from "./utils/SupplyStatusBadge";
@@ -54,6 +54,8 @@ import {
   ItemNameDisplay,
   UserNameDisplay,
 } from "../../../components/common/display/FormattedDisplay";
+import { usePermission } from "../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../permissions/accessMap";
 
 const PAGE_SIZE = 10;
 
@@ -193,6 +195,13 @@ function resolveOriginalQuantityRequested(request, quantityByGeneralItemId = {})
 }
 
 export default function PendingSuppliesList({ embedded = false }) {
+  const { can } = usePermission();
+  const canRaise = can(RESOURCES.generalRequests, ACTIONS.submit);
+  const canApprove = can(RESOURCES.supplyRequests, ACTIONS.approve);
+  const canIssue = can(RESOURCES.issuances, ACTIONS.create);
+  const canRejectSupply = can(RESOURCES.supplyRequests, ACTIONS.reject);
+  const canRejectGeneral = can(RESOURCES.generalRequests, ACTIONS.reject);
+  const canReceiveStock = can(RESOURCES.inventory, ACTIONS.receive);
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [supplyRows, setSupplyRows] = useState([]);
@@ -421,10 +430,11 @@ export default function PendingSuppliesList({ embedded = false }) {
     });
   }, [displayRows, searchQuery, statusFilter, locationFilter, dateFrom, dateTo]);
 
-  const showRaiseSelection = statusFilter === "PENDING_SUPPLY_REQUEST";
-  const showApprovalSelection = statusFilter === "PENDING_SUPPLY_APPROVAL";
+  const showRaiseSelection = statusFilter === "PENDING_SUPPLY_REQUEST" && canRaise;
+  const showApprovalSelection = statusFilter === "PENDING_SUPPLY_APPROVAL" && canApprove;
   const showIssueSelection =
-    statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIALLY_SUPPLIED";
+    (statusFilter === "PENDING_ISSUANCE" || statusFilter === "PARTIALLY_SUPPLIED")
+    && canIssue;
   const showBulkSelection = showRaiseSelection || showApprovalSelection || showIssueSelection;
   const showLocationFilter =
     statusFilter === "ALL"
@@ -470,7 +480,14 @@ export default function PendingSuppliesList({ embedded = false }) {
     if (safePage !== page) setPage(safePage);
   }, [safePage, page]);
 
-  const activeAction = activeRow ? getSupplyViewAction(activeRow.status) : null;
+  const activeAction = activeRow
+    ? resolveSupplyViewAction(activeRow.status, {
+        canRaise,
+        canApprove,
+        canReject: canRejectSupply,
+        canIssue,
+      })
+    : null;
 
   const raiseBlockReason = useMemo(() => {
     if (activeAction !== "raise_supply_request" || !activeRow || detailLoading || detailError) {
@@ -542,7 +559,12 @@ export default function PendingSuppliesList({ embedded = false }) {
 
 
   const openRow = async (row) => {
-    const action = getSupplyViewAction(row.status);
+    const action = resolveSupplyViewAction(row.status, {
+      canRaise,
+      canApprove,
+      canReject: canRejectSupply,
+      canIssue,
+    });
     setStoreOptions(null);
     setInventoryItem(null);
     setReceiverOptions([]);
@@ -613,7 +635,7 @@ export default function PendingSuppliesList({ embedded = false }) {
           : Promise.resolve(null);
         const [users, roles, item] = await Promise.all([
           listUsers().catch(() => []),
-          listRoles(),
+          listRoles().catch(() => []),
           inventoryPromise,
         ]);
         const receiverRole = findReceiverRole(roles);
@@ -1084,10 +1106,10 @@ export default function PendingSuppliesList({ embedded = false }) {
         requisition={activeRow}
         storeOptions={storeOptions}
         raiseBlockReason={raiseBlockReason}
-        onReceiveStock={() => setReceiveStockOpen(true)}
-        onRegisterItem={() => setRegisterItemOpen(true)}
+        onReceiveStock={canReceiveStock ? () => setReceiveStockOpen(true) : undefined}
+        onRegisterItem={canReceiveStock ? () => setRegisterItemOpen(true) : undefined}
         onSubmit={handleRaise}
-        onReject={handleReject}
+        onReject={canRejectGeneral ? handleReject : undefined}
         loading={detailLoading}
         saving={saving}
         error={detailError}
@@ -1121,7 +1143,7 @@ export default function PendingSuppliesList({ embedded = false }) {
         onClose={closeAction}
         requisition={activeRow}
         onSubmit={handleApprovalSubmit}
-        onReject={handleReject}
+        onReject={canRejectSupply ? handleReject : undefined}
         loading={detailLoading}
         saving={saving}
         error={detailError}
@@ -1156,7 +1178,7 @@ export default function PendingSuppliesList({ embedded = false }) {
         }}
         onSendOtp={handleSendIssueOtp}
         onConfirmIssue={handleConfirmIssue}
-        onReject={handleReject}
+        onReject={canRejectSupply ? handleReject : undefined}
         loading={detailLoading}
         saving={saving}
         error={detailError}

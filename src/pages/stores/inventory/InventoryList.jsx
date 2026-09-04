@@ -38,6 +38,8 @@ import {
   ItemNameDisplay,
 } from "../../../components/common/display/FormattedDisplay";
 import { STATUS_BADGE_CLASS, workflowStatusBadgeClass } from "../../../utils/workflowStatusBadge";
+import { usePermission } from "../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../permissions/accessMap";
 
 const PAGE_SIZE = 10;
 
@@ -63,6 +65,10 @@ export default function InventoryList({
   tabsSlot = null,
   onCreatedItemType,
 }) {
+  const { can } = usePermission();
+  const canAdd = can(RESOURCES.items, ACTIONS.create);
+  const canEdit = can(RESOURCES.items, ACTIONS.update);
+  const canReceive = can(RESOURCES.inventory, ACTIONS.receive);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -425,9 +431,11 @@ export default function InventoryList({
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-2 sm:px-4 bg-slate-50/30">
             <div className="min-w-0 flex-1">{tabsSlot}</div>
             <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 py-2">
-              <Button size="sm" onClick={() => setAddOpen(true)}>
-                <Plus size={16} /> New item
-              </Button>
+              {canAdd ? (
+                <Button size="sm" onClick={() => setAddOpen(true)}>
+                  <Plus size={16} /> New item
+                </Button>
+              ) : null}
             </div>
           </div>
 
@@ -584,8 +592,8 @@ export default function InventoryList({
         onClose={() => setSelected(null)}
         item={selected}
         variant="accessory"
-        onReceiveStock={handleReceiveStock}
-        onUpdateDetails={handleUpdateDetails}
+        onReceiveStock={canReceive ? handleReceiveStock : undefined}
+        onUpdateDetails={canEdit ? handleUpdateDetails : undefined}
         onRetryDetail={retryItemDetail}
         onRetryReceipts={retryReceipts}
         onRetrySupplies={retrySupplies}

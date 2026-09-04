@@ -11,7 +11,6 @@ import MoneyInputField from "../../../../components/common/fields/MoneyInputFiel
 import ChoiceOption from "../../../../components/common/fields/ChoiceOption";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { useBrandSelectOptions, useCategorySelectOptions } from "../../../../hooks/useCatalogOptions";
 import {
   VEHICLE_PART_MAKE_OPTIONS,
   getVehiclePartModelOptions,
@@ -32,6 +31,8 @@ import { formatBrand } from "../../../../utils/displayFormatters";
 import AddSupplierModal from "./AddSupplierModal";
 import SupplierPicker from "./SupplierPicker";
 import StoreSelect from "./StoreSelect";
+import BrandSelect from "./BrandSelect";
+import CategorySelect from "./CategorySelect";
 import InventoryUnitFields from "./InventoryUnitFields";
 import {
   buildReceiveStockPayload,
@@ -412,8 +413,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
   const [detailsConfirmed, setDetailsConfirmed] = useState(false);
-  const { options: brandOptions, loading: brandsLoading } = useBrandSelectOptions(isOpen);
-  const { options: categoryOptions, loading: categoriesLoading } = useCategorySelectOptions(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1237,38 +1236,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       {accessoryForm.itemCode || "—"}
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="newAccBrand"
-                      className={cn(
-                        "text-[10px] font-bold uppercase tracking-wider",
-                        errors.brand ? "text-red-500" : "text-slate-500",
-                      )}
-                    >
-                      Brand
-                    </label>
-                    <select
-                      id="newAccBrand"
-                      value={accessoryForm.brand}
-                      onChange={handleAccessoryChange("brand")}
-                      disabled={brandsLoading}
-                      className={cn(
-                        fieldClassName,
-                        errors.brand && "border-red-500 bg-red-50",
-                        brandsLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
-                      )}
-                    >
-                      <option value="">{brandsLoading ? "Loading brands…" : "Select brand…"}</option>
-                      {brandOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.brand ? (
-                      <p className="text-[10px] font-medium text-red-500">{errors.brand}</p>
-                    ) : null}
-                  </div>
+                  <BrandSelect
+                    id="newAccBrand"
+                    formKey="brand"
+                    value={accessoryForm.brand}
+                    onChange={(next) => handleAccessoryChange("brand")({ target: { value: next } })}
+                    error={errors.brand}
+                    enabled={isOpen}
+                  />
                   <InputField
                     label="Name"
                     id="newAccName"
@@ -1278,38 +1253,14 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                     error={errors.name}
                     placeholder="Enter item name..."
                   />
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="newAccCategory"
-                      className={cn(
-                        "text-[10px] font-bold uppercase tracking-wider",
-                        errors.category ? "text-red-500" : "text-slate-500",
-                      )}
-                    >
-                      Category
-                    </label>
-                    <select
-                      id="newAccCategory"
-                      value={accessoryForm.category}
-                      onChange={handleAccessoryChange("category")}
-                      disabled={categoriesLoading}
-                      className={cn(
-                        fieldClassName,
-                        errors.category && "border-red-500 bg-red-50",
-                        categoriesLoading && "bg-slate-100 text-slate-500 cursor-not-allowed",
-                      )}
-                    >
-                      <option value="">{categoriesLoading ? "Loading categories…" : "Select category…"}</option>
-                      {categoryOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.category ? (
-                      <p className="text-[10px] font-medium text-red-500">{errors.category}</p>
-                    ) : null}
-                  </div>
+                  <CategorySelect
+                    id="newAccCategory"
+                    formKey="category"
+                    value={accessoryForm.category}
+                    onChange={(next) => handleAccessoryChange("category")({ target: { value: next } })}
+                    error={errors.category}
+                    enabled={isOpen}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label

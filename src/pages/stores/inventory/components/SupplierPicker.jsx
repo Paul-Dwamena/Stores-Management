@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import ConfiguredSearchSelectField from "../../../../components/common/fields/ConfiguredSearchSelectField";
 import { listSuppliers } from "../../../../services/suppliersService";
 import { AddSupplierButton } from "./AddSupplierModal";
+import { usePermission } from "../../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../../permissions/accessMap";
 
 export default function SupplierPicker({
   value,
@@ -14,10 +16,19 @@ export default function SupplierPicker({
   id = "supplier-search",
   reloadToken = 0,
 }) {
+  const { can } = usePermission();
+  const canReadSuppliers = can(RESOURCES.suppliers, ACTIONS.read);
+  const canCreateSuppliers = can(RESOURCES.suppliers, ACTIONS.create);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!canReadSuppliers) {
+      setSuppliers([]);
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
     setLoading(true);
 
@@ -37,12 +48,15 @@ export default function SupplierPicker({
     return () => {
       cancelled = true;
     };
-  }, [reloadToken]);
+  }, [reloadToken, canReadSuppliers]);
 
-  const options = suppliers.map((supplier) => ({
-    value: String(supplier.id),
-    label: supplier.name,
-  }));
+  const denied = !canReadSuppliers;
+  const options = denied
+    ? []
+    : suppliers.map((supplier) => ({
+        value: String(supplier.id),
+        label: supplier.name,
+      }));
 
   return (
     <ConfiguredSearchSelectField
@@ -50,18 +64,24 @@ export default function SupplierPicker({
       field={{
         key: "supplierId",
         title: label,
-        placeholder,
+        placeholder: denied ? "Access denied" : placeholder,
         options,
       }}
       values={{ supplierId: value == null ? "" : String(value) }}
       error={error}
-      loading={loading}
+      loading={loading && !denied}
+      disabled={denied}
       onChange={(_key, next) => {
+        if (denied) return;
         const match = suppliers.find((row) => String(row.id) === String(next));
         onChange?.(next ?? "", match || null);
       }}
       required={required}
-      action={onAddClick ? <AddSupplierButton onClick={onAddClick} /> : null}
+      action={
+        !denied && canCreateSuppliers && onAddClick
+          ? <AddSupplierButton onClick={onAddClick} />
+          : null
+      }
     />
   );
 }

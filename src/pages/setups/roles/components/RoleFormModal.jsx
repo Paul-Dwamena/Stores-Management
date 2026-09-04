@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Info } from "lucide-react";
 import AddModal from "../../../../components/common/AddModal";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import InputField from "../../../../components/common/fields/InputField";
@@ -20,6 +21,7 @@ export default function RoleFormModal({
   editingRole = null,
   existingRoles = [],
   catalog = [],
+  canReadPermissions = true,
   loading = false,
   error = null,
   onRetry,
@@ -140,11 +142,23 @@ export default function RoleFormModal({
             </div>
 
             {isEdit ? (
-              <PermissionMatrixTable
-                catalog={catalog}
-                selectedIds={form.permission_ids}
-                onToggle={handleToggle}
-              />
+              canReadPermissions ? (
+                <PermissionMatrixTable
+                  catalog={catalog}
+                  selectedIds={form.permission_ids}
+                  onToggle={handleToggle}
+                />
+              ) : (
+                <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8">
+                  <span
+                    className="inline-flex items-center gap-1.5 text-[13px] font-medium italic text-slate-400"
+                    title="You don't have permission to view permissions"
+                  >
+                    <Info size={14} className="shrink-0" aria-hidden="true" />
+                    Access denied
+                  </span>
+                </div>
+              )
             ) : null}
           </div>
         </SectionLoadState>

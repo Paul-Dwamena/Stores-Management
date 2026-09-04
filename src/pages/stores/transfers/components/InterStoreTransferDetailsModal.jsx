@@ -68,30 +68,38 @@ export default function InterStoreTransferDetailsModal({
     <div className="flex flex-wrap justify-end gap-2">
       {status === TRANSFER_STATUS.PENDING_APPROVAL ? (
         <>
-          <Button variant="danger" size="modal" onClick={onCancel} disabled={disabled}>
-            Cancel request
-          </Button>
-          <Button size="modal" onClick={onApprove} disabled={disabled}>
-            Approve
-          </Button>
+          {onCancel ? (
+            <Button variant="danger" size="modal" onClick={onCancel} disabled={disabled}>
+              Cancel request
+            </Button>
+          ) : null}
+          {onApprove ? (
+            <Button size="modal" onClick={onApprove} disabled={disabled}>
+              Approve
+            </Button>
+          ) : null}
         </>
       ) : null}
       {status === TRANSFER_STATUS.PENDING_DISPATCH ? (
         <>
-          <Button variant="danger" size="modal" onClick={onReject} disabled={disabled}>
-            Reject dispatch
-          </Button>
-          <Button size="modal" onClick={onDispatch} disabled={disabled}>
-            Dispatch
-          </Button>
+          {onReject ? (
+            <Button variant="danger" size="modal" onClick={onReject} disabled={disabled}>
+              Reject dispatch
+            </Button>
+          ) : null}
+          {onDispatch ? (
+            <Button size="modal" onClick={onDispatch} disabled={disabled}>
+              Dispatch
+            </Button>
+          ) : null}
         </>
       ) : null}
-      {status === TRANSFER_STATUS.IN_TRANSIT ? (
+      {status === TRANSFER_STATUS.IN_TRANSIT && onMarkArrived ? (
         <Button size="modal" onClick={onMarkArrived} disabled={disabled}>
           Mark as arrived
         </Button>
       ) : null}
-      {status === TRANSFER_STATUS.ARRIVED ? (
+      {status === TRANSFER_STATUS.ARRIVED && onReceive ? (
         <Button size="modal" onClick={onReceive} disabled={disabled}>
           Receive to store
         </Button>

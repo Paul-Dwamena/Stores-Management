@@ -7,7 +7,6 @@ import { ConfiguredCustomFields } from "../../../../components/common/Configured
 import { requiredFieldLabel } from "../../../../components/common/fields/requiredFieldLabel";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import { formatStoreLocation } from "../../../../utils/displayFormatters";
 import { useFormTreeSections } from "../../../../hooks/useFormTreeSections";
 import {
   NEW_INTER_STORE_TRANSFER_FORM_FIELD_CATALOG,
@@ -24,9 +23,12 @@ import {
   sendDispatcherConfirmationOtp,
 } from "../../../../services/transfersService";
 import { ItemPhotoThumb } from "../../inventory/components/ItemPhotoField";
+import StoreSelect from "../../inventory/components/StoreSelect";
 import DispatcherPicker from "./DispatcherPicker";
 import DispatcherOtpSection from "./DispatcherOtpSection";
 import AddDispatcherModal from "./AddDispatcherModal";
+import { usePermission } from "../../../../hooks/usePermission";
+import { ACTIONS, RESOURCES } from "../../../../permissions/accessMap";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -44,6 +46,10 @@ export default function NewInterStoreTransferModal({
   onSave,
   saving = false,
 }) {
+  const { can } = usePermission();
+  const canReadStores = can(RESOURCES.stores, ACTIONS.read);
+  const canReadUsers = can(RESOURCES.users, ACTIONS.read);
+  const canReadRoles = can(RESOURCES.roles, ACTIONS.read);
   const [stores, setStores] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [dispatchers, setDispatchers] = useState([]);
@@ -78,10 +84,10 @@ export default function NewInterStoreTransferModal({
     setLoadError(null);
     try {
       const [storeRows, inventoryRows, userRows, roleRows] = await Promise.all([
-        listStores(),
+        canReadStores ? listStores() : Promise.resolve([]),
         listInventoryItems(),
-        listUsers(),
-        listRoles(),
+        canReadUsers ? listUsers() : Promise.resolve([]),
+        canReadRoles ? listRoles() : Promise.resolve([]),
       ]);
       const dispatcherRole = findDispatcherRole(roleRows);
       setDispatcherRoleId(dispatcherRole?.id ?? null);
@@ -108,7 +114,7 @@ export default function NewInterStoreTransferModal({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canReadStores, canReadUsers, canReadRoles]);
 
   const ensureDispatcherRoleId = useCallback(async () => {
     const roles = await listRoles();
@@ -411,61 +417,52 @@ export default function NewInterStoreTransferModal({
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label htmlFor="transferFromStore" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  {requiredFieldLabel("From store", true)}
-                </label>
-                <select
+                <StoreSelect
                   id="transferFromStore"
+                  formKey="fromStoreId"
+                  label="From store"
+                  placeholder={
+                    canReadStores
+                      ? "Search sending store…"
+                      : "Access denied"
+                  }
                   value={fromStoreId}
-                  onChange={(e) => handleFromStoreChange(e.target.value)}
-                  className={cn(fieldClassName, "uppercase", errors.fromStore && "border-rose-400 bg-rose-50")}
-                >
-                  <option value="">Select sending store</option>
-                  {fromStoreOptions.map((store) => (
-                    <option key={store.id} value={store.id}>
-                      {formatStoreLocation(store.name)}
-                    </option>
-                  ))}
-                </select>
-                {errors.fromStore ? (
-                  <p className="text-[10px] text-rose-600">{errors.fromStore}</p>
-                ) : (
+                  onChange={handleFromStoreChange}
+                  error={errors.fromStore}
+                  stores={canReadStores ? fromStoreOptions : []}
+                  required
+                />
+                {!errors.fromStore ? (
                   <p className="text-[11px] text-slate-400">
                     Only stores with on-hand stock are listed.
                   </p>
-                )}
+                ) : null}
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="transferToStore" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  {requiredFieldLabel("To store", true)}
-                </label>
-                <select
+                <StoreSelect
                   id="transferToStore"
+                  formKey="toStoreId"
+                  label="To store"
+                  placeholder={
+                    !canReadStores
+                      ? "Access denied"
+                      : fromStoreId
+                        ? "Search receiving store…"
+                        : "Select a sending store first"
+                  }
                   value={toStoreId}
-                  onChange={(e) => handleToStoreChange(e.target.value)}
+                  onChange={handleToStoreChange}
+                  error={errors.toStore}
+                  stores={canReadStores && fromStoreId ? destinationOptions : []}
                   disabled={!fromStoreId}
-                  className={cn(
-                    fieldClassName,
-                    "uppercase",
-                    errors.toStore && "border-rose-400 bg-rose-50",
-                    !fromStoreId && "opacity-60 cursor-not-allowed",
-                  )}
-                >
-                  <option value="">Select receiving store</option>
-                  {destinationOptions.map((store) => (
-                    <option key={store.id} value={store.id}>
-                      {formatStoreLocation(store.name)}
-                    </option>
-                  ))}
-                </select>
-                {errors.toStore ? (
-                  <p className="text-[10px] text-rose-600">{errors.toStore}</p>
-                ) : (
+                  required
+                />
+                {!errors.toStore ? (
                   <p className="text-[11px] text-slate-400">
                     {fromStoreId ? "All lines will go to this store." : "Select a sending store first."}
                   </p>
-                )}
+                ) : null}
               </div>
             </div>
 

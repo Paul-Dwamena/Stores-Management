@@ -9,7 +9,6 @@ export const EMPTY_USER_FORM = {
   lastName: "",
   email: "",
   phone: "",
-  password: "",
   role_id: "",
   is_active: true,
 };
@@ -66,11 +65,8 @@ export default function UserFormModal({
     () => [
       { key: "firstName", label: "First name", required: true, placeholder: "Jane" },
       { key: "lastName", label: "Last name", required: true, placeholder: "Mensah" },
-      { key: "email", label: "Email", type: "email", required: true, placeholder: "you@example.com" },
+      { key: "email", label: "Email", type: "email", required: true, placeholder: "you@example.com", span: 2 },
       { key: "phone", label: "Phone", placeholder: "024 000 0000" },
-      ...(!isEdit
-        ? [{ key: "password", label: "Password", type: "password", required: true, placeholder: "At least 8 characters", span: 2 }]
-        : []),
       {
         key: "role_id",
         label: "Role",
@@ -132,18 +128,12 @@ export default function UserFormModal({
       return;
     }
 
-    if ((form.password || "").length < 8) {
-      toast.warning("Password should have at least 8 characters");
-      return;
-    }
-
     try {
       const saved = await createUser({
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
         email: form.email.trim(),
         phone: (form.phone || "").trim() || null,
-        password: form.password,
         role_id: Number(roleId),
       });
       toast.success("User added.");

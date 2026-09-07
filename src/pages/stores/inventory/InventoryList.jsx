@@ -5,6 +5,7 @@ import {
   Wallet,
   Boxes,
   Plus,
+  Upload,
 } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import Button from "../../../components/common/base/Button";
@@ -29,6 +30,7 @@ import { updateItem, updateItemPhoto } from "../../../services/itemsService";
 import { buildInventoryUnitNotes, resolveItemBaseUnit } from "./utils/inventoryUnitOptions";
 import {
   AccessoryDetailModal,
+  ImportItemsModal,
   NewInventoryItemModal,
 } from "./components";
 import { ItemPhotoThumb } from "./components/ItemPhotoField";
@@ -77,6 +79,7 @@ export default function InventoryList({
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [stats, setStats] = useState([
     { label: "Accessory items", value: "0", icon: Package, tone: "teal" },
     { label: "Total quantity", value: "0", icon: Boxes, tone: "sky" },
@@ -432,9 +435,18 @@ export default function InventoryList({
             <div className="min-w-0 flex-1">{tabsSlot}</div>
             <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 py-2">
               {canAdd ? (
-                <Button size="sm" onClick={() => setAddOpen(true)}>
-                  <Plus size={16} /> New item
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setImportOpen(true)}
+                  >
+                    <Upload size={16} /> Import items
+                  </Button>
+                  <Button size="sm" onClick={() => setAddOpen(true)}>
+                    <Plus size={16} /> New item
+                  </Button>
+                </>
               ) : null}
             </div>
           </div>
@@ -604,6 +616,15 @@ export default function InventoryList({
         onClose={() => setAddOpen(false)}
         onSave={handleSaveItem}
         onBulkSave={handleBulkReceipt}
+      />
+
+      <ImportItemsModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          setPage(0);
+          reload();
+        }}
       />
     </div>
   );

@@ -105,3 +105,26 @@ export const updateItemPhoto = async (itemId, photo) => {
     throw error;
   }
 };
+
+/** POST /items/import — multipart field `file` (CSV). */
+export const importItems = async (file) => {
+  if (!(file instanceof File)) {
+    throw new Error("Choose a CSV file to import.");
+  }
+  try {
+    const body = new FormData();
+    body.append("file", file);
+    const { data } = await api.post("/items/import", body, multipartConfig);
+    return {
+      message: data?.message || "Import completed.",
+      totalRows: Number(data?.total_rows) || 0,
+      imported: Number(data?.imported) || 0,
+      failed: Number(data?.failed) || 0,
+      errors: Array.isArray(data?.errors) ? data.errors : [],
+    };
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to import items."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};

@@ -2,6 +2,7 @@ export { default as AccessoryDetailModal } from "./AccessoryDetailModal";
 export { default as EditInventoryItemModal } from "./EditInventoryItemModal";
 export { default as AddAccessoryModal } from "./AddAccessoryModal";
 export { default as NewInventoryItemModal } from "./NewInventoryItemModal";
+export { default as ImportItemsModal } from "./ImportItemsModal";
 export { default as ReceiveIntoStoreModal } from "./ReceiveIntoStoreModal";
 export { default as BulkInventoryReceiptModal } from "./BulkInventoryReceiptModal";
 export { default as ItemStoreStockModal } from "./ItemStoreStockModal";

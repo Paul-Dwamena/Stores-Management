@@ -378,6 +378,9 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
                 <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Name</th>
+                <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase">
+                  {optionId === "brands" ? "Brand ID" : "Category ID"}
+                </th>
                 <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase">Status</th>
                 <th className="px-6 py-2.5 text-[10px] font-bold text-slate-500 uppercase text-right">
                   Actions
@@ -387,7 +390,7 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-10 text-center text-[13px] text-slate-400">
+                  <td colSpan={4} className="px-6 py-10 text-center text-[13px] text-slate-400">
                     No items found.
                   </td>
                 </tr>
@@ -403,6 +406,9 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
                       {row.description ? (
                         <p className="text-[12px] text-slate-500 mt-0.5">{row.description}</p>
                       ) : null}
+                    </td>
+                    <td className="px-6 py-3 font-mono text-[13px] font-bold text-slate-900 tabular-nums">
+                      {row.id ?? "—"}
                     </td>
                     <td className="px-6 py-3">
                       <StatusBadge active={row.active !== false} />
@@ -438,6 +444,10 @@ export default function ManagedDropdownOptionList({ optionId, title }) {
         identifier={viewing?.name}
         fields={[
           { label: "Name", value: viewing?.name },
+          {
+            label: optionId === "brands" ? "Brand ID" : "Category ID",
+            value: viewing?.id != null ? String(viewing.id) : "—",
+          },
           { label: "Description", value: viewing?.description || "—" },
           { label: "Status", value: viewing?.active !== false ? "Active" : "Inactive" },
         ]}

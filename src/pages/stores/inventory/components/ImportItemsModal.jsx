@@ -3,64 +3,106 @@ import { Download, FileSpreadsheet, Upload } from "lucide-react";
 import AddModal from "../../../../components/common/AddModal";
 import Button from "../../../../components/common/base/Button";
 import { toast } from "../../../../components/common/ToastNotification";
+import { listBrands } from "../../../../services/brandsService";
+import { listCategories } from "../../../../services/categoriesService";
 import { importItems } from "../../../../services/itemsService";
-
-const IMPORT_COLUMNS = ["name", "brand_id", "category_id", "description", "unit"];
-const TEMPLATE_FILENAME = "items-import-template.csv";
-
-const isCsvFile = (file) => {
-  if (!(file instanceof File)) return false;
-  const name = file.name.toLowerCase();
-  return (
-    name.endsWith(".csv") ||
-    file.type === "text/csv" ||
-    file.type === "application/vnd.ms-excel"
-  );
-};
-
-const downloadImportTemplate = () => {
-  const csv = `${IMPORT_COLUMNS.join(",")}\n`;
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = TEMPLATE_FILENAME;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-};
+import { cn } from "../../../../utils/cn";
+import {
+  IMPORT_COLUMNS,
+  downloadItemsImportTemplate,
+  isImportSpreadsheetFile,
+  parseItemsImportFile,
+  rowsToImportCsvFile,
+  validateImportPreviewRows,
+} from "../utils/itemsImportTemplate";
 
 export default function ImportItemsModal({ isOpen, onClose, onImported }) {
   const inputRef = useRef(null);
-  const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [previewRows, setPreviewRows] = useState([]);
+  const [parsing, setParsing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
 
   useEffect(() => {
     if (!isOpen) {
-      setFile(null);
+      setFileName("");
+      setPreviewRows([]);
+      setParsing(false);
+      setDownloading(false);
       setSubmitting(false);
       setResult(null);
     }
   }, [isOpen]);
 
-  const handlePick = (picked) => {
+  const validCount = previewRows.filter((row) => row._valid).length;
+  const issueCount = previewRows.length - validCount;
+  const canImport =
+    previewRows.length > 0 &&
+    issueCount === 0 &&
+    !parsing &&
+    !submitting;
+
+  const handleDownloadTemplate = async () => {
+    if (downloading || submitting) return;
+    setDownloading(true);
+    try {
+      const [brands, categories] = await Promise.all([
+        listBrands(),
+        listCategories(),
+      ]);
+      await downloadItemsImportTemplate({
+        brands: brands.filter((row) => row.isActive !== false),
+        categories: categories.filter((row) => row.isActive !== false),
+      });
+      toast.success("Excel template downloaded.");
+    } catch (error) {
+      toast.error(error.message || "Could not download template.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handlePick = async (picked) => {
     if (!picked) return;
-    if (!isCsvFile(picked)) {
-      toast.warning("Please choose a CSV file.");
+    if (!isImportSpreadsheetFile(picked)) {
+      toast.warning("Please choose an Excel (.xlsx) or CSV file.");
       return;
     }
-    setFile(picked);
+
+    setParsing(true);
     setResult(null);
+    setFileName(picked.name);
+    setPreviewRows([]);
+
+    try {
+      const rows = await parseItemsImportFile(picked);
+      const validated = validateImportPreviewRows(rows);
+      if (!validated.length) {
+        toast.warning("No data rows found in the file.");
+        setFileName("");
+        return;
+      }
+      setPreviewRows(validated);
+      if (validated.some((row) => !row._valid)) {
+        toast.warning("Some rows need attention before import.");
+      }
+    } catch (error) {
+      setFileName("");
+      toast.error(error.message || "Could not read the file.");
+    } finally {
+      setParsing(false);
+    }
   };
 
   const handleImport = async () => {
-    if (!file || submitting) return;
+    if (!canImport) return;
     setSubmitting(true);
     setResult(null);
     try {
-      const response = await importItems(file);
+      const csvFile = rowsToImportCsvFile(previewRows);
+      const response = await importItems(csvFile);
       setResult(response);
 
       if (response.imported > 0) {
@@ -90,43 +132,50 @@ export default function ImportItemsModal({ isOpen, onClose, onImported }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Import items"
-      subtitle="Upload a CSV file to create items in bulk."
+      subtitle="Download the Excel template, fill it in, then preview and import."
       saveLabel={submitting ? "Importing…" : "Import items"}
-      saveDisabled={!file || submitting}
+      saveDisabled={!canImport}
       onSave={handleImport}
-      dialogClassName="max-w-xl"
+      dialogClassName="max-w-3xl"
     >
       <div className="space-y-4">
         <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3 space-y-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <p className="text-[12px] font-bold text-slate-800">CSV requirements</p>
+            <p className="text-[12px] font-bold text-slate-800">Import requirements</p>
             <Button
               type="button"
               variant="info"
               size="sm"
-              onClick={downloadImportTemplate}
-              disabled={submitting}
+              onClick={handleDownloadTemplate}
+              disabled={downloading || submitting || parsing}
             >
               <Download size={14} />
-              Download template
+              {downloading ? "Preparing…" : "Download template"}
             </Button>
           </div>
           <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-600 leading-relaxed">
-            <li>File must be a <span className="font-semibold text-slate-700">.csv</span> file.</li>
             <li>
-              Required columns (in order):{" "}
+              Download the <span className="font-semibold text-slate-700">Excel (.xlsx)</span>{" "}
+              template (CSV also accepted on upload).
+            </li>
+            <li>
+              Expected columns:{" "}
               <span className="font-semibold text-slate-700 font-mono">
                 {IMPORT_COLUMNS.join(", ")}
               </span>
             </li>
             <li>
-              <span className="font-semibold text-slate-700">brand_id</span> and{" "}
-              <span className="font-semibold text-slate-700">category_id</span> must match
-              existing IDs in the store database (see Brands and Item Categories under Setups).
+              On the <span className="font-semibold text-slate-700">Items</span> sheet, use the
+              dropdowns for <span className="font-semibold text-slate-700">brand_id</span>,{" "}
+              <span className="font-semibold text-slate-700">category_id</span>, and{" "}
+              <span className="font-semibold text-slate-700">unit</span>. Brand and category
+              options show as <span className="font-mono text-slate-700">ID | Name</span>
             </li>
             <li>
-              <span className="font-semibold text-slate-700">unit</span> (base unit) is mandatory
-              for every row.
+              <span className="font-semibold text-slate-700">Name</span>,{" "}
+              <span className="font-semibold text-slate-700">Brand Id</span>, and{" "}
+              <span className="font-semibold text-slate-700">Unit</span> (base unit) are required for every row. Excel
+              files are converted to CSV before upload.
             </li>
           </ul>
         </div>
@@ -134,7 +183,7 @@ export default function ImportItemsModal({ isOpen, onClose, onImported }) {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
           className="hidden"
           onChange={(event) => {
             handlePick(event.target.files?.[0]);
@@ -145,19 +194,90 @@ export default function ImportItemsModal({ isOpen, onClose, onImported }) {
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center">
           <FileSpreadsheet className="mx-auto mb-2 text-slate-400" size={28} />
           <p className="text-[12px] font-medium text-slate-600 mb-3">
-            {file ? file.name : "Select a CSV file to import"}
+            {parsing
+              ? "Reading file…"
+              : fileName
+                ? fileName
+                : "Select an Excel (.xlsx) or CSV file"}
           </p>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => inputRef.current?.click()}
-            disabled={submitting}
+            disabled={submitting || parsing}
           >
             <Upload size={14} />
-            {file ? "Change file" : "Choose CSV"}
+            {fileName ? "Change file" : "Choose file"}
           </Button>
         </div>
+
+        {previewRows.length ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[12px] font-bold text-slate-800">Preview</p>
+              <p className="text-[11px] text-slate-500">
+                {previewRows.length} row{previewRows.length === 1 ? "" : "s"}
+                {issueCount > 0
+                  ? ` · ${issueCount} with issues`
+                  : ` · ${validCount} ready`}
+              </p>
+            </div>
+            <div className="max-h-64 overflow-auto rounded-lg border border-slate-200">
+              <table className="w-full text-left min-w-[640px]">
+                <thead className="sticky top-0 bg-slate-50">
+                  <tr className="border-b border-slate-100">
+                    <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                      #
+                    </th>
+                    {IMPORT_COLUMNS.map((column) => (
+                      <th
+                        key={column}
+                        className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500"
+                      >
+                        {column}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 bg-white">
+                  {previewRows.map((row) => (
+                    <tr
+                      key={`${row._sourceRow}-${row._index}`}
+                      className={cn(!row._valid && "bg-amber-50/60")}
+                    >
+                      <td className="px-3 py-2 text-[11px] text-slate-500">{row._index}</td>
+                      {IMPORT_COLUMNS.map((column) => (
+                        <td
+                          key={column}
+                          className="px-3 py-2 text-[11px] text-slate-700 max-w-[160px] truncate"
+                          title={row[column] || ""}
+                        >
+                          {row[column] || "—"}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 text-[11px]">
+                        {row._valid ? (
+                          <span className="font-medium text-emerald-700">Ready</span>
+                        ) : (
+                          <span
+                            className="font-medium text-amber-700"
+                            title={row._issues.join("; ")}
+                          >
+                            {row._issues.join("; ")}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
 
         {result ? (
           <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 space-y-2">

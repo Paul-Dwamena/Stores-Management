@@ -48,3 +48,22 @@ export function toCatalogId(value) {
   const id = Number(value);
   return Number.isFinite(id) ? id : null;
 }
+
+/** Resolve a catalog id from an id value or by matching a name against a list. */
+export function resolveCatalogId(value, rows = [], nameHint = "") {
+  const direct = toCatalogId(value);
+  if (direct != null) return direct;
+  const name = String(nameHint || value || "")
+    .trim()
+    .toLowerCase();
+  if (!name || /^\d+$/.test(name)) return null;
+  const match = rows.find((row) => {
+    const label = String(row.name || row.label || row.short_name || "")
+      .trim()
+      .toLowerCase();
+    return label === name;
+  });
+  if (match == null) return null;
+  const id = toCatalogId(match.id ?? match.value);
+  return id;
+}

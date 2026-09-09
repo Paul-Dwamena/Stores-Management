@@ -968,6 +968,10 @@ export default function BulkInventoryReceiptModal({
           baseUnit,
           unit: baseUnitApiValue(baseUnit),
           itemCode: catalogItem?.code || catalogItem?.itemCode || line.itemCode || "",
+          brand: line.brand || (catalogItem?.brandId != null ? String(catalogItem.brandId) : ""),
+          brandId: line.brandId ?? catalogItem?.brandId ?? null,
+          category: line.category || (catalogItem?.categoryId != null ? String(catalogItem.categoryId) : ""),
+          categoryId: line.categoryId ?? catalogItem?.categoryId ?? null,
           condition: line.condition || shared.condition,
           notes,
         };

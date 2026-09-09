@@ -108,6 +108,12 @@ export const toBulkStockPayload = ({ shared = {}, lines = [], mode = "existing" 
       quantity: Number(line.quantity),
       unit_price: Number(line.unitCost ?? line.unit_price ?? line.unitPrice),
     };
+
+    const brandFromLine = toCatalogId(line.brandId) ?? toCatalogId(line.brand);
+    const categoryFromLine = toCatalogId(line.categoryId) ?? toCatalogId(line.category);
+    if (brandFromLine != null) item.brand = brandFromLine;
+    if (categoryFromLine != null) item.category = categoryFromLine;
+
     if (mode === "existing" || line.itemCode || line.itemId) {
       const code = String(line.itemCode || line.code || "").trim();
       if (code) {
@@ -117,13 +123,9 @@ export const toBulkStockPayload = ({ shared = {}, lines = [], mode = "existing" 
       }
     } else {
       const name = line.name?.trim();
-      const brandId = toCatalogId(line.brand ?? line.brandId);
-      const categoryId = toCatalogId(line.category ?? line.categoryId);
       const description = line.description?.trim();
       const unit = line.unit?.trim();
       if (name) item.name = name;
-      if (brandId != null) item.brand = brandId;
-      if (categoryId != null) item.category = categoryId;
       if (description) item.description = description;
       if (unit) item.unit = unit;
     }

@@ -24,6 +24,7 @@ import {
   OTP_TYPE,
 } from "../../../../services/inventoryService";
 import { formatMoneyGhs } from "../../../../utils/displayFormatters";
+import { resolveCatalogId } from "../../../../utils/catalogRefHelpers";
 import { listBrands } from "../../../../services/brandsService";
 import { listCategories } from "../../../../services/categoriesService";
 import { listStores } from "../../../../services/storesService";
@@ -577,8 +578,12 @@ export default function ImportItemsModal({
       shared,
       lines: validatedLines.map((line) => {
         const catalogItem = line.itemId
-          ? items.find((item) => item.id === line.itemId)
-          : null;
+          ? items.find((item) => String(item.id) === String(line.itemId))
+          : items.find(
+              (item) =>
+                String(item.itemCode || item.code || "").trim().toLowerCase() ===
+                String(line.itemCode || "").trim().toLowerCase(),
+            ) || null;
         const unitOfMeasure = normalizeInventoryUnit(line.unitOfMeasure);
         const baseUnit = mode === "existing"
           ? resolveItemBaseUnit(catalogItem?.unit || line.baseUnit)
@@ -595,6 +600,16 @@ export default function ImportItemsModal({
           baseUnit,
         });
         const notes = [shared.notes.trim(), unitNotes].filter(Boolean).join(" | ");
+        const brandId = resolveCatalogId(
+          line.brand || catalogItem?.brandId,
+          catalog.brands,
+          catalogItem?.brand,
+        );
+        const categoryId = resolveCatalogId(
+          line.category || catalogItem?.categoryId,
+          catalog.categories,
+          catalogItem?.category,
+        );
         return {
           ...line,
           quantity: totalQty ?? Number(line.quantity),
@@ -604,6 +619,10 @@ export default function ImportItemsModal({
           baseUnit,
           unit: baseUnitApiValue(baseUnit),
           itemCode: line.itemCode || catalogItem?.code || catalogItem?.itemCode || "",
+          brand: brandId != null ? String(brandId) : "",
+          brandId: brandId != null ? brandId : null,
+          category: categoryId != null ? String(categoryId) : "",
+          categoryId: categoryId != null ? categoryId : null,
           condition: line.condition || shared.condition,
           notes,
         };

@@ -5,6 +5,7 @@ import {
   normalizeBaseUnit,
   normalizeInventoryUnit,
 } from "./inventoryUnitOptions";
+import { resolveCatalogId } from "../../../../utils/catalogRefHelpers";
 
 export const TEMPLATE_FILENAME_REGISTERED = "stock-import-registered.xlsx";
 export const TEMPLATE_FILENAME_UNREGISTERED = "stock-import-unregistered.xlsx";
@@ -690,7 +691,21 @@ export function mapStockImportRowsToLines({
         line.itemId = item.id;
         line.itemCode = item.code || item.itemCode || "";
         line.name = item.name || "";
+        const brandId = resolveCatalogId(
+          item.brandId,
+          brands,
+          item.brand,
+        );
+        const categoryId = resolveCatalogId(
+          item.categoryId,
+          categories,
+          item.category,
+        );
+        line.brand = brandId != null ? String(brandId) : "";
+        line.category = categoryId != null ? String(categoryId) : "";
         if (!line.itemCode) issues.push("Item has no code");
+        if (!line.brand) issues.push("Item has no brand");
+        if (!line.category) issues.push("Item has no category");
       }
     } else {
       const brand = matchByLabeledId(row.brand, brands);

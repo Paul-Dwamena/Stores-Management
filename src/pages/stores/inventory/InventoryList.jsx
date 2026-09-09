@@ -310,11 +310,7 @@ export default function InventoryList({
     });
   };
 
-  const handleSaveItem = async ({ type, mode = "new", payload }) => {
-    if (type === "vehicle_part") {
-      toast.info("Vehicle parts are not available on this API.");
-      return;
-    }
+  const handleSaveItem = async ({ mode = "new", payload }) => {
     if (mode === "existing") {
       await stockItem(payload.itemId, toStockBody(payload));
       toast.success("Stock received.");
@@ -340,7 +336,7 @@ export default function InventoryList({
           brand: payload.brand,
           category: payload.category,
           description: payload.description?.trim() || "",
-          unit: payload.unit || "pcs",
+          unit: payload.unit || "piece",
           quantity: payload.quantity,
           unitCost: payload.unitCost ?? payload.unitPrice,
           location: payload.location,
@@ -399,16 +395,23 @@ export default function InventoryList({
     await Promise.all([reload(), refreshSelected(selected.id)]);
   };
 
-  const handleBulkReceipt = async ({ mode, inventoryType, shared, lines }) => {
-    if (inventoryType === "vehicle_part") {
-      toast.info("Vehicle parts are not available on this API.");
-      return;
-    }
+  const handleBulkReceipt = async ({ mode, shared, lines }) => {
     await stockItemsBulk({ mode, shared, lines });
     toast.success(
       `${lines.length} stock receipt${lines.length === 1 ? "" : "s"} recorded.`,
     );
     setAddOpen(false);
+    setPage(0);
+    onCreatedItemType?.("accessories");
+    reload();
+  };
+
+  const handleImportStock = async ({ mode, shared, lines }) => {
+    await stockItemsBulk({ mode, shared, lines });
+    toast.success(
+      `${lines.length} imported item${lines.length === 1 ? "" : "s"} received.`,
+    );
+    setImportOpen(false);
     setPage(0);
     onCreatedItemType?.("accessories");
     reload();
@@ -621,10 +624,8 @@ export default function InventoryList({
       <ImportItemsModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
-        onImported={() => {
-          setPage(0);
-          reload();
-        }}
+        items={items}
+        onSave={handleImportStock}
       />
     </div>
   );

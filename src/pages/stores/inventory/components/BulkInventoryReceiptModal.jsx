@@ -14,13 +14,6 @@ import { formatInventoryMoney, sendDeliveryOtp, OTP_TYPE } from "../../../../ser
 import { formatMoneyAmount } from "../../../../utils/displayFormatters";
 import { useBrandSelectOptions } from "../../../../hooks/useCatalogOptions";
 import { catalogOptionLabel } from "../../../../utils/catalogRefHelpers";
-import {
-  VEHICLE_PART_MAKE_OPTIONS,
-  getVehiclePartModelOptions,
-  getVehiclePartYearOptions,
-} from "../../../../mockdata/stores/vehiclePartsInventory";
-import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
-import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
 import {
   ItemNameDisplay,
@@ -77,7 +70,7 @@ const INITIAL_SHARED = {
   notes: "",
 };
 
-function createLine(inventoryType, mode) {
+function createLine(mode) {
   return {
     clientId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     itemId: "",
@@ -85,16 +78,6 @@ function createLine(inventoryType, mode) {
     brand: "",
     category: "",
     description: "",
-    make: "",
-    model: "",
-    year: "",
-    chassisNumber: "",
-    level1: "",
-    level2: "",
-    level3: "",
-    level4: "",
-    level5: "",
-    level6: "",
     quantity: "",
     baseUnit: "piece",
     unitOfMeasure: "",
@@ -104,18 +87,16 @@ function createLine(inventoryType, mode) {
     photo: "",
     condition: "",
     notes: "",
-    inventoryType,
+    inventoryType: "accessory",
     mode,
   };
 }
 
-function lineName(line, inventoryType, mode, items) {
+function lineName(line, mode, items) {
   if (mode === "existing") {
     return items.find((item) => item.id === line.itemId)?.name || "Selected item";
   }
-  if (inventoryType === "accessory") return line.name.trim() || "New accessory";
-  const levels = VEHICLE_COMPONENT_LEVEL_KEYS.map((key) => line[key]).filter(Boolean);
-  return levels.at(-1) || "New vehicle part";
+  return line.name.trim() || "New accessory";
 }
 
 function linePhoto(line, mode, items) {
@@ -135,19 +116,13 @@ function calcLineTotal(line) {
   );
 }
 
-function getLineErrors(line, mode, inventoryType) {
+function getLineErrors(line, mode) {
   const next = {};
   if (mode === "existing" && !line.itemId) next.itemId = "Select an inventory item.";
-  if (mode === "new" && inventoryType === "accessory") {
+  if (mode === "new") {
     if (!line.brand) next.brand = "Select a brand.";
     if (!line.category) next.category = "Select a category.";
     if (!line.name.trim()) next.name = "Enter an item name.";
-  }
-  if (mode === "new" && inventoryType === "vehicle_part") {
-    if (!line.make) next.make = "Select a make.";
-    if (!line.model) next.model = "Select a model.";
-    if (!line.year) next.year = "Select a year.";
-    if (!line.level1) next.level1 = "Select at least the first component level.";
   }
   if (!line.quantity || Number(line.quantity) <= 0) {
     next.quantity = "Enter a quantity greater than zero.";
@@ -157,7 +132,7 @@ function getLineErrors(line, mode, inventoryType) {
   }
   if (!line.location?.trim()) next.location = "Select a store location.";
   validateInventoryUnitFields(line, next, {
-    baseUnitRequired: mode === "new" && inventoryType === "accessory",
+    baseUnitRequired: mode === "new",
   });
   return next;
 }
@@ -426,252 +401,82 @@ function ExistingLineFields({
   errors,
   onChange,
   usedItemIds,
-  inventoryType,
   splitPanes = false,
 }) {
   const [search, setSearch] = useState("");
-  const [componentFilterOpen, setComponentFilterOpen] = useState(true);
   const selected = items.find((item) => item.id === line.itemId) ?? null;
-  const isVehiclePart = inventoryType === "vehicle_part";
-
-  const makeOptions = useMemo(() => {
-    if (!isVehiclePart) return [];
-    return [...new Set(items.map((item) => item.make).filter(Boolean))].sort();
-  }, [items, isVehiclePart]);
-
-  const modelOptions = useMemo(() => {
-    if (!line.make) return [];
-    return [
-      ...new Set(
-        items
-          .filter((item) => item.make === line.make)
-          .map((item) => item.model)
-          .filter(Boolean),
-      ),
-    ].sort();
-  }, [items, line.make]);
-
-  const yearOptions = useMemo(() => {
-    if (!line.make || !line.model) return [];
-    return [
-      ...new Set(
-        items
-          .filter((item) => item.make === line.make && item.model === line.model)
-          .map((item) => String(item.year))
-          .filter(Boolean),
-      ),
-    ].sort((a, b) => Number(b) - Number(a));
-  }, [items, line.make, line.model]);
-
-  const hasVehiclePartFilters =
-    !isVehiclePart || Boolean(line.make && line.model && line.year);
 
   const filtered = useMemo(() => {
-    let available = items.filter(
+    const available = items.filter(
       (item) => !usedItemIds.has(item.id) || item.id === line.itemId,
     );
-    if (isVehiclePart) {
-      if (!hasVehiclePartFilters) return [];
-      available = available.filter((item) => {
-        if (item.make !== line.make) return false;
-        if (item.model !== line.model) return false;
-        if (String(item.year) !== String(line.year)) return false;
-        for (let i = 0; i < 6; i += 1) {
-          const key = `level${i + 1}`;
-          const selectedLevel = line[key];
-          if (selectedLevel && item[key] !== selectedLevel) return false;
-        }
-        return true;
-      });
-    }
     const q = search.trim().toLowerCase();
     if (!q) return available.slice(0, 12);
     return available
       .filter((item) =>
-        [item.itemCode, item.name, item.brand, item.description, item.make, item.model]
+        [item.itemCode, item.name, item.brand, item.description]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
           .includes(q),
       )
       .slice(0, 12);
-  }, [
-    items,
-    search,
-    usedItemIds,
-    line.itemId,
-    line.make,
-    line.model,
-    line.year,
-    line.level1,
-    line.level2,
-    line.level3,
-    line.level4,
-    line.level5,
-    line.level6,
-    isVehiclePart,
-    hasVehiclePartFilters,
-  ]);
-
-  const setVehicleFilter = (field, value) => {
-    if (field === "make") {
-      onChange("make", value);
-      onChange("model", "");
-      onChange("year", "");
-      onChange("itemId", "");
-      onChange("componentLevels", {
-        level1: "",
-        level2: "",
-        level3: "",
-        level4: "",
-        level5: "",
-        level6: "",
-      });
-    } else if (field === "model") {
-      onChange("model", value);
-      onChange("year", "");
-      onChange("itemId", "");
-      onChange("componentLevels", {
-        level1: "",
-        level2: "",
-        level3: "",
-        level4: "",
-        level5: "",
-        level6: "",
-      });
-    } else if (field === "year") {
-      onChange("year", value);
-      onChange("itemId", "");
-    }
-    setSearch("");
-  };
+  }, [items, search, usedItemIds, line.itemId]);
 
   const findBlock = (
     <div className="space-y-3">
       {!selected ? (
-        <>
-          {isVehiclePart ? (
-            <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div>
-                  <FieldLabel required>Make</FieldLabel>
-                  <select
-                    value={line.make}
-                    onChange={(event) => setVehicleFilter("make", event.target.value)}
-                    className={cn(fieldClassName, "mt-1")}
-                  >
-                    <option value="">Select make</option>
-                    {makeOptions.map((make) => (
-                      <option key={make} value={make}>{make}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel required>Model</FieldLabel>
-                  <select
-                    value={line.model}
-                    onChange={(event) => setVehicleFilter("model", event.target.value)}
-                    disabled={!line.make}
-                    className={cn(fieldClassName, "mt-1", !line.make && "opacity-60")}
-                  >
-                    <option value="">{!line.make ? "Select make first" : "Select model"}</option>
-                    {modelOptions.map((model) => (
-                      <option key={model} value={model}>{model}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <FieldLabel required>Year</FieldLabel>
-                  <select
-                    value={line.year}
-                    onChange={(event) => setVehicleFilter("year", event.target.value)}
-                    disabled={!line.model}
-                    className={cn(fieldClassName, "mt-1", !line.model && "opacity-60")}
-                  >
-                    <option value="">{!line.model ? "Select model first" : "Select year"}</option>
-                    {yearOptions.map((year) => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <CollapsibleSection
-                title="Vehicle part component"
-                description="Optional. Narrow the list by component level."
-                open={componentFilterOpen}
-                onToggle={() => setComponentFilterOpen((prev) => !prev)}
-              >
-                <ComponentLevelSelects
-                  levels={Object.fromEntries(
-                    VEHICLE_COMPONENT_LEVEL_KEYS.map((key) => [key, line[key]]),
-                  )}
-                  onChange={(levels) => {
-                    onChange("componentLevels", levels);
-                    onChange("itemId", "");
+        <div>
+          <FieldLabel required error={Boolean(errors.itemId)}>
+            Search registered item
+          </FieldLabel>
+          <div className="relative mt-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className={cn(fieldClassName, "pl-9", errors.itemId && "border-rose-500 bg-rose-50")}
+              placeholder="Search by code, name, brand…"
+            />
+          </div>
+          <ErrorText>{errors.itemId}</ErrorText>
+          <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-[11px] text-slate-400">No matching items.</p>
+            ) : (
+              filtered.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    onChange("itemId", item.id);
+                    if (!line.unitCost && item.unitCost != null) {
+                      onChange("unitCost", String(item.unitCost));
+                    }
                     setSearch("");
                   }}
-                />
-              </CollapsibleSection>
-            </>
-          ) : null}
-          {hasVehiclePartFilters ? (
-            <div>
-              <FieldLabel required error={Boolean(errors.itemId)}>
-                Search registered item
-              </FieldLabel>
-              <div className="relative mt-1">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  className={cn(fieldClassName, "pl-9", errors.itemId && "border-rose-500 bg-rose-50")}
-                  placeholder="Search by code, name, brand…"
-                />
-              </div>
-              <ErrorText>{errors.itemId}</ErrorText>
-              <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white">
-                {filtered.length === 0 ? (
-                  <p className="px-3 py-2 text-[11px] text-slate-400">No matching items.</p>
-                ) : (
-                  filtered.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        onChange("itemId", item.id);
-                        if (!line.unitCost && item.unitCost != null) {
-                          onChange("unitCost", String(item.unitCost));
-                        }
-                        setSearch("");
-                      }}
-                      className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
-                    >
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
-                        <div className="min-w-0">
-                          <p className="text-[12px]">
-                            <ItemNameDisplay value={item.name} className="text-slate-800" />
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            {item.itemCode}
-                            {item.brand ? ` · ${formatBrand(item.brand)}` : ""}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-medium text-slate-400">
-                        Qty {item.quantity ?? 0}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-[11px] text-slate-500">
-              Select make, model, and year to search registered vehicle parts.
-            </p>
-          )}
-        </>
+                  className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <ItemPhotoThumb src={item.photo} name={item.name} className="h-9 w-9" />
+                    <div className="min-w-0">
+                      <p className="text-[12px]">
+                        <ItemNameDisplay value={item.name} className="text-slate-800" />
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        {item.itemCode}
+                        {item.brand ? ` · ${formatBrand(item.brand)}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-medium text-slate-400">
+                    Qty {item.quantity ?? 0}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
       ) : (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-[12px] text-slate-600">
           Selected{" "}
@@ -696,9 +501,6 @@ function ExistingLineFields({
               {[
                 selected.itemCode,
                 selected.brand ? formatBrand(selected.brand) : null,
-                selected.make
-                  ? `${selected.make} ${selected.model || ""} ${selected.year || ""}`.trim()
-                  : null,
                 `On hand ${selected.quantity ?? 0}`,
               ].filter(Boolean).join(" · ")}
             </p>
@@ -813,94 +615,7 @@ function NewAccessoryFields({ line, errors, onChange, splitPanes = false }) {
   );
 }
 
-function NewVehiclePartFields({ line, errors, onChange, splitPanes = false }) {
-  const modelOptions = getVehiclePartModelOptions(line.make);
-  const yearOptions = getVehiclePartYearOptions(line.make, line.model);
-  const identifyBlock = (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <FieldLabel required error={Boolean(errors.make)}>Make</FieldLabel>
-          <select
-            value={line.make}
-            onChange={(event) => onChange("make", event.target.value)}
-            className={cn(fieldClassName, "mt-1", errors.make && "border-rose-500 bg-rose-50")}
-          >
-            <option value="">Select make</option>
-            {VEHICLE_PART_MAKE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <ErrorText>{errors.make}</ErrorText>
-        </div>
-        <div>
-          <FieldLabel required error={Boolean(errors.model)}>Model</FieldLabel>
-          <select
-            value={line.model}
-            onChange={(event) => onChange("model", event.target.value)}
-            disabled={!line.make}
-            className={cn(fieldClassName, "mt-1", errors.model && "border-rose-500 bg-rose-50")}
-          >
-            <option value="">Select model</option>
-            {modelOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <ErrorText>{errors.model}</ErrorText>
-        </div>
-        <div>
-          <FieldLabel required error={Boolean(errors.year)}>Year</FieldLabel>
-          <select
-            value={line.year}
-            onChange={(event) => onChange("year", event.target.value)}
-            disabled={!line.model}
-            className={cn(fieldClassName, "mt-1", errors.year && "border-rose-500 bg-rose-50")}
-          >
-            <option value="">Select year</option>
-            {yearOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <ErrorText>{errors.year}</ErrorText>
-        </div>
-        <InputField
-          label="VIN / Chassis"
-          value={line.chassisNumber}
-          onChange={(event) => onChange("chassisNumber", event.target.value)}
-          className={whiteInputClassName}
-        />
-      </div>
-      <div>
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Vehicle component
-          <span className="normal-case !text-red-500" aria-hidden="true"> *</span>
-        </p>
-        <ComponentLevelSelects
-          levels={Object.fromEntries(VEHICLE_COMPONENT_LEVEL_KEYS.map((key) => [key, line[key]]))}
-          onChange={(levels) => onChange("componentLevels", levels)}
-        />
-        <ErrorText>{errors.level1}</ErrorText>
-      </div>
-    </div>
-  );
-  const detailsBlock = <LineOverrideFields line={line} onChange={onChange} />;
-  const receiveBlock = (
-    <ReceiveLineFields line={line} errors={errors} onChange={onChange} mode="new" items={[]} />
-  );
-
-  return (
-    <div className={splitPanes ? "contents" : "space-y-3"}>
-      {splitPanes ? <EditorPane step="1" title="Identify item">{identifyBlock}</EditorPane> : identifyBlock}
-      {splitPanes ? <EditorPane step="2" title="Item details">{detailsBlock}</EditorPane> : detailsBlock}
-      {splitPanes ? <EditorPane step="3" title="Receive">{receiveBlock}</EditorPane> : receiveBlock}
-    </div>
-  );
-}
-
 function applyLineChange(line, key, value) {
-  if (key === "componentLevels") return { ...line, ...value };
-  if (key === "make") return { ...line, make: value, model: "", year: "" };
-  if (key === "model") return { ...line, model: value, year: "" };
   return { ...line, [key]: value };
 }
 
@@ -908,9 +623,6 @@ function lineMeta(line, items, mode, brandOptions = []) {
   if (mode === "existing") {
     const item = items.find((row) => row.id === line.itemId);
     return [item?.itemCode, item?.brand ? formatBrand(item.brand) : null].filter(Boolean).join(" · ") || "—";
-  }
-  if (line.inventoryType === "vehicle_part" || line.make) {
-    return [line.make, line.model, line.year].filter(Boolean).join(" · ") || "—";
   }
   const brandLabel = catalogOptionLabel(brandOptions, line.brand);
   return brandLabel || "—";
@@ -924,7 +636,6 @@ function LineEditorPanel({
   line,
   errors,
   mode,
-  inventoryType,
   items,
   usedItemIds,
   onChange,
@@ -939,10 +650,7 @@ function LineEditorPanel({
           errors={errors}
           onChange={onChange}
           usedItemIds={usedItemIds}
-          inventoryType={inventoryType}
         />
-      ) : inventoryType === "vehicle_part" ? (
-        <NewVehiclePartFields splitPanes line={line} errors={errors} onChange={onChange} />
       ) : (
         <NewAccessoryFields splitPanes line={line} errors={errors} onChange={onChange} />
       )}
@@ -953,7 +661,7 @@ function LineEditorPanel({
 export default function BulkInventoryReceiptModal({
   isOpen,
   onClose,
-  inventoryType,
+  inventoryType = "accessory",
   items = [],
   onSave,
   forcedMode = null,
@@ -1056,7 +764,7 @@ export default function BulkInventoryReceiptModal({
 
   const openAddEditor = () => {
     setSupplyOpen(false);
-    setEditor({ type: "add", line: createLine(inventoryType, mode) });
+    setEditor({ type: "add", line: createLine(mode) });
     setEditorErrors({});
   };
 
@@ -1076,16 +784,16 @@ export default function BulkInventoryReceiptModal({
       current ? { ...current, line: applyLineChange(current.line, key, value) } : current
     ));
     setEditorErrors((current) => {
-      if (!current[key] && key !== "componentLevels") return current;
+      if (!current[key]) return current;
       const next = { ...current };
-      delete next[key === "componentLevels" ? "level1" : key];
+      delete next[key];
       return next;
     });
   };
 
   const commitEditor = () => {
     if (!editor) return;
-    const nextErrors = getLineErrors(editor.line, mode, inventoryType);
+    const nextErrors = getLineErrors(editor.line, mode);
     setEditorErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       toast.warning("Complete the item details before adding it to the list.");
@@ -1101,7 +809,7 @@ export default function BulkInventoryReceiptModal({
       return;
     }
     setLines((current) => [...current, editor.line]);
-    setEditor({ type: "add", line: createLine(inventoryType, mode) });
+    setEditor({ type: "add", line: createLine(mode) });
     setEditorErrors({});
     resetOtpState();
     toast.success("Item added.");
@@ -1185,7 +893,7 @@ export default function BulkInventoryReceiptModal({
 
     const lineErrors = {};
     lines.forEach((line) => {
-      const next = getLineErrors(line, mode, inventoryType);
+      const next = getLineErrors(line, mode);
       if (Object.keys(next).length) lineErrors[line.clientId] = next;
     });
 
@@ -1234,7 +942,7 @@ export default function BulkInventoryReceiptModal({
     }
     setPendingSave({
       mode,
-      inventoryType,
+      inventoryType: "accessory",
       shared,
       lines: lines.map((line) => {
         const catalogItem = line.itemId ? items.find((item) => item.id === line.itemId) : null;
@@ -1252,13 +960,14 @@ export default function BulkInventoryReceiptModal({
         const notes = [line.notes.trim(), shared.notes.trim(), unitNotes].filter(Boolean).join(" | ");
         return {
           ...line,
-          name: lineName(line, inventoryType, mode, items),
+          name: lineName(line, mode, items),
           quantity: totalQty ?? Number(line.quantity),
           unitCost: Number(line.unitCost),
           unitOfMeasure,
           unitsPerPack: line.unitsPerPack,
           baseUnit,
           unit: baseUnitApiValue(baseUnit),
+          itemCode: catalogItem?.code || catalogItem?.itemCode || line.itemCode || "",
           condition: line.condition || shared.condition,
           notes,
         };
@@ -1279,7 +988,7 @@ export default function BulkInventoryReceiptModal({
     }
   };
 
-  const typeLabel = inventoryType === "vehicle_part" ? "vehicle parts" : "accessories";
+  const typeLabel = "accessories";
 
   return (
     <>
@@ -1364,16 +1073,17 @@ export default function BulkInventoryReceiptModal({
               </div>
             ) : (
               <div className="overflow-x-auto pb-24">
-                <table className="w-full min-w-[720px] text-left">
+                <table className="w-full min-w-[900px] text-left">
                   <thead className="sticky top-0 bg-slate-50/95">
                     <tr className="border-b border-slate-200">
                       <th className={thClass}>#</th>
                       <th className={cn(thClass, "w-14")}>Photo</th>
                       <th className={thClass}>Item</th>
                       <th className={thClass}>Details</th>
-                      <th className={thClass}>Qty</th>
-                      <th className={thClass}>Unit price</th>
-                      <th className={thClass}>Total</th>
+                      <th className={thClass}>Package quantity</th>
+                      <th className={thClass}>Total base quantity</th>
+                      <th className={thClass}>Unit price (GHS)</th>
+                      <th className={thClass}>Total price</th>
                       <th className={thClass}>Store</th>
                       <th className={cn(thClass, "text-right")}>Actions</th>
                     </tr>
@@ -1381,6 +1091,11 @@ export default function BulkInventoryReceiptModal({
                   <tbody>
                     {lines.map((line, index) => {
                       const total = calcLineTotal(line);
+                      const totalBaseQty = calcInventoryTotalQuantity(
+                        line.quantity,
+                        line.unitsPerPack,
+                        line.unitOfMeasure,
+                      );
                       const selected = editor?.line.clientId === line.clientId;
                       return (
                         <tr
@@ -1394,12 +1109,12 @@ export default function BulkInventoryReceiptModal({
                           <td className={tdClass}>
                             <ItemPhotoThumb
                               src={linePhoto(line, mode, items)}
-                              name={lineName(line, inventoryType, mode, items)}
+                              name={lineName(line, mode, items)}
                             />
                           </td>
                           <td className={tdClass}>
                             <ItemNameDisplay
-                              value={lineName(line, inventoryType, mode, items)}
+                              value={lineName(line, mode, items)}
                               className="text-slate-800"
                             />
                           </td>
@@ -1407,6 +1122,9 @@ export default function BulkInventoryReceiptModal({
                             {lineMeta(line, items, mode, brandOptions)}
                           </td>
                           <td className={tdClass}>{line.quantity || "—"}</td>
+                          <td className={tdClass}>
+                            {totalBaseQty == null ? "—" : totalBaseQty}
+                          </td>
                           <td className={tdClass}>
                             {line.unitCost === ""
                               ? "—"
@@ -1489,7 +1207,6 @@ export default function BulkInventoryReceiptModal({
               line={editor.line}
               errors={editorErrors}
               mode={mode}
-              inventoryType={inventoryType}
               items={items}
               usedItemIds={usedItemIds}
               onChange={setEditorField}

@@ -11,16 +11,9 @@ import MoneyInputField from "../../../../components/common/fields/MoneyInputFiel
 import ChoiceOption from "../../../../components/common/fields/ChoiceOption";
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
-import {
-  VEHICLE_PART_MAKE_OPTIONS,
-  getVehiclePartModelOptions,
-  getVehiclePartYearOptions,
-} from "../../../../mockdata/stores/vehiclePartsInventory";
 import { formatInventoryMoney, sendDeliveryOtp, OTP_TYPE } from "../../../../services/inventoryService";
 import { formatMoneyAmount } from "../../../../utils/displayFormatters";
 import { listItems } from "../../../../services/itemsService";
-import ComponentLevelSelects from "../../vehicleParts/ComponentLevelSelects";
-import { VEHICLE_COMPONENT_LEVEL_KEYS } from "../../vehicleParts/vehicleComponentTreeHelpers";
 import BulkInventoryReceiptModal from "./BulkInventoryReceiptModal";
 import DeliveryPersonOtpSection from "./DeliveryPersonOtpSection";
 import ItemPhotoField, { ItemPhotoThumb } from "./ItemPhotoField";
@@ -88,34 +81,8 @@ const INITIAL_ACCESSORY = {
   ...SUPPLYING_FIELDS,
 };
 
-const INITIAL_VEHICLE_PART = {
-  make: "",
-  model: "",
-  year: "",
-  chassisNumber: "",
-  level1: "",
-  level2: "",
-  level3: "",
-  level4: "",
-  level5: "",
-  level6: "",
-  quantity: "",
-  unitPrice: "",
-  location: "",
-  ...SUPPLYING_FIELDS,
-};
-
 const INITIAL_REGISTERED = {
   itemId: "",
-  make: "",
-  model: "",
-  year: "",
-  level1: "",
-  level2: "",
-  level3: "",
-  level4: "",
-  level5: "",
-  level6: "",
   unitOfMeasure: "",
   unitsPerPack: "",
   quantity: "",
@@ -123,11 +90,6 @@ const INITIAL_REGISTERED = {
   location: "",
   ...SUPPLYING_FIELDS,
 };
-
-function resolveComponentName(form) {
-  const levels = VEHICLE_COMPONENT_LEVEL_KEYS.map((key) => form[key]).filter(Boolean);
-  return levels[levels.length - 1] || "";
-}
 
 function calcTotalPrice(quantity, unitPrice, unitsPerPack, unitOfMeasure) {
   return calcInventoryPurchaseTotal(quantity, unitsPerPack, unitOfMeasure, unitPrice);
@@ -198,9 +160,6 @@ function SelectedItemCard({ item, onChange }) {
   const meta = [
     item.itemCode,
     item.brand ? formatBrand(item.brand) : null,
-    item.make
-      ? `${item.make} ${item.model || ""} ${item.year || ""}`.trim()
-      : null,
     `On hand ${item.quantity ?? 0}`,
     item.unitCost != null ? `Avg cost ${formatInventoryMoney(item.unitCost)}` : null,
   ]
@@ -389,12 +348,10 @@ function withInventoryUnitPayload(form, payload, { itemUnit } = {}) {
 
 export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkSave }) {
   const [step, setStep] = useState("setup");
-  const [itemType, setItemType] = useState("accessory");
   const [entryMode, setEntryMode] = useState("");
   const [registrationMode, setRegistrationMode] = useState("registered");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [accessoryForm, setAccessoryForm] = useState(INITIAL_ACCESSORY);
-  const [vehicleForm, setVehicleForm] = useState(INITIAL_VEHICLE_PART);
   const [registeredForm, setRegisteredForm] = useState(INITIAL_REGISTERED);
   const [itemSearch, setItemSearch] = useState("");
   const [errors, setErrors] = useState({});
@@ -407,7 +364,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   const [supplierTick, setSupplierTick] = useState(0);
   const [catalogItems, setCatalogItems] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
-  const [componentFilterOpen, setComponentFilterOpen] = useState(true);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
@@ -417,12 +373,10 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
   useEffect(() => {
     if (!isOpen) return;
     setStep("setup");
-    setItemType("accessory");
     setEntryMode("");
     setRegistrationMode("registered");
     setBulkOpen(false);
     setAccessoryForm(INITIAL_ACCESSORY);
-    setVehicleForm(INITIAL_VEHICLE_PART);
     setRegisteredForm(INITIAL_REGISTERED);
     setItemSearch("");
     setErrors({});
@@ -430,7 +384,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setItemDetailsOpen(true);
     setSupplyingDetailsOpen(true);
     setAddSupplierOpen(false);
-    setComponentFilterOpen(true);
     setOtpSent(false);
     setOtp("");
     setOtpVerified(false);
@@ -466,85 +419,19 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     };
   }, [isOpen, catalogTick]);
 
-  const registeredMakeOptions = useMemo(() => {
-    if (itemType !== "vehicle_part") return [];
-    return [...new Set(catalogItems.map((item) => item.make).filter(Boolean))].sort();
-  }, [catalogItems, itemType]);
-
-  const registeredModelOptions = useMemo(() => {
-    if (!registeredForm.make) return [];
-    return [
-      ...new Set(
-        catalogItems
-          .filter((item) => item.make === registeredForm.make)
-          .map((item) => item.model)
-          .filter(Boolean),
-      ),
-    ].sort();
-  }, [catalogItems, registeredForm.make]);
-
-  const registeredYearOptions = useMemo(() => {
-    if (!registeredForm.make || !registeredForm.model) return [];
-    return [
-      ...new Set(
-        catalogItems
-          .filter(
-            (item) =>
-              item.make === registeredForm.make
-              && item.model === registeredForm.model,
-          )
-          .map((item) => String(item.year))
-          .filter(Boolean),
-      ),
-    ].sort((a, b) => Number(b) - Number(a));
-  }, [catalogItems, registeredForm.make, registeredForm.model]);
-
-  const hasVehiclePartFilters =
-    itemType !== "vehicle_part"
-    || Boolean(registeredForm.make && registeredForm.model && registeredForm.year);
-
   const filteredCatalog = useMemo(() => {
-    let list = catalogItems;
-    if (itemType === "vehicle_part") {
-      if (!hasVehiclePartFilters) return [];
-      list = catalogItems.filter((item) => {
-        if (item.make !== registeredForm.make) return false;
-        if (item.model !== registeredForm.model) return false;
-        if (String(item.year) !== String(registeredForm.year)) return false;
-        for (let i = 0; i < 6; i += 1) {
-          const key = `level${i + 1}`;
-          const selected = registeredForm[key];
-          if (selected && item[key] !== selected) return false;
-        }
-        return true;
-      });
-    }
     const q = itemSearch.trim().toLowerCase();
-    if (!q) return list.slice(0, 20);
-    return list
+    if (!q) return catalogItems.slice(0, 20);
+    return catalogItems
       .filter((item) =>
-        [item.itemCode, item.name, item.brand, item.description, item.make, item.model]
+        [item.itemCode, item.name, item.brand, item.description]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
           .includes(q),
       )
       .slice(0, 20);
-  }, [
-    catalogItems,
-    itemSearch,
-    itemType,
-    hasVehiclePartFilters,
-    registeredForm.make,
-    registeredForm.model,
-    registeredForm.year,
-    registeredForm.level1,
-    registeredForm.level2,
-    registeredForm.level3,
-    registeredForm.level4,
-    registeredForm.level5,
-    registeredForm.level6,
-  ]);
+  }, [catalogItems, itemSearch]);
 
   const selectedRegisteredItem = useMemo(
     () => catalogItems.find((item) => item.id === registeredForm.itemId) ?? null,
@@ -566,11 +453,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     ],
   );
 
-  const vehicleTotal = useMemo(
-    () => calcTotalPrice(vehicleForm.quantity, vehicleForm.unitPrice),
-    [vehicleForm.quantity, vehicleForm.unitPrice],
-  );
-
   const registeredTotal = useMemo(
     () => calcTotalPrice(
       registeredForm.quantity,
@@ -585,15 +467,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
       registeredForm.unitOfMeasure,
     ],
   );
-
-  const componentName = useMemo(() => resolveComponentName(vehicleForm), [vehicleForm]);
-
-  const vehicleModelOptions = useMemo(
-    () => getVehiclePartModelOptions(vehicleForm.make),
-    [vehicleForm.make],
-  );
-
-  const vehicleYearOptions = useMemo(() => getVehiclePartYearOptions(), []);
 
   const clearError = (field) => {
     setErrors((prev) => {
@@ -614,30 +487,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     resetOtpState();
   };
 
-  const handleVehicleChange = (field) => (event) => {
-    const value = event.target.value;
-    setVehicleForm((prev) => {
-      if (field === "make") {
-        return { ...prev, make: value, model: "", year: "" };
-      }
-      if (field === "model") {
-        return { ...prev, model: value, year: "" };
-      }
-      if (field === "supplierId") {
-        return applySupplierContact(prev, value, event.supplier);
-      }
-      return { ...prev, [field]: value };
-    });
-    clearError(field);
-    resetOtpState();
-    if (field === "make") {
-      clearError("model");
-      clearError("year");
-    } else if (field === "model") {
-      clearError("year");
-    }
-  };
-
   const handleRegisteredChange = (field) => (event) => {
     const value = event.target.value;
     setRegisteredForm((prev) =>
@@ -645,52 +494,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     );
     clearError(field);
     resetOtpState();
-  };
-
-  const handleRegisteredVehicleFilterChange = (field) => (event) => {
-    const value = event.target.value;
-    setRegisteredForm((prev) => {
-      if (field === "make") {
-        return {
-          ...prev,
-          make: value,
-          model: "",
-          year: "",
-          itemId: "",
-          level1: "",
-          level2: "",
-          level3: "",
-          level4: "",
-          level5: "",
-          level6: "",
-        };
-      }
-      if (field === "model") {
-        return {
-          ...prev,
-          model: value,
-          year: "",
-          itemId: "",
-          level1: "",
-          level2: "",
-          level3: "",
-          level4: "",
-          level5: "",
-          level6: "",
-        };
-      }
-      if (field === "year") {
-        return {
-          ...prev,
-          year: value,
-          itemId: "",
-        };
-      }
-      return { ...prev, [field]: value };
-    });
-    setItemSearch("");
-    clearError("itemId");
-    clearError(field);
   };
 
   const selectRegisteredItem = (item) => {
@@ -728,12 +531,10 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     setRegistrationMode("registered");
     setRegisteredForm(INITIAL_REGISTERED);
     setItemSearch("");
-    setComponentFilterOpen(true);
     setOtpSent(false);
     setOtp("");
     setOtpVerified(false);
     setDetailsConfirmed(false);
-    setItemType("accessory");
     setAccessoryForm((prev) => ({
       ...prev,
       itemCode: "",
@@ -755,7 +556,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
     }
 
     setPendingSave({
-      type: itemType === "vehicle_part" ? "vehicle_part" : "accessory",
+      type: "accessory",
       mode: "existing",
       label: selectedRegisteredItem.name,
       payload: withInventoryUnitPayload(registeredForm, {
@@ -814,53 +615,6 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
         supplierEmail: accessoryForm.supplierEmail,
         condition: accessoryForm.condition,
       }),
-    });
-  };
-
-  const submitVehiclePart = () => {
-    const nextErrors = {};
-    if (!vehicleForm.make.trim()) nextErrors.make = "Select a make.";
-    if (!vehicleForm.model.trim()) nextErrors.model = "Select a model.";
-    if (!vehicleForm.year.trim()) nextErrors.year = "Select a year.";
-    if (!vehicleForm.level1) nextErrors.level1 = "Select at least Level 1 component.";
-    validateStockFields(vehicleForm, nextErrors);
-    validateSupplyingDetails(vehicleForm, nextErrors);
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) {
-      toast.warning("Fix the highlighted fields before saving.");
-      return;
-    }
-
-    setPendingSave({
-      type: "vehicle_part",
-      mode: "new",
-      label: componentName || `${vehicleForm.make} ${vehicleForm.model}`.trim(),
-      payload: {
-        make: vehicleForm.make,
-        model: vehicleForm.model,
-        year: vehicleForm.year,
-        chassisNumber: vehicleForm.chassisNumber,
-        level1: vehicleForm.level1,
-        level2: vehicleForm.level2,
-        level3: vehicleForm.level3,
-        level4: vehicleForm.level4,
-        level5: vehicleForm.level5,
-        level6: vehicleForm.level6,
-        name: componentName,
-        quantity: vehicleForm.quantity,
-        unitCost: vehicleForm.unitPrice,
-        totalPurchaseCost: vehicleTotal,
-        supplierId: vehicleForm.supplierId,
-        location: vehicleForm.location,
-        waybillNumber: vehicleForm.waybillNumber,
-        deliveredByName: vehicleForm.deliveredByName,
-        deliveredByPhone: vehicleForm.deliveredByPhone,
-        deliveredByEmail: vehicleForm.deliveredByEmail,
-        supplierPhone: vehicleForm.supplierPhone,
-        supplierEmail: vehicleForm.supplierEmail,
-        condition: vehicleForm.condition,
-        notes: vehicleForm.notes,
-      },
     });
   };
 

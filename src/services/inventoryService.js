@@ -108,8 +108,13 @@ export const toBulkStockPayload = ({ shared = {}, lines = [], mode = "existing" 
       quantity: Number(line.quantity),
       unit_price: Number(line.unitCost ?? line.unit_price ?? line.unitPrice),
     };
-    if (mode === "existing" || line.itemId) {
-      item.item_id = Number(line.itemId || line.item_id);
+    if (mode === "existing" || line.itemCode || line.itemId) {
+      const code = String(line.itemCode || line.code || "").trim();
+      if (code) {
+        item.item_code = code;
+      } else {
+        item.item_id = Number(line.itemId || line.item_id);
+      }
     } else {
       const name = line.name?.trim();
       const brandId = toCatalogId(line.brand ?? line.brandId);

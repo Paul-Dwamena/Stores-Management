@@ -92,9 +92,7 @@ export function resolveItemBaseUnit(apiUnit) {
 
 /** Maps base unit key → API item.unit value. */
 export function baseUnitApiValue(baseUnit) {
-  const normalized = normalizeBaseUnit(baseUnit);
-  if (normalized === "piece") return "pcs";
-  return normalized;
+  return normalizeBaseUnit(baseUnit);
 }
 
 export function inventoryUnitRequiresPackSize(unit) {

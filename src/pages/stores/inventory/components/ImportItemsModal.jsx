@@ -41,9 +41,11 @@ import {
 } from "../../../../components/common/display/FormattedDisplay";
 import {
   baseUnitApiValue,
+  baseUnitLabel,
   buildInventoryUnitNotes,
   calcInventoryPurchaseTotal,
   calcInventoryTotalQuantity,
+  inventoryUnitLabel,
   normalizeBaseUnit,
   normalizeInventoryUnit,
   resolveItemBaseUnit,
@@ -63,7 +65,7 @@ const readOnlyClassName =
   "w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-[12px] text-slate-600 cursor-not-allowed";
 const whiteInputClassName = "bg-white focus:bg-white";
 const thClass =
-  "px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500";
+  "whitespace-nowrap px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider text-slate-500";
 const tdClass = "px-3 py-2.5 align-middle text-[12px] text-slate-700";
 
 const INITIAL_SHARED = {
@@ -236,6 +238,12 @@ function calcLineTotal(line) {
   );
 }
 
+function optionLabel(options, value) {
+  if (value == null || value === "") return "—";
+  const match = options.find((option) => String(option.value) === String(value));
+  return match?.label || String(value);
+}
+
 function lineDisplayName(line, mode) {
   if (mode === "existing") {
     return line.name || line.itemCode || "Selected item";
@@ -327,6 +335,14 @@ export default function ImportItemsModal({
   const storeNameById = useMemo(
     () => new Map(catalog.stores.map((store) => [String(store.id), store.name])),
     [catalog.stores],
+  );
+  const brandNameById = useMemo(
+    () => new Map(catalog.brands.map((brand) => [String(brand.id), brand.name])),
+    [catalog.brands],
+  );
+  const categoryNameById = useMemo(
+    () => new Map(catalog.categories.map((category) => [String(category.id), category.name])),
+    [catalog.categories],
   );
 
   const resetOtpState = () => {
@@ -813,11 +829,22 @@ export default function ImportItemsModal({
                     <tr className="border-b border-slate-200">
                       <th className={thClass}>#</th>
                       <th className={thClass}>Item</th>
-                      <th className={thClass}>Description</th>
+                      {mode === "new" ? (
+                        <>
+                          <th className={thClass}>Brand</th>
+                          <th className={thClass}>Category</th>
+                          <th className={thClass}>Description</th>
+                        </>
+                      ) : null}
                       <th className={thClass}>Package quantity</th>
                       <th className={thClass}>Total base quantity</th>
                       <th className={thClass}>Unit price (GHS)</th>
                       <th className={thClass}>Total price</th>
+                      <th className={thClass}>Package type</th>
+                      {mode === "new" ? (
+                        <th className={thClass}>Base unit</th>
+                      ) : null}
+                      <th className={thClass}>Condition</th>
                       <th className={thClass}>Store</th>
                       <th className={thClass}>Status</th>
                       <th className={cn(thClass, "text-right")}>Actions</th>
@@ -847,9 +874,19 @@ export default function ImportItemsModal({
                               <p className="text-[10px] text-slate-400">{line.itemCode}</p>
                             ) : null}
                           </td>
-                          <td className={cn(tdClass, "text-slate-500 max-w-[200px] truncate")}>
-                            {line.description || "—"}
-                          </td>
+                          {mode === "new" ? (
+                            <>
+                              <td className={cn(tdClass, "max-w-[140px] truncate")}>
+                                {brandNameById.get(String(line.brand)) || line.brand || "—"}
+                              </td>
+                              <td className={cn(tdClass, "max-w-[140px] truncate")}>
+                                {categoryNameById.get(String(line.category)) || line.category || "—"}
+                              </td>
+                              <td className={cn(tdClass, "text-slate-500 max-w-[200px] truncate")}>
+                                {line.description || "—"}
+                              </td>
+                            </>
+                          ) : null}
                           <td className={tdClass}>{line.quantity || "—"}</td>
                           <td className={tdClass}>
                             {totalBaseQty == null ? "—" : totalBaseQty}
@@ -861,6 +898,19 @@ export default function ImportItemsModal({
                           </td>
                           <td className={tdClass}>
                             {total == null ? "—" : formatMoneyGhs(total)}
+                          </td>
+                          <td className={tdClass}>
+                            {line.unitOfMeasure
+                              ? inventoryUnitLabel(line.unitOfMeasure)
+                              : "—"}
+                          </td>
+                          {mode === "new" ? (
+                            <td className={tdClass}>
+                              {line.baseUnit ? baseUnitLabel(line.baseUnit) : "—"}
+                            </td>
+                          ) : null}
+                          <td className={tdClass}>
+                            {optionLabel(CONDITION_OPTIONS, line.condition)}
                           </td>
                           <td className={cn(tdClass, "max-w-[180px] truncate")}>
                             <StoreLocationDisplay

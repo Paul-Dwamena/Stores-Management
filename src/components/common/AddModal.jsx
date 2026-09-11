@@ -62,7 +62,7 @@ const AddModal = ({
       {/* Modal Dialog */}
       <div
         className={cn(
-          "relative bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col min-h-0",
+          "relative bg-white shadow-2xl animate-in fade-in duration-200 flex flex-col min-h-0",
           fillViewport
             ? (flushViewport
               ? "flex-1 w-full max-w-none max-h-none rounded-none"

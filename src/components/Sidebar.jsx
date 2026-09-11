@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { FiGrid, FiBox, FiX, FiSettings } from "react-icons/fi";
-import { CheckCircle, Inbox, ScrollText, SlidersHorizontal } from "lucide-react";
+import { CheckCircle, Inbox, MessageSquare, ScrollText, SlidersHorizontal } from "lucide-react";
 import { cn } from "../utils/cn";
 import StoreLogo from "./common/StoreLogo";
 import { usePermission } from "../hooks/usePermission";
@@ -14,6 +14,7 @@ const mainNavItems = [
   { name: "Approvals", icon: CheckCircle, path: "/approvals" },
   { name: "Setups", icon: SlidersHorizontal, path: "/setups" },
   { name: "Audit Trail", icon: ScrollText, path: "/audit-trail" },
+  { name: "SMS", icon: MessageSquare, path: "/sms" },
   { name: "Settings", icon: FiSettings, path: "/settings" },
 ];
 

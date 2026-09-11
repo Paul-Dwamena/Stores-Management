@@ -15,6 +15,7 @@ import { ApprovalsList } from "./pages/approvals";
 import { SetupsHub } from "./pages/setups";
 import { DropdownOptionPlaceholder } from "./pages/setups/dropdownOptions";
 import { AuditTrailList } from "./pages/auditTrail";
+import { SmsHub } from "./pages/sms";
 import { AccountSettings } from "./pages/settings";
 import {
   DROPDOWN_VIEW_ANY,
@@ -126,6 +127,14 @@ function App() {
               element={
                 <PermissionRoute>
                   <AuditTrailList />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="sms"
+              element={
+                <PermissionRoute>
+                  <SmsHub />
                 </PermissionRoute>
               }
             />

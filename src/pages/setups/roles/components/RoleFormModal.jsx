@@ -113,7 +113,7 @@ export default function RoleFormModal({
         saveLabel={saving ? "Saving…" : isEdit ? "Save Changes" : "Create Role"}
         saveDisabled={saving || loading || Boolean(error)}
         dialogClassName={isEdit ? "max-w-7xl" : "max-w-lg"}
-        contentClassName={isEdit ? "overflow-x-auto" : undefined}
+        contentClassName={isEdit ? "overflow-x-auto !pt-0 sm:!pt-0" : undefined}
         overlayClassName="!z-[10001]"
       >
         <SectionLoadState
@@ -123,7 +123,13 @@ export default function RoleFormModal({
           loadingLabel="Loading role…"
           errorTitle="Couldn’t load this form"
         >
-          <div className={cn("space-y-5", saving && "pointer-events-none opacity-60")}>
+          <div
+            className={cn(
+              "space-y-5",
+              isEdit && "pt-4 sm:pt-6",
+              saving && "pointer-events-none opacity-60",
+            )}
+          >
             <div className="space-y-4">
               <InputField
                 label="Role Name"

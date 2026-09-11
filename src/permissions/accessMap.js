@@ -33,6 +33,7 @@ export const RESOURCES = {
   supplyRequests: "supply_requests",
   issuances: "issuances",
   audit: "audit",
+  sms: "sms",
   transfers: "transfers",
   suppliers: "suppliers",
   brands: "brands",
@@ -98,6 +99,7 @@ export const ROUTE_ACCESS = [
   { path: "/approvals", permissionAny: APPROVALS_VIEW_ANY },
   { path: "/setups", permissionAny: SETUPS_VIEW_ANY },
   { path: "/audit-trail", permission: read(RESOURCES.audit) },
+  { path: "/sms", permission: read(RESOURCES.sms) },
   { path: "/settings", always: true },
 ];
 

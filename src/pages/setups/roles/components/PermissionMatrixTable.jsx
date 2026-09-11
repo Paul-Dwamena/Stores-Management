@@ -75,27 +75,27 @@ export default function PermissionMatrixTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
+    <div className="rounded-lg border border-slate-200">
       <table className="w-max min-w-full text-left border-separate border-spacing-0">
-        <thead className="bg-slate-50">
-          <tr className="border-b border-slate-200">
-            <th className="sticky left-0 z-20 bg-slate-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap border-b border-r border-slate-200">
+        <thead>
+          <tr>
+            <th className="sticky left-0 top-0 z-30 bg-slate-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap border-b border-r border-slate-200 shadow-[0_1px_0_0_rgb(226_232_240)]">
               Permission Name
             </th>
             {matrix.actions.map((action) => (
               <th
                 key={action}
-                className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap border-b border-slate-200"
+                className="sticky top-0 z-20 bg-slate-50 px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap border-b border-slate-200 shadow-[0_1px_0_0_rgb(226_232_240)]"
               >
                 {formatRoleName(action)}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
+        <tbody className="bg-white">
           {matrix.resources.map((resource) => (
             <tr key={resource} className="group hover:bg-slate-50/40">
-              <td className="sticky left-0 z-20 bg-white px-4 py-2 text-[12px] font-semibold text-slate-800 whitespace-nowrap border-b border-r border-slate-200 group-hover:bg-slate-50">
+              <td className="sticky left-0 z-10 bg-white px-4 py-2 text-[12px] font-semibold text-slate-800 whitespace-nowrap border-b border-r border-slate-200 group-hover:bg-slate-50">
                 {formatRoleName(resource)}
               </td>
               {matrix.actions.map((action) => {

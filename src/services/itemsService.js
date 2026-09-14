@@ -86,6 +86,17 @@ export const updateItem = async (itemId, payload = {}) => {
   }
 };
 
+/** DELETE /items/{id} */
+export const deleteItem = async (itemId) => {
+  try {
+    await api.delete(`/items/${itemId}`);
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to delete item."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
 /** PUT /items/{id}/photo — multipart field `photo` (binary). */
 export const updateItemPhoto = async (itemId, photo) => {
   if (!(photo instanceof File)) {

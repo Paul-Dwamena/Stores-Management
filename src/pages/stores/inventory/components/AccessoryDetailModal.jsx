@@ -450,6 +450,7 @@ export default function AccessoryDetailModal({
   variant = "accessory",
   onReceiveStock,
   onUpdateDetails,
+  onDelete,
   onRetryDetail,
   onRetryReceipts,
   onRetrySupplies,
@@ -733,10 +734,24 @@ export default function AccessoryDetailModal({
           <Button onClick={onClose} variant="ghost" size="modal" className="border border-slate-200">
             Close
           </Button>
-          {onUpdateDetails && !isVehiclePart ? (
-            <Button size="modal" disabled={!detailReady} onClick={() => setEditOpen(true)}>
-              Edit
-            </Button>
+          {(onDelete || (onUpdateDetails && !isVehiclePart)) ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {onDelete ? (
+                <Button
+                  variant="danger"
+                  size="modal"
+                  disabled={!detailReady}
+                  onClick={onDelete}
+                >
+                  Delete
+                </Button>
+              ) : null}
+              {onUpdateDetails && !isVehiclePart ? (
+                <Button size="modal" disabled={!detailReady} onClick={() => setEditOpen(true)}>
+                  Edit
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

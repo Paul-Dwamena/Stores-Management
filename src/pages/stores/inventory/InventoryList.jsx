@@ -15,6 +15,7 @@ import Pagination from "../../../components/common/Pagination";
 import { TableRowActions, TableViewAction } from "../../../components/common/tableActions";
 import SectionLoadState from "../../../components/common/SectionLoadState";
 import { toast } from "../../../components/common/ToastNotification";
+import ConfirmationModal from "../../../components/common/ConfirmationModal";
 import {
   listInventoryItems,
   getInventoryItem,
@@ -26,7 +27,7 @@ import {
   formatInventoryMoney,
 } from "../../../services/inventoryService";
 import { getInventoryStats } from "../../../services/statsService";
-import { updateItem, updateItemPhoto } from "../../../services/itemsService";
+import { deleteItem, updateItem, updateItemPhoto } from "../../../services/itemsService";
 import { buildInventoryUnitNotes, resolveItemBaseUnit } from "./utils/inventoryUnitOptions";
 import {
   AccessoryDetailModal,
@@ -70,6 +71,7 @@ export default function InventoryList({
   const { can } = usePermission();
   const canAdd = can(RESOURCES.items, ACTIONS.create);
   const canEdit = can(RESOURCES.items, ACTIONS.update);
+  const canDelete = can(RESOURCES.items, ACTIONS.delete);
   const canReceive = can(RESOURCES.inventory, ACTIONS.receive);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +80,8 @@ export default function InventoryList({
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [stats, setStats] = useState([
@@ -388,6 +392,22 @@ export default function InventoryList({
     });
   };
 
+  const handleDeleteItem = async () => {
+    if (!deleteTarget || deleteLoading) return;
+    setDeleteLoading(true);
+    try {
+      await deleteItem(deleteTarget.id);
+      toast.success("Item deleted.");
+      setDeleteTarget(null);
+      setSelected(null);
+      reload();
+    } catch (error) {
+      toast.error(error.message ?? "Could not delete item.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleReceiveStock = async (payload) => {
     if (!selected) return;
     await stockItem(selected.id, toStockBody(payload));
@@ -603,15 +623,35 @@ export default function InventoryList({
       </div>
 
       <AccessoryDetailModal
-        isOpen={Boolean(selected)}
+        isOpen={Boolean(selected) && !deleteTarget}
         onClose={() => setSelected(null)}
         item={selected}
         variant="accessory"
         onReceiveStock={canReceive ? handleReceiveStock : undefined}
         onUpdateDetails={canEdit ? handleUpdateDetails : undefined}
+        onDelete={canDelete ? () => setDeleteTarget(selected) : undefined}
         onRetryDetail={retryItemDetail}
         onRetryReceipts={retryReceipts}
         onRetrySupplies={retrySupplies}
+      />
+
+      <ConfirmationModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (deleteLoading) return;
+          setDeleteTarget(null);
+        }}
+        onConfirm={handleDeleteItem}
+        closeOnConfirm={false}
+        confirmLoading={deleteLoading}
+        title="Delete item?"
+        message={
+          deleteTarget
+            ? `Remove "${deleteTarget.name || deleteTarget.itemCode || `Item #${deleteTarget.id}`}"? This cannot be undone.`
+            : ""
+        }
+        confirmText={deleteLoading ? "Deleting…" : "Delete"}
+        isDanger
       />
 
       <NewInventoryItemModal

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
-import { ChevronDown, Plus, Warehouse, X } from "lucide-react";
+import { ChevronDown, Pencil, Plus, Trash2, Warehouse, X } from "lucide-react";
 import Button from "../../../../components/common/base/Button";
 import AddModal from "../../../../components/common/AddModal";
 import SectionLoadState from "../../../../components/common/SectionLoadState";
@@ -24,9 +24,13 @@ import { SupplyStatusBadge } from "../../supplies/utils/SupplyStatusBadge";
 import ReceiveIntoStoreModal from "./ReceiveIntoStoreModal";
 import EditInventoryItemModal from "./EditInventoryItemModal";
 import ItemStoreStockModal from "./ItemStoreStockModal";
+import DiscardItemModal, { formatDiscardReason } from "./DiscardItemModal";
+import EditReceiptPackagingModal from "./EditReceiptPackagingModal";
 import { ItemPhotoThumb } from "./ItemPhotoField";
+import { toast } from "../../../../components/common/ToastNotification";
 import {
   baseUnitLabel,
+  inventoryUnitLabel,
   resolveItemBaseUnit,
 } from "../utils/inventoryUnitOptions";
 
@@ -310,6 +314,51 @@ const SUPPLY_COLUMNS = [
   },
 ];
 
+const DISCARD_COLUMNS = [
+  {
+    key: "storeName",
+    label: "Store",
+    minWidth: 160,
+    wrap: true,
+    render: (row) => <StoreLocationDisplay value={row.storeName || row.location} />,
+  },
+  {
+    key: "quantity",
+    label: "Qty discarded",
+    minWidth: 120,
+    render: (row) => cellValue(row.quantity),
+  },
+  {
+    key: "reason",
+    label: "Reason",
+    minWidth: 140,
+    wrap: true,
+    render: (row) => cellValue(formatDiscardReason(row.reason) || row.reason),
+  },
+  {
+    key: "discardedBy",
+    label: "Discarded by",
+    minWidth: 150,
+    wrap: true,
+    render: (row) => {
+      if (!row.discardedBy && !row.discardedByPhone) return EMPTY_DISPLAY;
+      return (
+        <div>
+          <div>{row.discardedBy ? formatUserName(row.discardedBy) : EMPTY_DISPLAY}</div>
+          {row.discardedByPhone ? (
+            <div className="mt-0.5 text-[11px] text-slate-500">{row.discardedByPhone}</div>
+          ) : null}
+        </div>
+      );
+    },
+  },
+  {
+    key: "discardedAt",
+    label: "Discarded",
+    minWidth: 150,
+    render: (row) => formatApiDateTime(row.discardedAt || row.createdAt),
+  },
+];
 
 function formatDetailLabel(key) {
   const labels = {
@@ -328,6 +377,10 @@ function formatDetailLabel(key) {
     approvedBy: "Approved by",
     supplierId: "Supplier",
     supplierName: "Supplier",
+    discardedBy: "Discarded by",
+    discardedByPhone: "Discarded by (phone)",
+    discardedAt: "Discarded at",
+    reason: "Reason",
     storeName: "Store",
     storeCode: "Store code",
     itemBrand: "Item brand",
@@ -348,6 +401,10 @@ function formatDetailLabel(key) {
     quantity: "Total quantity",
     totalQuantity: "Total quantity",
     photo: "Photo",
+    unitOfMeasure: "Packaging type",
+    packagingType: "Packaging type",
+    unitsPerPack: "Units per package",
+    packageQuantity: "Package quantity",
   };
   return labels[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());
 }
@@ -356,6 +413,10 @@ function formatDetailValue(key, value) {
   if (value == null || value === "") return EMPTY_DISPLAY;
   if (key === "supplierId") return String(value);
   if (key === "condition") return formatCondition(value);
+  if (key === "reason") return formatDiscardReason(value) || String(value);
+  if (key === "unitOfMeasure" || key === "packagingType") {
+    return inventoryUnitLabel(value) || String(value);
+  }
   if (["unitCost", "unitPrice", "averageUnitCost", "totalPurchaseCost"].includes(key)) {
     return formatInventoryMoney(value);
   }
@@ -370,7 +431,7 @@ function isPhotoValue(key, value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function scalarEntries(record) {
+function scalarEntries(record, { skipKeys = [] } = {}) {
   const skip = new Set([
     "detailReady",
     "detailLoading",
@@ -381,7 +442,11 @@ function scalarEntries(record) {
     "suppliesLoading",
     "suppliesError",
     "supplies",
+    "discardsLoading",
+    "discardsError",
+    "discards",
     "stores",
+    ...skipKeys,
   ]);
   return Object.entries(record || {}).filter(
     ([key, value]) =>
@@ -413,31 +478,36 @@ function DetailGrid({ entries }) {
   );
 }
 
-function DetailSection({ title, children }) {
+function DetailSection({ title, action, children }) {
   const [open, setOpen] = useState(true);
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
+      <div
         className={cn(
-          "flex w-full items-center gap-2 bg-slate-50 px-4 py-3 text-left",
+          "flex items-center gap-2 bg-slate-50 px-4 py-3",
           open && "border-b border-slate-200",
         )}
-        aria-expanded={open}
       >
-        <ChevronDown
-          size={15}
-          className={cn(
-            "shrink-0 text-slate-400 transition-transform",
-            open && "rotate-180",
-          )}
-        />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-          {title}
-        </span>
-      </button>
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="min-w-0 flex-1 flex items-center gap-2 text-left"
+          aria-expanded={open}
+        >
+          <ChevronDown
+            size={15}
+            className={cn(
+              "shrink-0 text-slate-400 transition-transform",
+              open && "rotate-180",
+            )}
+          />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+            {title}
+          </span>
+        </button>
+        {action}
+      </div>
       {open && <div className="px-4">{children}</div>}
     </section>
   );
@@ -454,16 +524,23 @@ export default function AccessoryDetailModal({
   onRetryDetail,
   onRetryReceipts,
   onRetrySupplies,
+  onRetryDiscards,
+  onDiscardStock,
+  onUpdateReceiptPackaging,
 }) {
   const [openSections, setOpenSections] = useState({
     information: true,
     collectives: true,
     supplies: true,
+    discards: true,
   });
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [storeStockOpen, setStoreStockOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState(null);
+  const [packagingEditOpen, setPackagingEditOpen] = useState(false);
+  const [receiptPackagingById, setReceiptPackagingById] = useState({});
 
   const isVehiclePart = variant === "vehicle_part";
   const detailReady = Boolean(item?.detailReady);
@@ -473,21 +550,29 @@ export default function AccessoryDetailModal({
   const receiptsError = item?.receiptsError || null;
   const suppliesLoading = Boolean(item?.suppliesLoading);
   const suppliesError = item?.suppliesError || null;
+  const discardsLoading = Boolean(item?.discardsLoading);
+  const discardsError = item?.discardsError || null;
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-      setOpenSections({ information: true, collectives: true, supplies: true });
+      setOpenSections({ information: true, collectives: true, supplies: true, discards: true });
       setReceiveOpen(false);
       setStoreStockOpen(false);
+      setDiscardOpen(false);
       setEditOpen(false);
       setSelectedMovement(null);
+      setPackagingEditOpen(false);
+      setReceiptPackagingById({});
     } else {
       document.body.style.overflow = "";
       setReceiveOpen(false);
       setStoreStockOpen(false);
+      setDiscardOpen(false);
       setEditOpen(false);
       setSelectedMovement(null);
+      setPackagingEditOpen(false);
+      setReceiptPackagingById({});
     }
     return () => {
       document.body.style.overflow = "";
@@ -501,6 +586,7 @@ export default function AccessoryDetailModal({
 
   const receipts = Array.isArray(item.receipts) ? item.receipts : [];
   const supplies = Array.isArray(item.supplies) ? item.supplies : [];
+  const discards = Array.isArray(item.discards) ? item.discards : [];
   const averageUnitCost = detailReady && receipts.length
     ? receipts.reduce((sum, row) => sum + Number(row.unitPrice || 0), 0) / receipts.length
     : 0;
@@ -521,14 +607,77 @@ export default function AccessoryDetailModal({
     setReceiveOpen(false);
   };
 
+  const handleDiscardSave = async (payload) => {
+    await onDiscardStock?.(payload);
+    setDiscardOpen(false);
+  };
+
+  const enrichReceiptRow = (row) => {
+    if (!row?.id) return row;
+    const packaging = receiptPackagingById[row.id];
+    return packaging ? { ...row, ...packaging } : row;
+  };
+
+  const handleReceiptPackagingSave = async (payload) => {
+    const receiptId = selectedMovement?.row?.id;
+    if (!receiptId) return;
+
+    const packaging = {
+      unitOfMeasure: payload.unitOfMeasure,
+      unitsPerPack: payload.unitsPerPack,
+      packageQuantity: payload.packageQuantity,
+    };
+
+    if (onUpdateReceiptPackaging) {
+      await onUpdateReceiptPackaging(receiptId, packaging);
+    }
+
+    setReceiptPackagingById((prev) => ({
+      ...prev,
+      [receiptId]: packaging,
+    }));
+    setSelectedMovement((prev) => {
+      if (!prev?.row || prev.row.id !== receiptId) return prev;
+      return {
+        ...prev,
+        row: {
+          ...prev.row,
+          ...packaging,
+        },
+      };
+    });
+    if (!onUpdateReceiptPackaging) {
+      toast.success("Packaging updated.");
+    }
+    setPackagingEditOpen(false);
+  };
+
   const receiptsTitle = receiptsLoading || receiptsError
     ? "Receipts"
     : `Receipts (${receipts.length})`;
   const suppliesTitle = suppliesLoading || suppliesError
     ? "Supplies"
     : `Supplies (${supplies.length})`;
+  const discardsTitle = discardsLoading || discardsError
+    ? "Discards"
+    : `Discards (${discards.length})`;
 
-  return ReactDOM.createPortal(
+  const isReceiptMovement = selectedMovement?.type === "Receipt";
+  const receiptDetailRow = isReceiptMovement
+    ? enrichReceiptRow(selectedMovement?.row)
+    : selectedMovement?.row;
+  const receiptPackagingEntries = isReceiptMovement
+    ? [
+      ["unitOfMeasure", receiptDetailRow?.unitOfMeasure ?? ""],
+      ["unitsPerPack", receiptDetailRow?.unitsPerPack ?? ""],
+      ["packageQuantity", receiptDetailRow?.packageQuantity ?? ""],
+    ]
+    : [];
+  const movementDetailEntries = scalarEntries(receiptDetailRow, {
+    skipKeys: isReceiptMovement
+      ? ["unitOfMeasure", "unitsPerPack", "packageQuantity", "packagingType"]
+      : [],
+  });  return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div
         className="absolute inset-0 bg-slate-900/60 animate-in fade-in duration-200"
@@ -569,6 +718,22 @@ export default function AccessoryDetailModal({
             onToggle={() => toggle("information")}
             action={
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {onDiscardStock ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="danger"
+                    disabled={!detailReady}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDiscardOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <Trash2 size={14} />
+                    Discard
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   size="sm"
@@ -702,7 +867,7 @@ export default function AccessoryDetailModal({
               columns={RECEIPT_COLUMNS}
               rows={receipts}
               emptyLabel="No receipts recorded for this item."
-              onView={(row) => setSelectedMovement({ row, type: "Receipt" })}
+              onView={(row) => setSelectedMovement({ row: enrichReceiptRow(row), type: "Receipt" })}
               loading={receiptsLoading}
               error={receiptsError}
               onRetry={onRetryReceipts}
@@ -726,6 +891,24 @@ export default function AccessoryDetailModal({
               onRetry={onRetrySupplies}
               loadingLabel="Loading supplies..."
               errorTitle="Couldn't load supplies"
+            />
+          </AccordionSection>
+
+          <AccordionSection
+            title={discardsTitle}
+            open={openSections.discards}
+            onToggle={() => toggle("discards")}
+          >
+            <MiniTable
+              columns={DISCARD_COLUMNS}
+              rows={discards}
+              emptyLabel="No discards recorded for this item."
+              onView={(row) => setSelectedMovement({ row, type: "Discard" })}
+              loading={discardsLoading}
+              error={discardsError}
+              onRetry={onRetryDiscards}
+              loadingLabel="Loading discards..."
+              errorTitle="Couldn't load discards"
             />
           </AccordionSection>
         </div>
@@ -763,6 +946,13 @@ export default function AccessoryDetailModal({
         onSave={handleReceiveSave}
       />
 
+      <DiscardItemModal
+        isOpen={discardOpen}
+        onClose={() => setDiscardOpen(false)}
+        item={item}
+        onSave={handleDiscardSave}
+      />
+
       <ItemStoreStockModal
         isOpen={storeStockOpen}
         onClose={() => setStoreStockOpen(false)}
@@ -780,11 +970,19 @@ export default function AccessoryDetailModal({
         isOpen={Boolean(selectedMovement)}
         onClose={() => setSelectedMovement(null)}
         onSave={() => setSelectedMovement(null)}
-        title={selectedMovement?.type === "Supply" ? "Supply details" : "Receipt details"}
+        title={
+          selectedMovement?.type === "Supply"
+            ? "Supply details"
+            : selectedMovement?.type === "Discard"
+              ? "Discard details"
+              : "Receipt details"
+        }
         subtitle={
           selectedMovement?.type === "Supply"
             ? "Supply information and linked item details."
-            : "Stock receipt information and linked item details."
+            : selectedMovement?.type === "Discard"
+              ? "Discard information and linked item details."
+              : "Stock receipt information and linked item details."
         }
         saveLabel="Close"
         saveVariant="ghost"
@@ -802,11 +1000,41 @@ export default function AccessoryDetailModal({
               <DetailGrid entries={scalarEntries(item)} />
             </DetailSection>
           ) : null}
-          <DetailSection title={`${selectedMovement?.type || "Record"} Details`}>
-            <DetailGrid entries={scalarEntries(selectedMovement?.row)} />
+          <DetailSection
+            title={`${selectedMovement?.type || "Record"} Details`}
+            action={
+              isReceiptMovement ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPackagingEditOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 border border-slate-200 shrink-0"
+                >
+                  <Pencil size={13} />
+                  Edit packaging
+                </Button>
+              ) : null
+            }
+          >
+            <DetailGrid entries={movementDetailEntries} />
+            {isReceiptMovement ? (
+              <DetailGrid entries={receiptPackagingEntries} />
+            ) : null}
           </DetailSection>
         </div>
       </AddModal>
+
+      <EditReceiptPackagingModal
+        isOpen={packagingEditOpen && isReceiptMovement}
+        onClose={() => setPackagingEditOpen(false)}
+        receipt={receiptDetailRow}
+        item={item}
+        onSave={handleReceiptPackagingSave}
+      />
     </div>,
     document.body,
   );

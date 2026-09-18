@@ -69,6 +69,9 @@ export const toStockReceipt = (row = {}) => {
     storeCode: row.store?.code || "",
     condition: row.condition || "",
     quantity: row.quantity ?? 0,
+    unitOfMeasure: row.package_type || "",
+    packageQuantity: row.package_quantity ?? null,
+    unitsPerPack: row.units_per_package ?? null,
     unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
     receivedAt: row.received_at || null,
     waybillNumber: row.waybill_number || "",
@@ -96,6 +99,20 @@ export const toStockPayload = (payload = {}) => {
   if (waybill) body.waybill_number = waybill;
   const notes = String(payload.notes ?? "").trim();
   if (notes) body.notes = notes;
+
+  const packageType = String(payload.package_type ?? payload.unitOfMeasure ?? "").trim();
+  if (packageType) body.package_type = packageType;
+
+  const packageQuantity = payload.package_quantity ?? payload.packageQuantity;
+  if (packageQuantity != null && packageQuantity !== "") {
+    body.package_quantity = Number(packageQuantity);
+  }
+
+  const unitsPerPackage = payload.units_per_package ?? payload.unitsPerPack;
+  if (unitsPerPackage != null && unitsPerPackage !== "") {
+    body.units_per_package = Number(unitsPerPackage);
+  }
+
   return body;
 };
 
@@ -108,6 +125,19 @@ export const toBulkStockPayload = ({ shared = {}, lines = [], mode = "existing" 
       quantity: Number(line.quantity),
       unit_price: Number(line.unitCost ?? line.unit_price ?? line.unitPrice),
     };
+
+    const packageType = String(line.package_type ?? line.unitOfMeasure ?? "").trim();
+    if (packageType) item.package_type = packageType;
+
+    const packageQuantity = line.package_quantity ?? line.packageQuantity;
+    if (packageQuantity != null && packageQuantity !== "") {
+      item.package_quantity = Number(packageQuantity);
+    }
+
+    const unitsPerPackage = line.units_per_package ?? line.unitsPerPack;
+    if (unitsPerPackage != null && unitsPerPackage !== "") {
+      item.units_per_package = Number(unitsPerPackage);
+    }
 
     const brandFromLine = toCatalogId(line.brandId) ?? toCatalogId(line.brand);
     const categoryFromLine = toCatalogId(line.categoryId) ?? toCatalogId(line.category);
@@ -244,6 +274,78 @@ export const listItemSupplies = async (itemId) => {
   }
 };
 
+export const toStockDiscard = (row = {}) => {
+  const discardedBy = row.discarded_by_user;
+  return {
+    id: row.id,
+    itemId: row.item_id ?? null,
+    storeId: row.store_id ?? row.store?.id ?? null,
+    storeName: row.store?.name || "",
+    storeCode: row.store?.code || "",
+    quantity: row.quantity ?? 0,
+    reason: row.reason || row.discard_reason || "",
+    discardedBy: personName(discardedBy) || "",
+    discardedByPhone: discardedBy?.phone || "",
+    discardedByEmail: discardedBy?.email || "",
+    discardedAt: row.created_at || null,
+  };
+};
+
+/** GET /inventory/items/{itemId}/discards */
+export const listItemDiscards = async (itemId) => {
+  try {
+    const { data } = await api.get(`/inventory/items/${itemId}/discards`);
+    return parsePaginatedList(data).map(toStockDiscard);
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to load discards."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+/** POST /inventory/items/{itemId}/discard */
+export const discardItemStock = async (itemId, { storeId, quantity, reason }) => {
+  try {
+    const body = {
+      store_id: Number(storeId),
+      quantity: Number(quantity),
+    };
+    const discardReason = String(reason || "").trim();
+    if (discardReason) body.discard_reason = discardReason;
+    const { data } = await api.post(`/inventory/items/${itemId}/discard`, body);
+    return toStockDiscard(data);
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to discard stock."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
+/** PUT /inventory/receipt/{receiptId}/update */
+export const updateReceiptPackaging = async (
+  receiptId,
+  { packageType, packageQuantity, unitsPerPackage },
+) => {
+  try {
+    const { data } = await api.put(`/inventory/receipt/${receiptId}/update`, {
+      package_type: packageType?.trim() ? packageType.trim() : null,
+      package_quantity:
+        packageQuantity == null || packageQuantity === ""
+          ? null
+          : Number(packageQuantity),
+      units_per_package:
+        unitsPerPackage == null || unitsPerPackage === ""
+          ? null
+          : Number(unitsPerPackage),
+    });
+    return data;
+  } catch (err) {
+    const error = new Error(extractApiErrorDetail(err, "Unable to update receipt packaging."));
+    error.status = err?.response?.status;
+    throw error;
+  }
+};
+
 /** GET /items/items/{id}/stores — qty + shelf/position per store for one item. */
 export const getItemStoreStock = async (itemId) => {
   try {
@@ -311,6 +413,7 @@ export const updateStoreItemLocation = async (storeId, itemId, { shelf, position
 
 export const OTP_TYPE = {
   STOCK_DELIVERY: "STOCK_DELIVERY",
+  STOCK_DISCARD: "STOCK_DISCARD",
 };
 
 export const sendDeliveryOtp = async (phone, otpType = OTP_TYPE.STOCK_DELIVERY) => {

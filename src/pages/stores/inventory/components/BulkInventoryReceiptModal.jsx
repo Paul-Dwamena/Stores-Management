@@ -353,7 +353,7 @@ function ReceiveLineFields({ line, errors, onChange, mode, items = [] }) {
         onUnitChange={(value) => {
           onChange("unitOfMeasure", value);
           if (normalizeInventoryUnit(value) === "pieces") {
-            onChange("unitsPerPack", "");
+            onChange("unitsPerPack", "1");
           }
         }}
         onUnitsPerPackChange={(value) => onChange("unitsPerPack", value)}
@@ -962,6 +962,7 @@ export default function BulkInventoryReceiptModal({
           ...line,
           name: lineName(line, mode, items),
           quantity: totalQty ?? Number(line.quantity),
+          packageQuantity: Number(line.quantity),
           unitCost: Number(line.unitCost),
           unitOfMeasure,
           unitsPerPack: line.unitsPerPack,

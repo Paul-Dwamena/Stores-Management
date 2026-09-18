@@ -20,6 +20,13 @@ export default function DeliveryPersonOtpSection({
   sendLoading = false,
   required = true,
   detailsConfirmed = false,
+  lockedMessage = "Confirm supplier and item details first. OTP verification unlocks afterwards as the final step before receiving stock.",
+  sectionTitle = "Delivery person verification",
+  enableHint = "Send and confirm the OTP to enable Receive stock",
+  verifiedContinueHint = "You can now receive stock.",
+  enterOtpHint = "Enter the code they received to continue.",
+  confirmBeforeHint = "Confirm the code before receiving stock.",
+  otpInputId = "receiveDeliveryOtp",
 }) {
   const [otpError, setOtpError] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -66,10 +73,7 @@ export default function DeliveryPersonOtpSection({
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-2">
         <p className="text-[12px] font-bold text-slate-800">OTP confirmation</p>
-        <p className="text-[12px] text-slate-500">
-          Confirm supplier and item details first. OTP verification unlocks afterwards as the
-          final step before receiving stock.
-        </p>
+        <p className="text-[12px] text-slate-500">{lockedMessage}</p>
       </div>
     );
   }
@@ -87,7 +91,7 @@ export default function DeliveryPersonOtpSection({
     >
       <div>
         <p className="text-[12px] font-bold text-slate-800">
-          {otpVerified ? "OTP confirmed" : "Delivery person verification"}
+          {otpVerified ? "OTP confirmed" : sectionTitle}
         </p>
         <p className="text-[12px] text-slate-500 mt-1">
           {otpVerified ? (
@@ -101,7 +105,7 @@ export default function DeliveryPersonOtpSection({
                   <span className="font-semibold text-slate-700">{contact}</span>
                 </>
               ) : null}
-              . You can now receive stock.
+              . {verifiedContinueHint}
             </>
           ) : otpSent ? (
             <>
@@ -114,7 +118,7 @@ export default function DeliveryPersonOtpSection({
                   <span className="font-semibold text-slate-700">{contact}</span>
                 </>
               ) : null}
-              . Enter the code they received to continue.
+              . {enterOtpHint}
             </>
           ) : (
             <>
@@ -127,7 +131,7 @@ export default function DeliveryPersonOtpSection({
                   <span className="font-semibold text-slate-700">{contact}</span>
                 </>
               ) : null}
-              . Confirm the code before receiving stock.
+              . {confirmBeforeHint}
             </>
           )}
         </p>
@@ -164,9 +168,7 @@ export default function DeliveryPersonOtpSection({
               <KeyRound size={15} />
               {sendLoading ? "Sending…" : "Send OTP"}
             </Button>
-            <p className="text-[11px] font-medium text-slate-400">
-              Send and confirm the OTP to enable Receive stock
-            </p>
+            <p className="text-[11px] font-medium text-slate-400">{enableHint}</p>
           </div>
         )
       ) : (
@@ -181,7 +183,7 @@ export default function DeliveryPersonOtpSection({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="max-w-xs flex-1">
             <InputField
-              id="receiveDeliveryOtp"
+              id={otpInputId}
               label="Enter OTP"
               required={required}
               value={otp}

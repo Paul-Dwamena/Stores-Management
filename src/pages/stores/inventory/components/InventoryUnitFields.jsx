@@ -13,6 +13,7 @@ import {
   inventoryUnitRequiresPackSize,
   INVENTORY_UNIT_OPTIONS,
   normalizeBaseUnit,
+  normalizeInventoryUnit,
 } from "../utils/inventoryUnitOptions";
 
 const fieldClassName =
@@ -37,9 +38,13 @@ export default function InventoryUnitFields({
   inputClassName = "",
   /** Put unit of measure + units per package on one row (single receive modals). */
   packagingFieldsSameRow = false,
+  /** Optional content rendered immediately above the total base quantity field. */
+  beforeTotal = null,
 }) {
   const resolvedBaseUnit = normalizeBaseUnit(baseUnit);
   const baseUnitOptions = getBaseUnitOptions();
+  const normalizedUnit = normalizeInventoryUnit(unitOfMeasure);
+  const isPieces = normalizedUnit === "pieces";
   const showPackSize = inventoryUnitRequiresPackSize(unitOfMeasure);
   const totalQuantity = calcInventoryTotalQuantity(quantity, unitsPerPack, unitOfMeasure);
   const summary = formatPackagingReceiptSummary({
@@ -48,11 +53,12 @@ export default function InventoryUnitFields({
     unitsPerPack,
     baseUnit: resolvedBaseUnit,
   });
+  const unitsPerPackValue = isPieces ? (unitsPerPack || "1") : unitsPerPack;
 
   const handleUnitChange = (value) => {
     onUnitChange?.(value);
     if (!inventoryUnitRequiresPackSize(value)) {
-      onUnitsPerPackChange?.("");
+      onUnitsPerPackChange?.("1");
     }
   };
 
@@ -84,20 +90,22 @@ export default function InventoryUnitFields({
     </div>
   );
 
-  const unitsPerPackField = showPackSize ? (
+  const unitsPerPackField = (
     <InputField
       id={`${idPrefix}-units-per-pack`}
       label={inventoryPackSizeLabel()}
       type="number"
       min="1"
-      required={required}
-      value={unitsPerPack}
+      required={required && showPackSize}
+      value={unitsPerPackValue}
       onChange={(event) => onUnitsPerPackChange?.(event.target.value)}
       placeholder="e.g. 8"
-      error={errors.unitsPerPack}
-      className={inputClassName}
+      error={showPackSize ? errors.unitsPerPack : undefined}
+      disabled={isPieces}
+      className={cn(inputClassName, isPieces && "cursor-not-allowed")}
+      title={isPieces ? "Fixed at 1 when packaging type is pieces." : undefined}
     />
-  ) : null;
+  );
 
   return (
     <>
@@ -139,7 +147,7 @@ export default function InventoryUnitFields({
       </div>
 
       {packagingFieldsSameRow ? (
-        <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2">
           {unitOfMeasureField}
           {unitsPerPackField}
         </div>
@@ -150,7 +158,9 @@ export default function InventoryUnitFields({
         </>
       )}
 
-      <div className={cn("space-y-1.5 sm:col-span-2", className)}>
+      {beforeTotal}
+
+      <div className={cn("-mt-4 space-y-1.5 sm:col-span-2", className)}>
         <Label htmlFor={`${idPrefix}-total-quantity`}>
           Total base quantity ({baseUnitLabel(resolvedBaseUnit).toLowerCase()}s)
         </Label>

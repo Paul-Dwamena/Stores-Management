@@ -629,6 +629,7 @@ export default function ImportItemsModal({
         return {
           ...line,
           quantity: totalQty ?? Number(line.quantity),
+          packageQuantity: Number(line.quantity),
           unitCost: Number(line.unitCost),
           unitOfMeasure,
           unitsPerPack: line.unitsPerPack,
@@ -1055,7 +1056,7 @@ export default function ImportItemsModal({
                 onUnitChange={(value) => {
                   setEditorField("unitOfMeasure", value);
                   if (normalizeInventoryUnit(value) === "pieces") {
-                    setEditorField("unitsPerPack", "");
+                    setEditorField("unitsPerPack", "1");
                   }
                 }}
                 onUnitsPerPackChange={(value) => setEditorField("unitsPerPack", value)}

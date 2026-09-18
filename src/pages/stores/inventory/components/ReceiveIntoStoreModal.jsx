@@ -283,7 +283,7 @@ export default function ReceiveIntoStoreModal({
                 onUnitChange={(value) => {
                   setField("unitOfMeasure", value);
                   if (normalizeInventoryUnit(value) === "pieces") {
-                    setField("unitsPerPack", "");
+                    setField("unitsPerPack", "1");
                   }
                 }}
                 onUnitsPerPackChange={(value) => setField("unitsPerPack", value)}

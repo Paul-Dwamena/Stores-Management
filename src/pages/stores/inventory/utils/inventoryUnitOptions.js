@@ -240,8 +240,11 @@ export function buildReceiveStockPayload(form, payload = {}, { itemUnit } = {}) 
   return {
     ...payload,
     quantity: totalQty ?? Number(form.quantity),
+    packageQuantity: Number(form.quantity),
     unitOfMeasure,
-    unitsPerPack: form.unitsPerPack,
+    unitsPerPack: inventoryUnitRequiresPackSize(unitOfMeasure)
+      ? form.unitsPerPack
+      : (form.unitsPerPack || "1"),
     baseUnit,
     unit: baseUnitApiValue(baseUnit),
     notes: buildInventoryUnitNotes({

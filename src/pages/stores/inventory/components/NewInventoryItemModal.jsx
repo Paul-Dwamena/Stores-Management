@@ -942,7 +942,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       setRegisteredForm((prev) => ({
                         ...prev,
                         unitOfMeasure: value,
-                        unitsPerPack: normalizeInventoryUnit(value) === "pieces" ? "" : prev.unitsPerPack,
+                        unitsPerPack: normalizeInventoryUnit(value) === "pieces" ? "1" : prev.unitsPerPack,
                       }));
                       clearError("unitOfMeasure");
                       clearError("unitsPerPack");
@@ -1067,7 +1067,7 @@ export default function NewInventoryItemModal({ isOpen, onClose, onSave, onBulkS
                       setAccessoryForm((prev) => ({
                         ...prev,
                         unitOfMeasure: value,
-                        unitsPerPack: normalizeInventoryUnit(value) === "pieces" ? "" : prev.unitsPerPack,
+                        unitsPerPack: normalizeInventoryUnit(value) === "pieces" ? "1" : prev.unitsPerPack,
                       }));
                       clearError("unitOfMeasure");
                       clearError("unitsPerPack");

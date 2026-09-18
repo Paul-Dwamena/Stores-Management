@@ -12,6 +12,7 @@ export const ACTIONS = {
   update: "update",
   delete: "delete",
   receive: "receive",
+  discard: "discard",
   adjust: "adjust",
   approve: "approve",
   reject: "reject",

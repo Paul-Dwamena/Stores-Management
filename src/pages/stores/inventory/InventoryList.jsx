@@ -21,6 +21,9 @@ import {
   getInventoryItem,
   listItemReceipts,
   listItemSupplies,
+  listItemDiscards,
+  discardItemStock,
+  updateReceiptPackaging,
   stockItem,
   stockItemsBulk,
   formatInventoryStatus,
@@ -73,6 +76,7 @@ export default function InventoryList({
   const canEdit = can(RESOURCES.items, ACTIONS.update);
   const canDelete = can(RESOURCES.items, ACTIONS.delete);
   const canReceive = can(RESOURCES.inventory, ACTIONS.receive);
+  const canDiscard = can(RESOURCES.inventory, ACTIONS.discard);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -129,13 +133,16 @@ export default function InventoryList({
     location: payload.location,
     condition: payload.condition,
     quantity: payload.quantity,
+    packageQuantity: payload.packageQuantity,
+    unitOfMeasure: payload.unitOfMeasure,
+    unitsPerPack: payload.unitsPerPack,
     unitCost: payload.unitCost ?? payload.unitPrice,
     deliveredByName: payload.deliveredByName,
     deliveredByPhone: payload.deliveredByPhone,
     deliveredByEmail: payload.deliveredByEmail,
     waybillNumber: payload.waybillNumber,
     notes: payload.notes || buildInventoryUnitNotes({
-      quantity: payload.quantity,
+      quantity: payload.packageQuantity ?? payload.quantity,
       unitOfMeasure: payload.unitOfMeasure,
       unitsPerPack: payload.unitsPerPack,
       baseUnit: payload.baseUnit || resolveItemBaseUnit(payload.unit),
@@ -227,9 +234,29 @@ export default function InventoryList({
     });
   };
 
+  const applyDiscardsResult = (itemId, result) => {
+    setSelected((prev) => {
+      if (!prev || prev.id !== itemId) return prev;
+      if (result.status === "fulfilled") {
+        return {
+          ...prev,
+          discards: result.value,
+          discardsLoading: false,
+          discardsError: null,
+        };
+      }
+      return {
+        ...prev,
+        discards: [],
+        discardsLoading: false,
+        discardsError: result.reason?.message || "Unable to load discards.",
+      };
+    });
+  };
+
   const loadSelectedSections = async (
     itemId,
-    { detail = true, receipts = true, supplies = true } = {},
+    { detail = true, receipts = true, supplies = true, discards = true } = {},
   ) => {
     if (!itemId) return;
     setSelected((prev) => {
@@ -239,6 +266,7 @@ export default function InventoryList({
         ...(detail ? { detailLoading: true, detailError: null } : null),
         ...(receipts ? { receiptsLoading: true, receiptsError: null } : null),
         ...(supplies ? { suppliesLoading: true, suppliesError: null } : null),
+        ...(discards ? { discardsLoading: true, discardsError: null } : null),
       };
     });
 
@@ -246,6 +274,7 @@ export default function InventoryList({
     if (detail) tasks.push(["detail", getInventoryItem(itemId)]);
     if (receipts) tasks.push(["receipts", listItemReceipts(itemId)]);
     if (supplies) tasks.push(["supplies", listItemSupplies(itemId)]);
+    if (discards) tasks.push(["discards", listItemDiscards(itemId)]);
 
     const settled = await Promise.all(
       tasks.map(async ([key, promise]) => {
@@ -261,6 +290,7 @@ export default function InventoryList({
       if (key === "detail") applyDetailResult(itemId, result);
       if (key === "receipts") applyReceiptsResult(itemId, result);
       if (key === "supplies") applySuppliesResult(itemId, result);
+      if (key === "discards") applyDiscardsResult(itemId, result);
     });
   };
 
@@ -279,6 +309,9 @@ export default function InventoryList({
       supplies: [],
       suppliesLoading: true,
       suppliesError: null,
+      discards: [],
+      discardsLoading: true,
+      discardsError: null,
     });
     await loadSelectedSections(row.id);
   };
@@ -293,6 +326,7 @@ export default function InventoryList({
       detail: true,
       receipts: false,
       supplies: false,
+      discards: false,
     });
   };
 
@@ -302,6 +336,7 @@ export default function InventoryList({
       detail: false,
       receipts: true,
       supplies: false,
+      discards: false,
     });
   };
 
@@ -311,6 +346,17 @@ export default function InventoryList({
       detail: false,
       receipts: false,
       supplies: true,
+      discards: false,
+    });
+  };
+
+  const retryDiscards = async () => {
+    if (!selected?.id) return;
+    await loadSelectedSections(selected.id, {
+      detail: false,
+      receipts: false,
+      supplies: false,
+      discards: true,
     });
   };
 
@@ -413,6 +459,41 @@ export default function InventoryList({
     await stockItem(selected.id, toStockBody(payload));
     toast.success("Stock received.");
     await Promise.all([reload(), refreshSelected(selected.id)]);
+  };
+
+  const handleDiscardStock = async (payload) => {
+    if (!selected) return;
+    await discardItemStock(selected.id, {
+      storeId: payload.storeId,
+      quantity: payload.quantity,
+      reason: payload.reason,
+    });
+    toast.success("Stock discarded.");
+    await Promise.all([
+      reload(),
+      loadSelectedSections(selected.id, {
+        detail: true,
+        receipts: false,
+        supplies: false,
+        discards: true,
+      }),
+    ]);
+  };
+
+  const handleUpdateReceiptPackaging = async (receiptId, payload) => {
+    if (!selected) return;
+    await updateReceiptPackaging(receiptId, {
+      packageType: payload.unitOfMeasure,
+      packageQuantity: payload.packageQuantity,
+      unitsPerPackage: payload.unitsPerPack,
+    });
+    toast.success("Packaging updated.");
+    await loadSelectedSections(selected.id, {
+      detail: false,
+      receipts: true,
+      supplies: false,
+      discards: false,
+    });
   };
 
   const handleBulkReceipt = async ({ mode, shared, lines }) => {
@@ -630,9 +711,12 @@ export default function InventoryList({
         onReceiveStock={canReceive ? handleReceiveStock : undefined}
         onUpdateDetails={canEdit ? handleUpdateDetails : undefined}
         onDelete={canDelete ? () => setDeleteTarget(selected) : undefined}
+        onDiscardStock={canDiscard ? handleDiscardStock : undefined}
+        onUpdateReceiptPackaging={handleUpdateReceiptPackaging}
         onRetryDetail={retryItemDetail}
         onRetryReceipts={retryReceipts}
         onRetrySupplies={retrySupplies}
+        onRetryDiscards={retryDiscards}
       />
 
       <ConfirmationModal

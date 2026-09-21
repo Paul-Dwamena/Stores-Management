@@ -7,4 +7,6 @@ export { default as ReceiveIntoStoreModal } from "./ReceiveIntoStoreModal";
 export { default as BulkInventoryReceiptModal } from "./BulkInventoryReceiptModal";
 export { default as ItemStoreStockModal } from "./ItemStoreStockModal";
 export { default as DiscardItemModal } from "./DiscardItemModal";
+export { default as ChangeStockConditionModal } from "./ChangeStockConditionModal";
+export { default as StoreStockConditionsModal } from "./StoreStockConditionsModal";
 export { default as EditReceiptPackagingModal } from "./EditReceiptPackagingModal";

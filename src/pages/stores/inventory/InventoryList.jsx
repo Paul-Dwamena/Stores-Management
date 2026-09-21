@@ -29,6 +29,10 @@ import {
   formatInventoryStatus,
   formatInventoryMoney,
 } from "../../../services/inventoryService";
+import {
+  changeStockCondition,
+  listItemConditionHistory,
+} from "../../../services/stockConditionsService";
 import { getInventoryStats } from "../../../services/statsService";
 import { deleteItem, updateItem, updateItemPhoto } from "../../../services/itemsService";
 import { buildInventoryUnitNotes, resolveItemBaseUnit } from "./utils/inventoryUnitOptions";
@@ -254,9 +258,36 @@ export default function InventoryList({
     });
   };
 
+  const applyConditionHistoryResult = (itemId, result) => {
+    setSelected((prev) => {
+      if (!prev || prev.id !== itemId) return prev;
+      if (result.status === "fulfilled") {
+        return {
+          ...prev,
+          conditionHistory: result.value,
+          conditionHistoryLoading: false,
+          conditionHistoryError: null,
+        };
+      }
+      return {
+        ...prev,
+        conditionHistory: [],
+        conditionHistoryLoading: false,
+        conditionHistoryError:
+          result.reason?.message || "Unable to load condition history.",
+      };
+    });
+  };
+
   const loadSelectedSections = async (
     itemId,
-    { detail = true, receipts = true, supplies = true, discards = true } = {},
+    {
+      detail = true,
+      receipts = true,
+      supplies = true,
+      discards = true,
+      conditionHistory = true,
+    } = {},
   ) => {
     if (!itemId) return;
     setSelected((prev) => {
@@ -267,6 +298,9 @@ export default function InventoryList({
         ...(receipts ? { receiptsLoading: true, receiptsError: null } : null),
         ...(supplies ? { suppliesLoading: true, suppliesError: null } : null),
         ...(discards ? { discardsLoading: true, discardsError: null } : null),
+        ...(conditionHistory
+          ? { conditionHistoryLoading: true, conditionHistoryError: null }
+          : null),
       };
     });
 
@@ -275,6 +309,9 @@ export default function InventoryList({
     if (receipts) tasks.push(["receipts", listItemReceipts(itemId)]);
     if (supplies) tasks.push(["supplies", listItemSupplies(itemId)]);
     if (discards) tasks.push(["discards", listItemDiscards(itemId)]);
+    if (conditionHistory) {
+      tasks.push(["conditionHistory", listItemConditionHistory(itemId)]);
+    }
 
     const settled = await Promise.all(
       tasks.map(async ([key, promise]) => {
@@ -291,6 +328,7 @@ export default function InventoryList({
       if (key === "receipts") applyReceiptsResult(itemId, result);
       if (key === "supplies") applySuppliesResult(itemId, result);
       if (key === "discards") applyDiscardsResult(itemId, result);
+      if (key === "conditionHistory") applyConditionHistoryResult(itemId, result);
     });
   };
 
@@ -312,6 +350,9 @@ export default function InventoryList({
       discards: [],
       discardsLoading: true,
       discardsError: null,
+      conditionHistory: [],
+      conditionHistoryLoading: true,
+      conditionHistoryError: null,
     });
     await loadSelectedSections(row.id);
   };
@@ -327,6 +368,7 @@ export default function InventoryList({
       receipts: false,
       supplies: false,
       discards: false,
+      conditionHistory: false,
     });
   };
 
@@ -337,6 +379,7 @@ export default function InventoryList({
       receipts: true,
       supplies: false,
       discards: false,
+      conditionHistory: false,
     });
   };
 
@@ -347,6 +390,7 @@ export default function InventoryList({
       receipts: false,
       supplies: true,
       discards: false,
+      conditionHistory: false,
     });
   };
 
@@ -357,6 +401,18 @@ export default function InventoryList({
       receipts: false,
       supplies: false,
       discards: true,
+      conditionHistory: false,
+    });
+  };
+
+  const retryConditionHistory = async () => {
+    if (!selected?.id) return;
+    await loadSelectedSections(selected.id, {
+      detail: false,
+      receipts: false,
+      supplies: false,
+      discards: false,
+      conditionHistory: true,
     });
   };
 
@@ -476,6 +532,30 @@ export default function InventoryList({
         receipts: false,
         supplies: false,
         discards: true,
+        conditionHistory: false,
+      }),
+    ]);
+  };
+
+  const handleChangeStockCondition = async (payload) => {
+    if (!selected) return;
+    await changeStockCondition({
+      storeId: payload.storeId,
+      itemId: selected.id,
+      quantity: payload.quantity,
+      previousCondition: payload.previousCondition,
+      newCondition: payload.newCondition,
+      reason: payload.reason,
+    });
+    toast.success("Stock condition updated.");
+    await Promise.all([
+      reload(),
+      loadSelectedSections(selected.id, {
+        detail: true,
+        receipts: false,
+        supplies: false,
+        discards: false,
+        conditionHistory: true,
       }),
     ]);
   };
@@ -493,6 +573,7 @@ export default function InventoryList({
       receipts: true,
       supplies: false,
       discards: false,
+      conditionHistory: false,
     });
   };
 
@@ -712,11 +793,13 @@ export default function InventoryList({
         onUpdateDetails={canEdit ? handleUpdateDetails : undefined}
         onDelete={canDelete ? () => setDeleteTarget(selected) : undefined}
         onDiscardStock={canDiscard ? handleDiscardStock : undefined}
+        onChangeStockCondition={handleChangeStockCondition}
         onUpdateReceiptPackaging={handleUpdateReceiptPackaging}
         onRetryDetail={retryItemDetail}
         onRetryReceipts={retryReceipts}
         onRetrySupplies={retrySupplies}
         onRetryDiscards={retryDiscards}
+        onRetryConditionHistory={retryConditionHistory}
       />
 
       <ConfirmationModal

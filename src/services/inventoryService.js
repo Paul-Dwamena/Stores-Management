@@ -6,6 +6,7 @@ import { catalogDisplayName, normalizeCatalogRef, toCatalogId } from "../utils/c
 const toStoreStock = (store) => ({
   id: store.store_id,
   name: store.store_name,
+  storeItemId: store.store_item_id ?? null,
   quantity: store.quantity,
   shelfPosition: store.shelf_position || "",
   shelf: store.shelf || "",
@@ -355,6 +356,7 @@ export const getItemStoreStock = async (itemId) => {
       stores: (data?.stores || []).map((store) => ({
         id: store.store_id,
         name: store.store_name || "",
+        storeItemId: store.store_item_id ?? null,
         quantity: store.quantity ?? 0,
         shelf: store.shelf || "",
         position: store.position || "",

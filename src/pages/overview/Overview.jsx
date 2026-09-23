@@ -10,6 +10,7 @@ import {
   Package,
   PackageCheck,
   RotateCcw,
+  ShieldAlert,
   Tags,
   Truck,
   Warehouse,
@@ -219,7 +220,7 @@ function storeChartRows(items) {
       name: shortName,
       store: storeLabel,
       value: item.value,
-      skuCount: item.skuCount,
+      damagedQuantity: item.damagedQuantity,
       unitsReceived: item.unitsReceived,
       unitsSupplied: item.unitsSupplied,
       color: STORE_BAR_COLORS[index % STORE_BAR_COLORS.length],
@@ -227,7 +228,7 @@ function storeChartRows(items) {
   });
 }
 
-function ColumnChart({ items, emptyLabel, valueLabel = "units", showSkuCount = false }) {
+function ColumnChart({ items, emptyLabel, valueLabel = "units", showDamaged = false }) {
   if (!items.length) return <EmptyState>{emptyLabel}</EmptyState>;
 
   const data = storeChartRows(items);
@@ -244,10 +245,10 @@ function ColumnChart({ items, emptyLabel, valueLabel = "units", showSkuCount = f
             contentStyle={CHART_TOOLTIP_STYLE}
             wrapperStyle={{ zIndex: 30 }}
             formatter={(value, _name, props) => {
-              const skuCount = props.payload.skuCount;
+              const damaged = props.payload.damagedQuantity;
               const suffix =
-                showSkuCount && Number.isFinite(skuCount) && skuCount > 0
-                  ? ` · ${skuCount} SKU${skuCount === 1 ? "" : "s"}`
+                showDamaged && Number.isFinite(damaged) && damaged > 0
+                  ? ` · ${damaged} damaged`
                   : "";
               return [`${value} ${valueLabel}${suffix}`, props.payload.store];
             }}
@@ -384,6 +385,7 @@ const EMPTY_DASHBOARD = {
   general: {
     numberOfItems: 0,
     lowOutOfStock: 0,
+    damagedQuantity: 0,
     openSupplies: 0,
     openTransfers: 0,
     itemCategories: 0,
@@ -531,6 +533,7 @@ export default function Overview() {
             <SummaryStatCard title="Store transfers" value={general.storeTransfers} icon={ArrowLeftRight} tone="rose" />
             <SummaryStatCard title="Accessory SKUs" value={general.numberOfItems} icon={Package} tone="slate" />
             <SummaryStatCard title="Low / out of stock" value={general.lowOutOfStock} icon={AlertTriangle} tone="orange" />
+            <SummaryStatCard title="Damaged quantity" value={general.damagedQuantity} icon={ShieldAlert} tone="rose" />
             <SummaryStatCard title="Open supplies" value={general.openSupplies} icon={ClipboardList} tone="violet" />
             <SummaryStatCard title="Open transfers" value={general.openTransfers} icon={Truck} tone="moss" />
           </div>
@@ -541,7 +544,7 @@ export default function Overview() {
                 items={stockChartItems}
                 emptyLabel="No store stock to chart yet."
                 valueLabel="units"
-                showSkuCount
+                showDamaged
               />
             </ChartCard>
 
@@ -576,6 +579,7 @@ export default function Overview() {
                       <tr className="border-b border-slate-100">
                         <th className="pb-2 pr-3 text-[10px] font-bold text-slate-500 uppercase">Item</th>
                         <th className="pb-2 px-3 text-[10px] font-bold text-slate-500 uppercase text-right">On hand</th>
+                        <th className="pb-2 px-3 text-[10px] font-bold text-slate-500 uppercase text-right">Damaged</th>
                         <th className="pb-2 pl-3 text-[10px] font-bold text-slate-500 uppercase">Status</th>
                       </tr>
                     </thead>
@@ -599,6 +603,9 @@ export default function Overview() {
                                 <span className="text-[12px] font-bold text-text tabular-nums">{item.quantity ?? 0}</span>
                                 <MiniMeter value={item.quantity ?? 0} max={item.minStock || 1} />
                               </div>
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-[12px] font-semibold tabular-nums text-slate-700">
+                              {item.damagedQuantity ?? 0}
                             </td>
                             <td className="py-2.5 pl-3">
                               <StatusBadge

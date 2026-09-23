@@ -8,6 +8,11 @@ const toStoreStock = (store) => ({
   name: store.store_name,
   storeItemId: store.store_item_id ?? null,
   quantity: store.quantity,
+  availableQuantity:
+    store.available_quantity != null
+      ? Number(store.available_quantity)
+      : Number(store.quantity) || 0,
+  damagedQuantity: Number(store.damaged_quantity) || 0,
   shelfPosition: store.shelf_position || "",
   shelf: store.shelf || "",
   position: store.position || "",

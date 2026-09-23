@@ -4,6 +4,7 @@ import {
   ClipboardList,
   AlertTriangle,
   Truck,
+  ShieldAlert,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "../../utils/cn";
@@ -68,7 +69,8 @@ export default function StoresHub() {
   const [hubAnalytics, setHubAnalytics] = useState([
     { label: "Accessory SKUs", value: 0, icon: Package, tone: "teal" },
     { label: "Low / out of stock", value: 0, icon: AlertTriangle, tone: "amber" },
-    { label: "Open supplies", value: 0, icon: ClipboardList, tone: "rose" },
+    { label: "Damaged quantity", value: 0, icon: ShieldAlert, tone: "rose" },
+    { label: "Open supplies", value: 0, icon: ClipboardList, tone: "violet" },
     { label: "Open transfers", value: 0, icon: Truck, tone: "sky" },
   ]);
 
@@ -80,7 +82,8 @@ export default function StoresHub() {
         setHubAnalytics([
           { label: "Accessory SKUs", value: general.numberOfItems, icon: Package, tone: "teal" },
           { label: "Low / out of stock", value: general.lowOutOfStock, icon: AlertTriangle, tone: "amber" },
-          { label: "Open supplies", value: general.openSupplies, icon: ClipboardList, tone: "rose" },
+          { label: "Damaged quantity", value: general.damagedQuantity, icon: ShieldAlert, tone: "rose" },
+          { label: "Open supplies", value: general.openSupplies, icon: ClipboardList, tone: "violet" },
           { label: "Open transfers", value: general.openTransfers, icon: Truck, tone: "sky" },
         ]);
       })
@@ -109,7 +112,7 @@ export default function StoresHub() {
         className="mb-0"
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {hubAnalytics.map((card) => (
           <SummaryStatCard
             key={card.label}

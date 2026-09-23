@@ -6,7 +6,7 @@ import CheckboxMultiSelect from "../../../../components/common/fields/CheckboxMu
 import { toast } from "../../../../components/common/ToastNotification";
 import { cn } from "../../../../utils/cn";
 import { formatStoreLocation } from "../../../../utils/displayFormatters";
-import { getLocationStock, getStockLocationsForRequisition, sumStoreQuantities } from "./RaiseSupplyRequestModal";
+import { getLocationStock, formatAvailableStockLabel, getStockLocationsForRequisition, sumStoreQuantities } from "./RaiseSupplyRequestModal";
 
 const fieldClassName =
   "w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/25 transition-colors text-slate-700";
@@ -269,7 +269,7 @@ export default function BatchRaiseSupplyRequestModal({
                               options={locations.map((loc) => ({
                                 value: loc.location,
                                 label: formatStoreLocation(loc.location),
-                                description: `Available Stock: ${loc.quantity}`,
+                                description: formatAvailableStockLabel(loc),
                               }))}
                               value={selected}
                               onChange={(storeLocations) => setRowLocations(row.id, storeLocations)}

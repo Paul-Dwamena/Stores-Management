@@ -494,8 +494,14 @@ export default function PendingSuppliesList({ embedded = false }) {
       return null;
     }
     if (!activeRow.itemId) return "unregistered";
-    if (!storeOptions?.some((store) => Number(store.quantity) > 0)) return "out_of_stock";
-    return null;
+    const hasAvailable = storeOptions?.some(
+      (store) => Number(store.availableQuantity ?? store.quantity) > 0,
+    );
+    if (hasAvailable) return null;
+    const hasDamaged = storeOptions?.some(
+      (store) => Number(store.damagedQuantity) > 0,
+    );
+    return hasDamaged ? "all_damaged" : "out_of_stock";
   }, [activeAction, activeRow, detailLoading, detailError, storeOptions]);
 
   const handleItemRegistered = async (result) => {
@@ -616,12 +622,19 @@ export default function PendingSuppliesList({ embedded = false }) {
             description: item.description || workingRow.description,
           };
           setActiveRow(workingRow);
-          const stocked = (item.stores || []).filter((store) => Number(store.quantity) > 0);
+          const present = (item.stores || []).filter(
+            (store) =>
+              Number(store.availableQuantity ?? store.quantity) > 0
+              || Number(store.damagedQuantity) > 0
+              || Number(store.quantity) > 0,
+          );
           setStoreOptions(
-            stocked.map((store) => ({
+            present.map((store) => ({
               id: store.id,
               name: store.name,
-              quantity: store.quantity,
+              quantity: Number(store.availableQuantity ?? store.quantity) || 0,
+              availableQuantity: Number(store.availableQuantity ?? store.quantity) || 0,
+              damagedQuantity: Number(store.damagedQuantity) || 0,
             })),
           );
         } else {

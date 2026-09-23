@@ -156,28 +156,36 @@ export function buildIssueStoreOptions(requisition, inventoryItem = null) {
   const stockByStoreId = new Map(
     (inventoryItem?.stores || []).map((store) => [
       Number(store.id),
-      Number(store.quantity) || 0,
+      {
+        available: Number(store.availableQuantity ?? store.quantity) || 0,
+        damaged: Number(store.damagedQuantity) || 0,
+      },
     ]),
   );
   const stockByName = new Map(
     (inventoryItem?.stores || []).map((store) => [
       store.name,
-      Number(store.quantity) || 0,
+      {
+        available: Number(store.availableQuantity ?? store.quantity) || 0,
+        damaged: Number(store.damagedQuantity) || 0,
+      },
     ]),
   );
 
   return allocations.map((allocation) => {
     const storeId = allocation.storeId;
     const name = allocation.location;
-    const quantity =
+    const stock =
       (storeId != null ? stockByStoreId.get(Number(storeId)) : undefined)
       ?? stockByName.get(name)
-      ?? 0;
+      ?? { available: 0, damaged: 0 };
 
     return {
       id: storeId,
       name,
-      quantity,
+      quantity: stock.available,
+      availableQuantity: stock.available,
+      damagedQuantity: stock.damaged,
       quantityRequested: allocation.quantity,
       quantityIssued: allocation.quantityIssued ?? 0,
     };
@@ -211,7 +219,20 @@ export function getRequisitionItemState(requisition) {
 }
 
 export function getLocationStock(stockLocations, location) {
-  return Number(stockLocations.find((row) => row.location === location)?.quantity) || 0;
+  const row = stockLocations.find((entry) => entry.location === location);
+  if (!row) return 0;
+  return Number(row.availableQuantity ?? row.quantity) || 0;
+}
+
+export function formatAvailableStockLabel(row) {
+  if (row == null) return "Available Stock : —";
+  const available = row.availableQuantity ?? row.quantity;
+  if (available == null) return "Available Stock : —";
+  const damaged = Number(row.damagedQuantity) || 0;
+  if (damaged > 0) {
+    return `Available Stock : ${available} · Damaged : ${damaged}`;
+  }
+  return `Available Stock : ${available}`;
 }
 
 export function sumStoreQuantities(quantitiesByLocation, locations = []) {
@@ -246,7 +267,11 @@ export default function RaiseSupplyRequestModal({
 }) {
   const busy = loading || Boolean(error) || saving;
   const isBlocked =
-    raiseBlockReason === "unregistered" || raiseBlockReason === "out_of_stock";
+    raiseBlockReason === "unregistered"
+    || raiseBlockReason === "out_of_stock"
+    || raiseBlockReason === "all_damaged";
+  const stockUnavailable =
+    raiseBlockReason === "out_of_stock" || raiseBlockReason === "all_damaged";
   const [quantityRequested, setQuantityRequested] = useState("");
   const [selectedLocations, setSelectedLocations] = useState([]);
   const [quantitiesByLocation, setQuantitiesByLocation] = useState({});
@@ -264,14 +289,28 @@ export default function RaiseSupplyRequestModal({
   );
   const systemKeys = new Set(RAISE_SUPPLY_REQUEST_FORM_FIELD_CATALOG.map((field) => field.key));
 
+  const damagedStoreSummary = useMemo(() => {
+    if (!Array.isArray(storeOptions)) return [];
+    return storeOptions
+      .filter((store) => Number(store.damagedQuantity) > 0)
+      .map((store) => ({
+        name: store.name,
+        damagedQuantity: Number(store.damagedQuantity) || 0,
+      }));
+  }, [storeOptions]);
+
   const stockLocations = useMemo(() => {
     if (Array.isArray(storeOptions)) {
-      return storeOptions.map((store) => ({
-        location: String(store.id),
-        name: store.name,
-        quantity: store.quantity,
-        storeId: store.id,
-      }));
+      return storeOptions
+        .filter((store) => Number(store.availableQuantity ?? store.quantity) > 0)
+        .map((store) => ({
+          location: String(store.id),
+          name: store.name,
+          quantity: Number(store.availableQuantity ?? store.quantity) || 0,
+          availableQuantity: Number(store.availableQuantity ?? store.quantity) || 0,
+          damagedQuantity: Number(store.damagedQuantity) || 0,
+          storeId: store.id,
+        }));
     }
     return getStockLocationsForRequisition(requisition);
   }, [storeOptions, requisition]);
@@ -412,9 +451,9 @@ export default function RaiseSupplyRequestModal({
     filledStoreLocations.forEach((location) => {
       const qty = Number(quantitiesByLocation[location]);
       const stockRow = stockLocations.find((row) => row.location === location);
-      const stock = stockRow?.quantity;
+      const stock = stockRow?.availableQuantity ?? stockRow?.quantity;
       if (stock != null && qty > Number(stock)) {
-        nextErrors[`qty-${location}`] = `Cannot exceed stock (${stock}).`;
+        nextErrors[`qty-${location}`] = `Cannot exceed available stock (${stock}).`;
       }
     });
     if (selectedLocations.length > 0 && allocated <= 0) {
@@ -462,7 +501,7 @@ export default function RaiseSupplyRequestModal({
         subtitle={
           raiseBlockReason === "unregistered"
             ? "This item must be registered before a supply request can be raised."
-            : raiseBlockReason === "out_of_stock"
+            : stockUnavailable
               ? "Receive stock into a store before raising a supply request."
               : isRemainingRaise
                 ? `Remaining to supply: ${remaining}. Stores and quantities are not locked — pick any stocked store.`
@@ -488,7 +527,7 @@ export default function RaiseSupplyRequestModal({
                   Register item
                 </Button>
               ) : null}
-              {raiseBlockReason === "out_of_stock" && onReceiveStock ? (
+              {stockUnavailable && onReceiveStock ? (
                 <Button size="modal" onClick={() => onReceiveStock()}>
                   <Boxes size={16} />
                   Receive stock
@@ -572,6 +611,42 @@ export default function RaiseSupplyRequestModal({
                     : "This item is registered but has no stock in any store."}{" "}
                   Receive stock before raising a supply request.
                 </p>
+              </div>
+            </div>
+          ) : null}
+
+          {!busy && raiseBlockReason === "all_damaged" ? (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
+              <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-600" />
+              <div className="min-w-0 space-y-2">
+                <div>
+                  <p className="text-[12px] font-semibold text-amber-900">
+                    All on-hand stock is damaged (No stock available)
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-amber-800/90">
+                    {requisition?.itemName
+                      ? `“${requisition.itemName}” is registered but has no stock in any store.`
+                      : "This item is registered but has no stock in any store."}{" "}
+                    Receive stock before raising a supply request.
+                  </p>
+                </div>
+                {damagedStoreSummary.length > 0 ? (
+                  <ul className="space-y-1 border-t border-amber-200/80 pt-2">
+                    {damagedStoreSummary.map((row) => (
+                      <li
+                        key={row.name}
+                        className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11px] text-amber-900/90"
+                      >
+                        <span className="font-semibold">
+                          <StoreLocationDisplay value={row.name} />
+                        </span>
+                        <span className="tabular-nums">
+                          {row.damagedQuantity} damaged
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -689,9 +764,7 @@ export default function RaiseSupplyRequestModal({
                               <StoreLocationDisplay value={row.name || row.location} />
                             </span>
                             <span className="block text-[11px] text-slate-500 mt-0.5">
-                              {row.quantity == null
-                                ? "Available Stock : —"
-                                : `Available Stock : ${row.quantity}`}
+                              {formatAvailableStockLabel(row)}
                             </span>
                           </span>
                         </label>
@@ -736,9 +809,10 @@ export default function RaiseSupplyRequestModal({
                       <tbody className="divide-y divide-slate-50">
                         {selectedLocations.map((location) => {
                           const stockRow = stockLocations.find((row) => row.location === location);
-                          const stock = stockRow?.quantity;
+                          const stock = stockRow?.availableQuantity ?? stockRow?.quantity;
                           const storeQty = Number(quantitiesByLocation[location]);
                           const storeMax = stock == null ? undefined : Number(stock);
+                          const damaged = Number(stockRow?.damagedQuantity) || 0;
                           return (
                             <tr key={location}>
                               <td className="px-3 py-2 text-[12px] text-slate-800">
@@ -746,6 +820,11 @@ export default function RaiseSupplyRequestModal({
                               </td>
                               <td className="px-3 py-2 text-[12px] font-semibold text-slate-700 whitespace-nowrap">
                                 {stock == null ? "—" : stock}
+                                {damaged > 0 ? (
+                                  <span className="ml-1.5 font-medium text-slate-400">
+                                    · {damaged} dmg
+                                  </span>
+                                ) : null}
                               </td>
                               <td className="px-3 py-2 w-36">
                                 <input

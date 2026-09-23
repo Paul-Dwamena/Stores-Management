@@ -4,6 +4,7 @@ import { extractApiErrorDetail, formatStatusLabel } from "../utils/apiResponseHe
 const toGeneralStats = (row = {}) => ({
   numberOfItems: Number(row.number_of_items) || 0,
   lowOutOfStock: Number(row.low_out_of_stock) || 0,
+  damagedQuantity: Number(row.damaged_quantity) || 0,
   openSupplies: Number(row.open_supplies) || 0,
   openTransfers: Number(row.open_transfers) || 0,
   itemCategories: Number(row.item_categories) || 0,
@@ -19,7 +20,7 @@ const toStockByStore = (row = {}) => ({
   storeId: row.store_id,
   label: row.store_name || "Unassigned",
   value: Number(row.total_quantity) || 0,
-  skuCount: Number(row.sku_count) || 0,
+  damagedQuantity: Number(row.damaged_quantity) || 0,
 });
 
 const toCategoriesInStockByStore = (row = {}) => ({
@@ -71,6 +72,7 @@ const toLowStockItem = (row = {}) => ({
   id: row.item_id,
   name: row.item_name || "",
   quantity: Number(row.quantity) || 0,
+  damagedQuantity: Number(row.damaged_quantity) || 0,
   status: String(row.status || "").toUpperCase(),
   itemCode: row.item_code || "",
   minStock: row.min_stock ?? null,
